@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": ["./*"],
+      "@kamri/ui": ["../../packages/ui/src"],
+      "@kamri/ui/*": ["../../packages/ui/src/*"],
+      "@kamri/lib": ["../../packages/lib/src"],
+      "@kamri/lib/*": ["../../packages/lib/src/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
