@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
+import HomeFooter from '../../components/HomeFooter';
+import ModernHeader from '../../components/ModernHeader';
 
 interface CartItem {
   id: string;
@@ -66,6 +68,7 @@ export default function CartPage() {
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <ModernHeader />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
             <svg className="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,12 +84,14 @@ export default function CartPage() {
             </Link>
           </div>
         </div>
+        <HomeFooter />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ModernHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -210,6 +215,7 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+      <HomeFooter />
     </div>
   );
 }

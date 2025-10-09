@@ -28,11 +28,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F8F0',
     height: '100%',
+    paddingBottom: 120, // Espace pour la barre de navigation courbée
   },
   scrollView: {
     flex: 1,
     marginTop: 120, // No space - content goes directly under header
     paddingTop: 0, // No padding - content starts immediately
-    paddingBottom: 0, // No space - content goes directly under navigation
+    paddingBottom: 100, // Espace suffisant pour la barre de navigation courbée
+    marginBottom: 0,
   },
 });

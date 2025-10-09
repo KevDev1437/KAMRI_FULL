@@ -201,6 +201,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 16,
     marginTop: 0,
+    paddingBottom: 20, // Padding normal
   },
   topSection: {
     paddingBottom: 20,

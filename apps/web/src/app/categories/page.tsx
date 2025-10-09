@@ -1,3 +1,4 @@
+import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 
 export default function CategoriesPage() {
@@ -15,6 +16,8 @@ export default function CategoriesPage() {
           </p>
         </div>
       </main>
+      
+      <HomeFooter />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CategoryTabs from '../../components/CategoryTabs';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
+import HomeFooter from '../../components/HomeFooter';
 import ProductCard from '../../components/ProductCard';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
@@ -304,6 +305,8 @@ export default function ProductsScreen() {
             </ThemedText>
           </View>
         )}
+        
+        <HomeFooter />
       </ScrollView>
 
       <CurvedBottomNav />
@@ -315,7 +318,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingBottom: 0, // No space - content goes directly under navigation
+    paddingBottom: 120, // Espace pour la barre de navigation courbée
   },
   safeArea: {
     backgroundColor: '#FFFFFF',
@@ -367,6 +370,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     marginTop: 0, // No space - content goes directly under header
+    paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
   },
   filtersContainer: {
     backgroundColor: '#FFFFFF',

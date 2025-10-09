@@ -1,3 +1,4 @@
+import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 
 export default function ContactPage() {
@@ -15,6 +16,8 @@ export default function ContactPage() {
           </p>
         </div>
       </main>
+      
+      <HomeFooter />
     </div>
   );
 }

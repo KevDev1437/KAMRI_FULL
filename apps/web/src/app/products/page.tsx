@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import CategoryTabs from '../../components/CategoryTabs';
+import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
@@ -234,6 +235,8 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+      
+      <HomeFooter />
     </div>
   );
 }

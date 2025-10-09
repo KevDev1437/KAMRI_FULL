@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import HomeFooter from '../../../components/HomeFooter';
 import ModernHeader from '../../../components/ModernHeader';
 import ProductImageGallery from '../../../components/ProductImageGallery';
 import ProductInfo from '../../../components/ProductInfo';
@@ -215,6 +216,8 @@ export default function ProductDetailsPage() {
           </div>
         )}
       </div>
+      
+      <HomeFooter />
     </div>
   );
 }
