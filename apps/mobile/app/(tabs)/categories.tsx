@@ -1,15 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
 
-export default function ExploreScreen() {
+export default function CategoriesScreen() {
   return (
     <View style={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedText style={styles.title}>Explorer</ThemedText>
-        <ThemedText style={styles.subtitle}>Découvrez de nouveaux produits</ThemedText>
-      </ThemedView>
+      <View style={styles.content}>
+        <ThemedText style={styles.title}>Catégories</ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Découvrez nos différentes catégories de produits
+        </ThemedText>
+      </View>
       <CurvedBottomNav />
     </View>
   );
@@ -28,14 +29,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#424242',
-    marginBottom: 8,
+    color: '#4CAF50',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#81C784',
+    color: '#666',
     textAlign: 'center',
+    lineHeight: 24,
   },
 });

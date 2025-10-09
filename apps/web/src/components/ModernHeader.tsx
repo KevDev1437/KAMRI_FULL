@@ -11,8 +11,8 @@ export default function ModernHeader() {
   const categories = [
     { name: 'Accueil', href: '/', icon: '🏠' },
     { name: 'Produits', href: '/products', icon: '🛍️' },
-    { name: 'Accessoires', href: '/products?category=accessoires', icon: '👜' },
-    { name: 'Tech', href: '/products?category=technologie', icon: '💻' },
+    { name: 'Catégories', href: '/categories', icon: '📋' },
+    { name: 'Contact', href: '/contact', icon: '📞' },
     { name: 'Promos', href: '/products?category=promotions', icon: '💸' },
   ];
 

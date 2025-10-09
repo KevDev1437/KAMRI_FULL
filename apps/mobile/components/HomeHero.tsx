@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 20,
   },
   background: {
     position: 'absolute',
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   imageContainer: {
-    height: 350,
+    height: 300,
     backgroundColor: '#E8F5E8',
     borderRadius: 12,
     overflow: 'hidden',
@@ -127,5 +127,6 @@ const styles = StyleSheet.create({
   modelImage: {
     width: '100%',
     height: '100%',
+    objectFit: 'contain',
   },
 });

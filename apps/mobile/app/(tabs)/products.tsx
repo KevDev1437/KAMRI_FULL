@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CategoryTabs from '../../components/CategoryTabs';
-import ModernBottomNavigation from '../../components/ModernBottomNavigation';
+import CurvedBottomNav from '../../components/CurvedBottomNav';
 import ProductCard from '../../components/ProductCard';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
@@ -306,7 +306,7 @@ export default function ProductsScreen() {
         )}
       </ScrollView>
 
-      <ModernBottomNavigation />
+      <CurvedBottomNav />
     </View>
   );
 }
@@ -315,6 +315,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    paddingBottom: 0, // No space - content goes directly under navigation
   },
   safeArea: {
     backgroundColor: '#FFFFFF',
@@ -364,6 +365,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    marginTop: 0, // No space - content goes directly under header
   },
   filtersContainer: {
     backgroundColor: '#FFFFFF',

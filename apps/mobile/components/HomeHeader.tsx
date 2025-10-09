@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 export default function HomeHeader() {
+  const router = useRouter();
+  
   return (
     <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
-        {/* Logo */}
+        {/* Logo centré */}
         <View style={styles.logoContainer}>
           <Image
             source={require('../assets/images/logo.png')}
@@ -17,9 +20,9 @@ export default function HomeHeader() {
           />
         </View>
 
-        {/* Barre de recherche */}
+        {/* Barre de recherche moderne */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color="#4CAF50" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Rechercher des produits..."
@@ -27,13 +30,22 @@ export default function HomeHeader() {
           />
         </View>
 
-        {/* Icônes de navigation */}
+        {/* Icônes d'action */}
         <View style={styles.iconsContainer}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="person-outline" size={24} color="#424242" />
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/(tabs)/favorites')}
+          >
+            <Ionicons name="heart-outline" size={24} color="#4CAF50" />
+            <View style={styles.badge}>
+              <ThemedText style={styles.badgeText}>2</ThemedText>
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="bag-outline" size={24} color="#424242" />
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/(tabs)/cart')}
+          >
+            <Ionicons name="bag-outline" size={24} color="#4CAF50" />
             <View style={styles.badge}>
               <ThemedText style={styles.badgeText}>3</ThemedText>
             </View>
@@ -45,28 +57,33 @@ export default function HomeHeader() {
 }
 
 const styles = StyleSheet.create({
-      safeArea: {
-        backgroundColor: '#FFFFFF',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        paddingTop: 8, // Marge en haut pour éviter d'être collé au bord
-      },
+  safeArea: {
+    backgroundColor: 'white',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    paddingTop: 0, // Pas de marge - fond blanc continu
+    borderRadius: 0,
+    height: 0,
+    
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    backgroundColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    height: 100,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 0,
+    height: 90,
+    marginBottom: 2,
+    width: '100%',
   },
   logoContainer: {
     flex: 1,
@@ -74,8 +91,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: 400,
-    height: 60,
+    width: 120,
+    height: 40,
   },
   searchContainer: {
     flex: 3,
@@ -102,8 +119,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   iconButton: {
-    padding: 8,
+    padding: 10,
     position: 'relative',
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
   },
   badge: {
     position: 'absolute',
