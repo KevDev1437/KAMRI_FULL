@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import CategoryTabs from '../../components/CategoryTabs';
-import HomeHeader from '../../components/HomeHeader';
+import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
 
@@ -173,10 +173,7 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
-      <HomeHeader 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-      />
+      <ModernHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">

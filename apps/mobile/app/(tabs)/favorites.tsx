@@ -3,12 +3,15 @@ import ModernBottomNavigation from '../../components/ModernBottomNavigation';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
-export default function ExploreScreen() {
+export default function FavoritesScreen() {
   return (
     <View style={styles.container}>
       <ThemedView style={styles.content}>
-        <ThemedText style={styles.title}>Explorer</ThemedText>
-        <ThemedText style={styles.subtitle}>Découvrez de nouveaux produits</ThemedText>
+        <ThemedText style={styles.icon}>❤️</ThemedText>
+        <ThemedText style={styles.title}>Mes Favoris</ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Vos produits favoris apparaîtront ici
+        </ThemedText>
       </ThemedView>
       <ModernBottomNavigation />
     </View>
@@ -25,6 +28,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+  },
+  icon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,

@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomNavigation from '../../components/BottomNavigation';
 import CategoryTabs from '../../components/CategoryTabs';
+import ModernBottomNavigation from '../../components/ModernBottomNavigation';
 import ProductCard from '../../components/ProductCard';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
@@ -306,7 +306,7 @@ export default function ProductsScreen() {
         )}
       </ScrollView>
 
-      <BottomNavigation />
+      <ModernBottomNavigation />
     </View>
   );
 }

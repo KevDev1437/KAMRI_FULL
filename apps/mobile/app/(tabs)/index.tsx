@@ -1,9 +1,9 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import BestOffers from '../../components/BestOffers';
-import BottomNavigation from '../../components/BottomNavigation';
 import HomeFooter from '../../components/HomeFooter';
 import HomeHeader from '../../components/HomeHeader';
 import HomeHero from '../../components/HomeHero';
+import ModernBottomNavigation from '../../components/ModernBottomNavigation';
 import ProductGrid from '../../components/ProductGrid';
 import TopSales from '../../components/TopSales';
 
@@ -18,7 +18,7 @@ export default function HomeScreen() {
         <BestOffers />
         <HomeFooter />
       </ScrollView>
-      <BottomNavigation />
+      <ModernBottomNavigation />
     </View>
   );
 }
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    marginTop: 100, // Space for fixed header
+    marginTop: 108, // Space for fixed header + marge
     paddingBottom: 0,
   },
 });

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -21,6 +22,7 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const router = useRouter();
   const getBadgeColor = (badge: string | null) => {
     switch (badge) {
       case 'tendance':
@@ -48,7 +50,11 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <ThemedView style={styles.productCard}>
+    <TouchableOpacity 
+      style={styles.productCard}
+      onPress={() => router.push(`/product/${product.id}`)}
+    >
+      <ThemedView style={styles.productCardContent}>
       {/* Image placeholder */}
       <View style={styles.imageContainer}>
         <ThemedView style={styles.imagePlaceholder}>
@@ -104,13 +110,17 @@ export default function ProductCard({ product }: ProductCardProps) {
           <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
         </TouchableOpacity>
       </View>
-    </ThemedView>
+      </ThemedView>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   productCard: {
     width: '48%',
+    marginBottom: 16,
+  },
+  productCardContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     shadowColor: '#000',
@@ -119,7 +129,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     overflow: 'hidden',
-    marginBottom: 16,
   },
   imageContainer: {
     height: 140,

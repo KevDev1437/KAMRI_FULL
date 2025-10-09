@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import BottomNavigation from '../../components/BottomNavigation';
+import ModernBottomNavigation from '../../components/ModernBottomNavigation';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
@@ -10,7 +10,7 @@ export default function CartScreen() {
         <ThemedText style={styles.title}>Panier</ThemedText>
         <ThemedText style={styles.subtitle}>Votre panier est vide</ThemedText>
       </ThemedView>
-      <BottomNavigation />
+      <ModernBottomNavigation />
     </View>
   );
 }

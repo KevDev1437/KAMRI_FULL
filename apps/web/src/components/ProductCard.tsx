@@ -11,6 +11,8 @@ interface Product {
   brand: string;
 }
 
+import Link from 'next/link';
+
 interface ProductCardProps {
   product: Product;
 }
@@ -43,7 +45,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
+    <Link href={`/product/${product.id}`}>
+      <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group cursor-pointer">
       {/* Image placeholder */}
       <div className="h-56 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
         <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,6 +108,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           Ajouter au panier
         </button>
       </div>
-    </div>
+      </div>
+    </Link>
   );
 }

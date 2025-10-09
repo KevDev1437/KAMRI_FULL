@@ -45,15 +45,15 @@ export default function HomeHeader() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: '#FFFFFF',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    paddingTop: 0,
-  },
+      safeArea: {
+        backgroundColor: '#FFFFFF',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        paddingTop: 8, // Marge en haut pour éviter d'être collé au bord
+      },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
