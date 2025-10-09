@@ -1,9 +1,11 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
+import BestOffers from '../../components/BestOffers';
 import BottomNavigation from '../../components/BottomNavigation';
 import HomeFooter from '../../components/HomeFooter';
 import HomeHeader from '../../components/HomeHeader';
 import HomeHero from '../../components/HomeHero';
 import ProductGrid from '../../components/ProductGrid';
+import TopSales from '../../components/TopSales';
 
 export default function HomeScreen() {
   return (
@@ -12,6 +14,8 @@ export default function HomeScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <HomeHero />
         <ProductGrid />
+        <TopSales />
+        <BestOffers />
         <HomeFooter />
       </ScrollView>
       <BottomNavigation />

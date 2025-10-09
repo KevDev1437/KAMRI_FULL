@@ -59,19 +59,19 @@ export default function HomeFooter() {
               <h3 className="text-lg font-bold mb-4 text-[#424242]">Téléchargez l'app KAMRI</h3>
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-sm text-[#81C784]">
-                  <span className="w-4 h-4 bg-[#1E88E5] rounded-full flex items-center justify-center">
+                  <span className="w-4 h-4 bg-[#4CAF50] rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </span>
                   <span>Alertes de promotions</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-[#81C784]">
-                  <span className="w-4 h-4 bg-[#1E88E5] rounded-full flex items-center justify-center">
+                  <span className="w-4 h-4 bg-[#4CAF50] rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </span>
                   <span>Paiement sécurisé</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-[#81C784]">
-                  <span className="w-4 h-4 bg-[#1E88E5] rounded-full flex items-center justify-center">
+                  <span className="w-4 h-4 bg-[#4CAF50] rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </span>
                   <span>Suivi des commandes</span>

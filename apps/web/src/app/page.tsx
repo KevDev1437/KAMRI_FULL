@@ -1,7 +1,9 @@
+import BestOffers from '../components/BestOffers';
 import HomeFooter from '../components/HomeFooter';
 import HomeHeader from '../components/HomeHeader';
 import HomeHero from '../components/HomeHero';
 import ProductGrid from '../components/ProductGrid';
+import TopSales from '../components/TopSales';
 
 export default function Home() {
   return (
@@ -9,6 +11,8 @@ export default function Home() {
       <HomeHeader />
       <HomeHero />
       <ProductGrid />
+      <TopSales />
+      <BestOffers />
       <HomeFooter />
     </div>
   );
