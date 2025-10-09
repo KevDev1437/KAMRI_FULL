@@ -1,4 +1,5 @@
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -11,6 +12,10 @@ const mockProducts = [
   { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
   { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
 ];
+
+const { width } = Dimensions.get('window');
+const isTablet = width > 768;
+const cardWidth = isTablet ? (width - 60) / 4 : (width - 60) / 2;
 
 interface Product {
   id: string;
@@ -25,21 +30,27 @@ interface ProductCardProps {
 
 function ProductCard({ product }: ProductCardProps) {
   return (
-    <ThemedView style={styles.productCard}>
+    <ThemedView style={[styles.productCard, { width: cardWidth }]}>
       {/* Image placeholder */}
       <View style={styles.imageContainer}>
         <ThemedView style={styles.imagePlaceholder}>
-          <ThemedText style={styles.imageText}>Image</ThemedText>
+          <Ionicons name="image-outline" size={32} color="#9CA3AF" />
         </ThemedView>
+        <TouchableOpacity style={styles.favoriteButton}>
+          <Ionicons name="heart-outline" size={20} color="#9CA3AF" />
+        </TouchableOpacity>
       </View>
       
       {/* Product info */}
       <View style={styles.productInfo}>
-        <ThemedText style={styles.productName}>{product.name}</ThemedText>
+        <ThemedText style={styles.productName} numberOfLines={1}>
+          {product.name}
+        </ThemedText>
         <ThemedText style={styles.productPrice}>{product.price}</ThemedText>
         
         <TouchableOpacity style={styles.addButton}>
-          <ThemedText style={styles.addButtonText}>Ajouter au panier</ThemedText>
+          <Ionicons name="add" size={16} color="#FFFFFF" />
+          <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
         </TouchableOpacity>
       </View>
     </ThemedView>
@@ -49,7 +60,12 @@ function ProductCard({ product }: ProductCardProps) {
 export default function ProductGrid() {
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.sectionTitle}>Nos produits</ThemedText>
+      <View style={styles.titleContainer}>
+        <ThemedText style={styles.sectionTitle}>Nos produits</ThemedText>
+        <ThemedText style={styles.sectionSubtitle}>
+          Découvrez notre sélection exclusive
+        </ThemedText>
+      </View>
       
       <View style={styles.grid}>
         {mockProducts.map((product) => (
@@ -62,47 +78,66 @@ export default function ProductGrid() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 32,
     backgroundColor: '#F5F5F5',
   },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#212121',
-    marginBottom: 20,
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  sectionSubtitle: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontWeight: '400',
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 16,
   },
   productCard: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    margin: 8,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
     overflow: 'hidden',
+    marginBottom: 16,
   },
   imageContainer: {
-    height: 150,
+    height: 160,
     backgroundColor: '#F5F5F5',
+    position: 'relative',
   },
   imagePlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#F8F9FA',
   },
-  imageText: {
-    color: '#9CA3AF',
-    fontSize: 14,
+  favoriteButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   productInfo: {
     padding: 16,
@@ -112,19 +147,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212121',
     marginBottom: 8,
+    lineHeight: 20,
   },
   productPrice: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1E88E5',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   addButton: {
-    backgroundColor: '#FF7043',
-    paddingVertical: 10,
+    backgroundColor: '#1E88E5',
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 25,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   addButtonText: {
     color: '#FFFFFF',

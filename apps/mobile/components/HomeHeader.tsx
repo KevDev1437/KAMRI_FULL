@@ -1,81 +1,118 @@
-import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 export default function HomeHeader() {
   return (
-    <ThemedView style={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <ThemedText style={styles.logo}>KAMRI</ThemedText>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ThemedView style={styles.container}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
 
-      {/* Barre de recherche */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Rechercher des produits..."
-          placeholderTextColor="#9CA3AF"
-        />
-      </View>
+        {/* Barre de recherche */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher des produits..."
+            placeholderTextColor="#9CA3AF"
+          />
+        </View>
 
-      {/* Icônes de navigation */}
-      <View style={styles.iconsContainer}>
-        <TouchableOpacity style={styles.iconButton}>
-          <ThemedText style={styles.iconText}>👤</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton}>
-          <ThemedText style={styles.iconText}>🛒</ThemedText>
-        </TouchableOpacity>
-      </View>
-    </ThemedView>
+        {/* Icônes de navigation */}
+        <View style={styles.iconsContainer}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="person-outline" size={24} color="#212121" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="bag-outline" size={24} color="#212121" />
+            <View style={styles.badge}>
+              <ThemedText style={styles.badgeText}>3</ThemedText>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#FFFFFF',
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 20,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+    height: 100,
   },
   logoContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E88E5',
+    width: 400,
+    height: 60,
   },
   searchContainer: {
-    flex: 2,
-    marginHorizontal: 16,
+    flex: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    flex: 1,
     fontSize: 16,
     color: '#212121',
+    paddingVertical: 0,
   },
   iconsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   iconButton: {
     padding: 8,
+    position: 'relative',
   },
-  iconText: {
-    fontSize: 20,
-    color: '#212121',
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#FF7043',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
