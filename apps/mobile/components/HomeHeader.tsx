@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#E8F5E8',
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#212121',
+    color: '#424242',
     paddingVertical: 0,
   },
   iconsContainer: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#FF7043',
+    backgroundColor: '#4CAF50',
     borderRadius: 10,
     minWidth: 20,
     height: 20,

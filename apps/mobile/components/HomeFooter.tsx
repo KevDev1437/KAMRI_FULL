@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#212121',
+    color: '#424242',
     marginBottom: 12,
   },
   linkItem: {
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#81C784',
   },
   appSection: {
     marginBottom: 24,
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#81C784',
   },
   appButtons: {
     flexDirection: 'row',
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#4CAF50',
     borderWidth: 1,
-    borderColor: '#45A049',
+    borderColor: '#2E7D32',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   middleSection: {
     borderTopWidth: 1,
-    borderTopColor: '#A7D3A7',
+    borderTopColor: '#81C784',
     paddingTop: 20,
     paddingBottom: 20,
   },
@@ -343,13 +343,13 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     borderTopWidth: 1,
-    borderTopColor: '#A7D3A7',
+    borderTopColor: '#81C784',
     paddingTop: 16,
     alignItems: 'center',
   },
   copyright: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#81C784',
     marginBottom: 12,
   },
   legalLinks: {
@@ -363,6 +363,6 @@ const styles = StyleSheet.create({
   },
   legalText: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#81C784',
   },
 });

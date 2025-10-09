@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
     paddingVertical: 32,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#E8F5E8',
   },
   titleContainer: {
     alignItems: 'center',
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#212121',
+    color: '#424242',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 0.5,
@@ -119,14 +119,14 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     height: 160,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#E8F5E8',
     position: 'relative',
   },
   imagePlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#E8F5E8',
   },
   favoriteButton: {
     position: 'absolute',
@@ -145,18 +145,18 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212121',
+    color: '#424242',
     marginBottom: 8,
     lineHeight: 20,
   },
   productPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E88E5',
+    color: '#4CAF50',
     marginBottom: 16,
   },
   addButton: {
-    backgroundColor: '#1E88E5',
+    backgroundColor: '#4CAF50',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 25,
