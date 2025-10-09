@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -28,29 +29,28 @@ function NavItem({ icon, label, isActive = false, onPress }: NavItemProps) {
 }
 
 export default function BottomNavigation() {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const navItems = [
+    { icon: 'home' as const, label: 'Home', route: '/(tabs)/' },
+    { icon: 'grid-outline' as const, label: 'Products', route: '/(tabs)/products' },
+    { icon: 'bag-outline' as const, label: 'Cart', route: '/(tabs)/cart' },
+    { icon: 'person-outline' as const, label: 'Profile', route: '/(tabs)/explore' },
+  ];
+
   return (
     <View style={styles.wrapper}>
       <ThemedView style={styles.container}>
-        <NavItem 
-          icon="home" 
-          label="Home" 
-          isActive={true}
-        />
-        
-        <NavItem 
-          icon="grid-outline" 
-          label="Products" 
-        />
-        
-        <NavItem 
-          icon="bag-outline" 
-          label="Cart" 
-        />
-        
-        <NavItem 
-          icon="person-outline" 
-          label="Profile" 
-        />
+        {navItems.map((item) => (
+          <NavItem
+            key={item.route}
+            icon={item.icon}
+            label={item.label}
+            isActive={pathname === item.route}
+            onPress={() => router.push(item.route)}
+          />
+        ))}
       </ThemedView>
     </View>
   );

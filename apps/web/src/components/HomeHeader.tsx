@@ -1,17 +1,30 @@
 
-export default function HomeHeader() {
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+interface HomeHeaderProps {
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
+}
+
+export default function HomeHeader({ searchQuery, setSearchQuery }: HomeHeaderProps) {
+  const pathname = usePathname();
   return (
     <header className="bg-white/95 backdrop-blur-sm shadow-sm sticky top-0 z-50 border-b border-[#E8F5E8]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <img
-              src="/logo.png"
-              alt="KAMRI Logo"
-              className="h-16 w-auto transition-all duration-300 hover:scale-105"
-              style={{ maxWidth: '240px', height: '64px' }}
-            />
+            <Link href="/">
+              <img
+                src="/logo.png"
+                alt="KAMRI Logo"
+                className="h-16 w-auto transition-all duration-300 hover:scale-105 cursor-pointer"
+                style={{ maxWidth: '240px', height: '64px' }}
+              />
+            </Link>
           </div>
 
           {/* Barre de recherche */}
@@ -25,6 +38,8 @@ export default function HomeHeader() {
               <input
                 type="text"
                 placeholder="Rechercher des produits..."
+                value={searchQuery || ''}
+                onChange={(e) => setSearchQuery?.(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-[#E8F5E8] rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-[#4CAF50] focus:bg-white transition-all duration-300 ease-in-out font-medium text-[#424242] placeholder-[#81C784]"
               />
             </div>
@@ -32,18 +47,38 @@ export default function HomeHeader() {
 
           {/* Navigation principale */}
           <nav className="hidden md:flex items-center space-x-8">
-            <button className="text-[#4CAF50] font-semibold border-b-2 border-[#4CAF50] pb-1 transition-all duration-300">
+            <Link 
+              href="/"
+              className={`font-medium transition-all duration-300 ease-in-out hover:scale-105 ${
+                pathname === '/' 
+                  ? 'text-[#4CAF50] font-semibold border-b-2 border-[#4CAF50] pb-1' 
+                  : 'text-[#81C784] hover:text-[#4CAF50]'
+              }`}
+            >
               Accueil
-            </button>
-            <button className="text-[#81C784] hover:text-[#4CAF50] font-medium transition-all duration-300 ease-in-out hover:scale-105">
+            </Link>
+            <Link 
+              href="/products"
+              className={`font-medium transition-all duration-300 ease-in-out hover:scale-105 ${
+                pathname === '/products' 
+                  ? 'text-[#4CAF50] font-semibold border-b-2 border-[#4CAF50] pb-1' 
+                  : 'text-[#81C784] hover:text-[#4CAF50]'
+              }`}
+            >
               Produits
-            </button>
-            <button className="text-[#81C784] hover:text-[#4CAF50] font-medium transition-all duration-300 ease-in-out hover:scale-105">
+            </Link>
+            <Link 
+              href="/categories"
+              className="text-[#81C784] hover:text-[#4CAF50] font-medium transition-all duration-300 ease-in-out hover:scale-105"
+            >
               Catégories
-            </button>
-            <button className="text-[#81C784] hover:text-[#4CAF50] font-medium transition-all duration-300 ease-in-out hover:scale-105">
+            </Link>
+            <Link 
+              href="/contact"
+              className="text-[#81C784] hover:text-[#4CAF50] font-medium transition-all duration-300 ease-in-out hover:scale-105"
+            >
               Contact
-            </button>
+            </Link>
           </nav>
 
           {/* Icônes de navigation */}
