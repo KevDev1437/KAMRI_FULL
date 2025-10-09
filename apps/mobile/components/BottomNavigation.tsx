@@ -17,7 +17,7 @@ function NavItem({ icon, label, isActive = false, onPress }: NavItemProps) {
         <Ionicons 
           name={icon} 
           size={24} 
-          color={isActive ? '#FFFFFF' : '#9CA3AF'} 
+          color={isActive ? '#FFFFFF' : '#81C784'} 
         />
       </View>
       <ThemedText style={[styles.navLabel, isActive && styles.activeLabel]}>
@@ -91,8 +91,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   activeIconContainer: {
-    backgroundColor: '#1E88E5',
-    shadowColor: '#1E88E5',
+    backgroundColor: '#4CAF50',
+    shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -100,12 +100,12 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#81C784',
     fontWeight: '500',
     textAlign: 'center',
   },
   activeLabel: {
-    color: '#1E88E5',
+    color: '#4CAF50',
     fontWeight: '600',
   },
 });

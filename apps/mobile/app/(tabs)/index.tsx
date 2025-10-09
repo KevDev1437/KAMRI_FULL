@@ -8,8 +8,8 @@ import ProductGrid from '../../components/ProductGrid';
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
+      <HomeHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <HomeHeader />
         <HomeHero />
         <ProductGrid />
         <HomeFooter />
@@ -22,9 +22,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F0F8F0',
+    height: '100%',
   },
   scrollView: {
     flex: 1,
+    marginTop: 100, // Space for fixed header
+    paddingBottom: 0,
   },
 });

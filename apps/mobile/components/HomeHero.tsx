@@ -1,51 +1,61 @@
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
 
 export default function HomeHero() {
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
       {/* Background gradient */}
-      <ThemedView style={styles.background} />
+      <LinearGradient
+        colors={['#EAF3EE', '#FFFFFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.background}
+      />
       
-      {/* Content */}
-      <View style={styles.content}>
-        <ThemedText style={styles.title}>
-          Découvrez les tendances du moment
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Collection exclusive de vêtements et accessoires
-        </ThemedText>
+      {/* Content Grid - Two columns like web */}
+      <View style={styles.contentGrid}>
+        {/* Left Column - Text Content */}
+        <View style={styles.textColumn}>
+          <ThemedText style={styles.title}>
+            Découvrez les tendances du moment
+          </ThemedText>
+          <ThemedText style={styles.subtitle}>
+            Collection exclusive de vêtements et accessoires
+          </ThemedText>
+          
+          <TouchableOpacity style={styles.ctaButton}>
+            <ThemedText style={styles.ctaText}>Explorer maintenant</ThemedText>
+          </TouchableOpacity>
+        </View>
         
-        <TouchableOpacity style={styles.ctaButton}>
-          <ThemedText style={styles.ctaText}>Explorer maintenant</ThemedText>
-        </TouchableOpacity>
+        {/* Right Column - Model Image */}
+        <View style={styles.imageColumn}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={require('../assets/images/modelo.png')}
+              style={styles.modelImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
       </View>
-      
-      {/* Image placeholder */}
-      <View style={styles.imageContainer}>
-        <ThemedView style={styles.imagePlaceholder}>
-          <ThemedText style={styles.imageText}>Image de modèle</ThemedText>
-        </ThemedView>
-      </View>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    height: 400,
+    height: 550,
     position: 'relative',
-    backgroundColor: '#EAF3EE',
-    marginHorizontal: 20,
-    marginVertical: 20,
-    borderRadius: 20,
+    marginBottom: 0,
+    marginTop: 0,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   background: {
     position: 'absolute',
@@ -53,67 +63,69 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#EAF3EE',
-    opacity: 0.8,
   },
-  content: {
+  contentGrid: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 30,
     zIndex: 1,
   },
+  textColumn: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: 15,
+  },
+  imageColumn: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingLeft: 15,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1A3C2E',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 34,
+    marginBottom: 12,
+    lineHeight: 30,
     letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4B6254',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   ctaButton: {
     backgroundColor: '#2F6F4E',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     borderRadius: 8,
     shadowColor: '#2F6F4E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    alignSelf: 'flex-start',
   },
   ctaText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   imageContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    zIndex: 0,
-  },
-  imagePlaceholder: {
-    flex: 1,
+    height: 350,
     backgroundColor: '#E8F5E8',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  imageText: {
-    color: '#4B6254',
-    fontSize: 14,
-    fontWeight: '500',
+  modelImage: {
+    width: '100%',
+    height: '100%',
   },
 });

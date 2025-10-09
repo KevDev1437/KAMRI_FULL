@@ -79,8 +79,10 @@ export default function ProductGrid() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingVertical: 32,
-    backgroundColor: '#E8F5E8',
+    paddingTop: 20,
+    paddingBottom: 32,
+    backgroundColor: 'rgba(232, 245, 232, 0.3)',
+    marginTop: 0,
   },
   titleContainer: {
     alignItems: 'center',

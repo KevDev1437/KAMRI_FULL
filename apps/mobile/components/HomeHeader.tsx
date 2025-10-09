@@ -19,21 +19,21 @@ export default function HomeHeader() {
 
         {/* Barre de recherche */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Rechercher des produits..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#81C784"
           />
         </View>
 
         {/* Icônes de navigation */}
         <View style={styles.iconsContainer}>
           <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="person-outline" size={24} color="#212121" />
+            <Ionicons name="person-outline" size={24} color="#424242" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="bag-outline" size={24} color="#212121" />
+            <Ionicons name="bag-outline" size={24} color="#424242" />
             <View style={styles.badge}>
               <ThemedText style={styles.badgeText}>3</ThemedText>
             </View>
@@ -47,6 +47,12 @@ export default function HomeHeader() {
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: '#FFFFFF',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    paddingTop: 0,
   },
   container: {
     flexDirection: 'row',
@@ -56,10 +62,10 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
     height: 100,
   },
   logoContainer: {
