@@ -96,11 +96,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   ctaButton: {
-    backgroundColor: '#2F6F4E',
+    backgroundColor: '#4CAF50',
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
-    shadowColor: '#2F6F4E',
+    shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

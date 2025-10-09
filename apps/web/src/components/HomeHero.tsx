@@ -14,7 +14,7 @@ export default function HomeHero() {
               Collection exclusive de vêtements et accessoires
             </p>
             
-            <button className="bg-[#2F6F4E] text-white px-8 py-4 text-lg font-semibold shadow-sm hover:bg-[#256046] transform hover:scale-105 transition-all duration-300 ease-in-out" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <button className="bg-[#4CAF50] text-white px-8 py-4 text-lg font-semibold shadow-sm hover:bg-[#2E7D32] transform hover:scale-105 transition-all duration-300 ease-in-out" style={{ fontFamily: 'Inter, sans-serif' }}>
               Explorer maintenant
             </button>
           </div>
