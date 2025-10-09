@@ -89,10 +89,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 40,
   },
   logo: {
-    width: 120,
-    height: 40,
+    width: 300,
+    height: 100,
   },
   searchContainer: {
     flex: 3,

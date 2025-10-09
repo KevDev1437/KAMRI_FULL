@@ -338,6 +338,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 80,
     height: 30,
+    transform: [{ scale: 2.5 }],
   },
   searchContainer: {
     flex: 1,
