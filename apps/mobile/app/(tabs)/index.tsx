@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 120, // No space - content goes directly under header
     paddingTop: 0, // No padding - content starts immediately
-    paddingBottom: 100, // Espace suffisant pour la barre de navigation courbée
+    paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
     marginBottom: 0,
   },
 });

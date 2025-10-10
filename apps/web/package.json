@@ -10,13 +10,14 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@kamri/ui": "file:../../packages/ui",
     "@kamri/lib": "file:../../packages/lib",
+    "@kamri/ui": "file:../../packages/ui",
+    "@stripe/react-stripe-js": "^2.0.0",
+    "@stripe/stripe-js": "^2.0.0",
+    "framer-motion": "^12.23.22",
     "next": "^14.0.0",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "@stripe/stripe-js": "^2.0.0",
-    "@stripe/react-stripe-js": "^2.0.0"
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -30,4 +31,3 @@
     "typescript": "^5.0.0"
   }
 }
-

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 
-export default function CartPage() {
+export default function FavoritesPage() {
   return (
     <div className="min-h-screen bg-[#F0F8F0]">
       <ModernHeader />
@@ -19,10 +19,10 @@ export default function CartPage() {
             className="text-center"
           >
             <h1 className="text-4xl sm:text-5xl font-bold text-[#4CAF50] mb-4">
-              Mon panier
+              Mes favoris
             </h1>
             <p className="text-lg sm:text-xl text-[#424242] mb-8 max-w-3xl mx-auto">
-              Finalisez votre commande en quelques clics
+              Retrouvez tous vos produits favoris en un seul endroit
             </p>
           </motion.div>
         </div>
@@ -36,19 +36,19 @@ export default function CartPage() {
           className="text-center"
         >
           <div className="bg-white rounded-2xl shadow-lg p-12">
-            <div className="text-6xl mb-6">🛒</div>
+            <div className="text-6xl mb-6">❤️</div>
             <h2 className="text-2xl font-bold text-[#424242] mb-4">
-              Votre panier est vide
+              Aucun favori pour le moment
             </h2>
             <p className="text-gray-500 mb-8">
-              Ajoutez des produits à votre panier pour commencer vos achats
+              Commencez à ajouter des produits à vos favoris en cliquant sur le cœur
             </p>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="bg-[#4CAF50] text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-[#45a049] transition-colors duration-300"
             >
-              Continuer mes achats
+              Découvrir nos produits
             </motion.button>
           </div>
         </motion.div>

@@ -80,7 +80,7 @@ export default function TopSales() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 32,
     backgroundColor: 'rgba(232, 245, 232, 0.3)',
     marginTop: 0,
@@ -88,6 +88,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     alignItems: 'center',
     marginBottom: 28,
+    paddingTop: 10,
   },
   sectionTitle: {
     fontSize: 28,
