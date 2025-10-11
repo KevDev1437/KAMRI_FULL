@@ -10,8 +10,8 @@ import { ThemedText } from '../../components/themed-text';
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('personal');
   const [userInfo] = useState({
-    name: 'Jean Dupont',
-    email: 'jean.dupont@email.com',
+    name: 'Ulrich Kevin',
+    email: 'ulrich.kevin@email.com',
     phone: '+33 6 12 34 56 78',
     memberSince: '15 Janvier 2024'
   });
