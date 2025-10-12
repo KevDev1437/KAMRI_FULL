@@ -56,23 +56,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                      registerData.password === registerData.confirmPassword;
 
   const handleLogin = async () => {
-    if (!loginData.email || !loginData.password) {
-      alert('Veuillez remplir tous les champs');
+    if (!loginData.email) {
+      alert('Veuillez entrer votre email ou numéro de téléphone');
       return;
     }
 
     setIsLoading(true);
     try {
       // Simulation d'authentification
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Mock de validation - Utilisateur de test
-      if (loginData.email === 'test@test.com' && loginData.password === 'password123') {
-        login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
-        onClose();
-      } else {
-        alert('Email ou mot de passe incorrect\n\nUtilisateur de test :\nEmail: test@test.com\nMot de passe: password123');
-      }
+      // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
+      const email = loginData.email;
+      const firstName = email.includes('@') ? email.split('@')[0] : 'Utilisateur';
+      const lastName = 'KAMRI';
+      
+      login({ firstName, lastName, email });
+      onClose();
     } catch (error) {
       alert('Une erreur est survenue');
     } finally {
@@ -106,8 +106,33 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   const renderLoginForm = () => (
     <div className="space-y-1">
+      {/* Avantages KAMRI */}
+      <div className="grid grid-cols-2 gap-1 mb-2">
+        <div className="flex items-center space-x-1 bg-green-50 p-1 rounded-md">
+          <svg className="h-3 w-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+          <span className="text-xs text-green-700 font-medium">Livraison gratuite</span>
+        </div>
+        <div className="flex items-center space-x-1 bg-blue-50 p-1 rounded-md">
+          <svg className="h-3 w-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-xs text-blue-700 font-medium">Qualité garantie</span>
+        </div>
+      </div>
+
+      {/* Sécurité */}
+      <div className="flex items-center space-x-1 mb-2">
+        <svg className="h-3 w-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <span className="text-xs text-gray-600">Données protégées</span>
+      </div>
+
+      {/* Email simple */}
       <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-0.5">Email</label>
+        <label className="block text-xs font-semibold text-gray-700 mb-0.5">E-mail ou numéro de téléphone</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-1.5 flex items-center pointer-events-none">
             <svg className="h-3 w-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,64 +140,30 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </svg>
           </div>
           <input
-            type="email"
+            type="text"
             className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
-            placeholder="email"
+            placeholder="votre@email.com ou +33 6 12 34 56 78"
             value={loginData.email}
             onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
           />
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-0.5">Mot de passe</label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-1.5 flex items-center pointer-events-none">
-            <svg className="h-3 w-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <input
-            type={showPassword ? 'text' : 'password'}
-            className="w-full pl-6 pr-6 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
-            placeholder="mot de passe"
-            value={loginData.password}
-            onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-1.5 flex items-center"
-          >
-            <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {showPassword ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              )}
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <button className="text-xs text-green-600 hover:text-green-700 font-semibold">
-        Mot de passe oublié ?
-      </button>
-
+      {/* Bouton Continuer */}
       <button
         onClick={handleLogin}
-        disabled={isLoading}
+        disabled={isLoading || !loginData.email}
         className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-1.5 rounded-md font-bold text-xs hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
       >
-        {isLoading ? 'Connexion...' : 'Se connecter'}
+        {isLoading ? 'Connexion...' : 'Continuer'}
       </button>
 
       {/* Bouton de test rapide */}
       <button
-        onClick={() => setLoginData({ email: 'test@test.com', password: 'password123' })}
+        onClick={() => setLoginData({ email: 'demo@kamri.com', password: '' })}
         className="w-full bg-gray-100 text-gray-600 py-1 rounded-md font-medium hover:bg-gray-200 transition-colors duration-300 border border-gray-300 text-xs"
       >
-        🧪 Test rapide
+        🧪 Test rapide (demo@kamri.com)
       </button>
 
       {/* Connexion sociale */}
@@ -185,6 +176,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
               <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+          </button>
+          <button className="w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors duration-300">
+            <svg className="h-3 w-3 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
           </button>
           <button className="w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors duration-300">
@@ -406,7 +402,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </svg>
           </button>
           <h2 className="text-sm font-bold text-gray-800">
-            {activeTab === 'login' ? 'Connexion' : 'Inscription'}
+            Se connecter
           </h2>
           <div className="w-6" />
         </div>
@@ -423,46 +419,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <h3 className="text-sm font-bold text-green-600">KAMRI</h3>
         </div>
 
-        {/* Onglets */}
-        <div className="flex mx-1 mb-1 bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => setActiveTab('login')}
-            className={`flex-1 py-0.5 px-1 rounded-md font-semibold text-xs transition-all duration-200 ${
-              activeTab === 'login'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            Connexion
-          </button>
-          <button
-            onClick={() => setActiveTab('register')}
-            className={`flex-1 py-0.5 px-1 rounded-md font-semibold text-xs transition-all duration-200 ${
-              activeTab === 'register'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            Inscription
-          </button>
+        {/* Titre simple */}
+        <div className="text-center mb-1">
+          <h3 className="text-sm font-bold text-gray-800">Se connecter</h3>
         </div>
 
         {/* Contenu du formulaire */}
         <div className="px-1 pb-1">
-          {activeTab === 'login' ? renderLoginForm() : renderRegisterForm()}
-        </div>
-
-        {/* Lien de basculement */}
-        <div className="flex items-center justify-center p-1 border-t border-gray-200 bg-gray-50 rounded-b-3xl">
-          <span className="text-xs text-gray-600">
-            {activeTab === 'login' ? "Pas de compte ?" : 'Déjà un compte ?'}
-          </span>
-          <button
-            onClick={() => setActiveTab(activeTab === 'login' ? 'register' : 'login')}
-            className="ml-1 text-xs text-green-600 hover:text-green-700 font-semibold"
-          >
-            {activeTab === 'login' ? 'Créer' : 'Se connecter'}
-          </button>
+          {renderLoginForm()}
         </div>
       </div>
     </div>

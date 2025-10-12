@@ -73,23 +73,19 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
                      registerData.password === registerData.confirmPassword;
 
   const handleLogin = async () => {
-    if (!loginData.email || !loginData.password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+    if (!loginData.email) {
+      Alert.alert('Erreur', 'Veuillez entrer votre email ou numéro de téléphone');
       return;
     }
 
     setIsLoading(true);
     try {
       // Simulation d'authentification
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Mock de validation - Utilisateur de test
-      if (loginData.email === 'test@test.com' && loginData.password === 'password123') {
-        onLoginSuccess?.();
-        onClose();
-      } else {
-        Alert.alert('Erreur', 'Email ou mot de passe incorrect\n\nUtilisateur de test :\nEmail: test@test.com\nMot de passe: password123');
-      }
+      // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
+      onLoginSuccess?.();
+      onClose();
     } catch (error) {
       Alert.alert('Erreur', 'Une erreur est survenue');
     } finally {
@@ -119,13 +115,32 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
 
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
+      {/* Avantages KAMRI */}
+      <View style={styles.benefitsContainer}>
+        <View style={styles.benefitItem}>
+          <Ionicons name="car-outline" size={16} color="#4CAF50" />
+          <ThemedText style={styles.benefitText}>Livraison gratuite</ThemedText>
+        </View>
+        <View style={styles.benefitItem}>
+          <Ionicons name="shield-checkmark-outline" size={16} color="#2196F3" />
+          <ThemedText style={styles.benefitText}>Qualité garantie</ThemedText>
+        </View>
+      </View>
+
+      {/* Sécurité */}
+      <View style={styles.securityContainer}>
+        <Ionicons name="lock-closed-outline" size={16} color="#4CAF50" />
+        <ThemedText style={styles.securityText}>Données protégées</ThemedText>
+      </View>
+
+      {/* Email simple */}
       <View style={styles.inputGroup}>
-        <ThemedText style={styles.inputLabel}>Email</ThemedText>
+        <ThemedText style={styles.inputLabel}>E-mail ou numéro de téléphone</ThemedText>
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
           <TextInput
             style={styles.textInput}
-            placeholder="votre@email.com"
+            placeholder="votre@email.com ou +33 6 12 34 56 78"
             placeholderTextColor="#9CA3AF"
             value={loginData.email}
             onChangeText={(text) => setLoginData({ ...loginData, email: text })}
@@ -135,46 +150,18 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
         </View>
       </View>
 
-      <View style={styles.inputGroup}>
-        <ThemedText style={styles.inputLabel}>Mot de passe</ThemedText>
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            placeholder="Votre mot de passe"
-            placeholderTextColor="#9CA3AF"
-            value={loginData.password}
-            onChangeText={(text) => setLoginData({ ...loginData, password: text })}
-            secureTextEntry={!showPassword}
-          />
-          <TouchableOpacity 
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-off-outline" : "eye-outline"} 
-              size={20} 
-              color="#9CA3AF" 
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.forgotPassword}>
-        <ThemedText style={styles.forgotPasswordText}>Mot de passe oublié ?</ThemedText>
-      </TouchableOpacity>
-
+      {/* Bouton Continuer */}
       <TouchableOpacity 
-        style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+        style={[styles.submitButton, (isLoading || !loginData.email) && styles.submitButtonDisabled]}
         onPress={handleLogin}
-        disabled={isLoading}
+        disabled={isLoading || !loginData.email}
       >
         <LinearGradient
           colors={['#4CAF50', '#45A049']}
           style={styles.submitButtonGradient}
         >
           <ThemedText style={styles.submitButtonText}>
-            {isLoading ? 'Connexion...' : 'Se connecter'}
+            {isLoading ? 'Connexion...' : 'Continuer'}
           </ThemedText>
         </LinearGradient>
       </TouchableOpacity>
@@ -183,11 +170,11 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
       <TouchableOpacity 
         style={styles.testButton}
         onPress={() => {
-          setLoginData({ email: 'test@test.com', password: 'password123' });
+          setLoginData({ email: 'demo@kamri.com', password: '' });
         }}
       >
         <ThemedText style={styles.testButtonText}>
-          🧪 Remplir avec les données de test
+          🧪 Test rapide (demo@kamri.com)
         </ThemedText>
       </TouchableOpacity>
 
@@ -422,7 +409,7 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
               <Ionicons name="close" size={24} color="#9CA3AF" />
             </TouchableOpacity>
             <ThemedText style={styles.headerTitle}>
-              {activeTab === 'login' ? 'Connexion' : 'Inscription'}
+              Se connecter
             </ThemedText>
             <View style={styles.placeholder} />
           </View>
@@ -439,25 +426,6 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
             <ThemedText style={styles.logoText}>KAMRI</ThemedText>
           </View>
 
-          {/* Onglets */}
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'login' && styles.activeTab]}
-              onPress={() => setActiveTab('login')}
-            >
-              <ThemedText style={[styles.tabText, activeTab === 'login' && styles.activeTabText]}>
-                Connexion
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'register' && styles.activeTab]}
-              onPress={() => setActiveTab('register')}
-            >
-              <ThemedText style={[styles.tabText, activeTab === 'register' && styles.activeTabText]}>
-                Inscription
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
 
           {/* Contenu du formulaire */}
           <ScrollView 
@@ -466,20 +434,8 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
-            {activeTab === 'login' ? renderLoginForm() : renderRegisterForm()}
+            {renderLoginForm()}
           </ScrollView>
-
-          {/* Lien de basculement */}
-          <View style={styles.switchContainer}>
-            <ThemedText style={styles.switchText}>
-              {activeTab === 'login' ? "Vous n'avez pas de compte ?" : 'Vous avez déjà un compte ?'}
-            </ThemedText>
-            <TouchableOpacity onPress={() => setActiveTab(activeTab === 'login' ? 'register' : 'login')}>
-              <ThemedText style={styles.switchLink}>
-                {activeTab === 'login' ? 'Créer un compte' : 'Se connecter'}
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
           </ThemedView>
         </KeyboardAvoidingView>
       </View>
@@ -774,5 +730,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  benefitsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 8,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    flex: 1,
+    gap: 4,
+  },
+  benefitText: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  securityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  securityText: {
+    fontSize: 11,
+    color: '#6B7280',
   },
 });
