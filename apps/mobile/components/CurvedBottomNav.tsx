@@ -112,7 +112,7 @@ export default function CurvedBottomNav() {
             <Ionicons 
               name={item.icon} 
               size={20} 
-              color="#9CA3AF" 
+              color="green" 
             />
             <ThemedText style={styles.secondaryLabel}>{item.label}</ThemedText>
             {'badge' in item && typeof item.badge === 'number' && item.badge > 0 && (
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: 'green',
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 2,

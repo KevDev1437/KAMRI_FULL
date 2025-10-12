@@ -94,9 +94,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#424242',
-    marginBottom: 8,
+    marginBottom: 14,
     textAlign: 'center',
     letterSpacing: 0.5,
+    lineHeight: 36,
   },
   sectionSubtitle: {
     fontSize: 16,

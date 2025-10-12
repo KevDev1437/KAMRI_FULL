@@ -91,15 +91,17 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 33,
+    paddingTop: 10,
   },
   sectionTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#424242',
-    marginBottom: 8,
+    marginBottom: 14,
     textAlign: 'center',
     letterSpacing: 0.5,
+    lineHeight: 36,
   },
   sectionSubtitle: {
     fontSize: 16,
