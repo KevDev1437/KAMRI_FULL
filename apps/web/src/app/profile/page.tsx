@@ -1,16 +1,37 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import AccountSettings from '../../components/AccountSettings';
 import AddressSection from '../../components/AddressSection';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import OrdersHistory from '../../components/OrdersHistory';
 import PersonalInfo from '../../components/PersonalInfo';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personal');
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#F0F8F0] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirection en cours...</p>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'personal', label: 'Informations', icon: '👤' },
