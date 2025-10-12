@@ -2,12 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AuthModal from '../../components/AuthModal';
 import CategoryTabs from '../../components/CategoryTabs';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import ProductCard from '../../components/ProductCard';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Mock data pour les produits
 const mockProducts = [
@@ -130,6 +132,8 @@ export default function ProductsScreen() {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { isAuthenticated, user, login } = useAuth();
 
   // Filtrage des produits
   useEffect(() => {
@@ -176,7 +180,7 @@ export default function ProductsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header complet */}
+      {/* Header principal */}
       <SafeAreaView style={styles.safeArea}>
         <ThemedView style={styles.header}>
           {/* Logo */}
@@ -200,13 +204,66 @@ export default function ProductsScreen() {
             />
           </View>
 
-          {/* Bouton filtres */}
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons name="options-outline" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+          {/* Bouton de connexion */}
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => {
+                if (isAuthenticated) {
+                  // Navigation vers profil
+                } else {
+                  setShowAuthModal(true);
+                }
+              }}
+            >
+              {isAuthenticated ? (
+                <View style={styles.avatar}>
+                  <ThemedText style={styles.avatarText}>
+                    {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || 'K'}
+                  </ThemedText>
+                </View>
+              ) : (
+                <Ionicons name="log-in-outline" size={22} color="#4CAF50" />
+              )}
+            </TouchableOpacity>
+        </ThemedView>
+
+        {/* Ligne des actions */}
+        <ThemedView style={styles.actionsRow}>
+          <View style={styles.leftActions}>
+            <View style={styles.titleButton}>
+              <Ionicons name="cube-outline" size={20} color="#4CAF50" />
+              <ThemedText style={styles.titleButtonText}>Produits</ThemedText>
+            </View>
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => setShowFilters(!showFilters)}
+            >
+              <Ionicons name="options-outline" size={20} color="#4CAF50" />
+              <ThemedText style={styles.filterButtonText}>Filtres</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Favoris et Panier */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {/* Navigation vers favoris */}}
+            >
+              <Ionicons name="heart-outline" size={20} color="#4CAF50" />
+              <View style={styles.actionBadge}>
+                <ThemedText style={styles.badgeText}>2</ThemedText>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {/* Navigation vers panier */}}
+            >
+              <Ionicons name="bag-outline" size={20} color="#4CAF50" />
+              <View style={styles.actionBadge}>
+                <ThemedText style={styles.badgeText}>3</ThemedText>
+              </View>
+            </TouchableOpacity>
+          </View>
         </ThemedView>
       </SafeAreaView>
 
@@ -310,6 +367,20 @@ export default function ProductsScreen() {
       </ScrollView>
 
       <CurvedBottomNav />
+      
+      {/* Modal d'authentification */}
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLoginSuccess={() => {
+          setShowAuthModal(false);
+          login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
+        }}
+        onRegisterSuccess={() => {
+          setShowAuthModal(false);
+          login({ firstName: 'Nouveau', lastName: 'Utilisateur', email: 'nouveau@email.com' });
+        }}
+      />
     </View>
   );
 }
@@ -362,14 +433,120 @@ const styles = StyleSheet.create({
     color: '#424242',
     paddingVertical: 0,
   },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  leftActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    gap: 4,
+  },
+  titleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
   filterButton: {
-    padding: 8,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
     backgroundColor: '#E8F5E8',
+    gap: 4,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 6,
+    position: 'relative',
+    borderRadius: 14,
+    backgroundColor: '#F8F9FA',
+  },
+  actionBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 8,
+  },
+  iconButton: {
+    padding: 8,
+    position: 'relative',
+    borderRadius: 16,
+    backgroundColor: '#F8F9FA',
+  },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  profileButton: {
+    padding: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
-    marginTop: 0, // No space - content goes directly under header
+    marginTop: -2, // Réduire l'espace entre header et contenu
     paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
   },
   filtersContainer: {

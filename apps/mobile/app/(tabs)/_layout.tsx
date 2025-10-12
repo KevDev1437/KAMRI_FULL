@@ -67,6 +67,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="phone.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="profile-info"
+        options={{
+          title: 'Profile Info',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.circle.fill" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

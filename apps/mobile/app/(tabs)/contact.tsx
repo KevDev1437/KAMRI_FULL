@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import ContactPageHeader from '../../components/ContactPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
-import HomeHeader from '../../components/HomeHeader';
 import { ThemedText } from '../../components/themed-text';
 
 export default function ContactScreen() {
@@ -103,7 +103,7 @@ export default function ContactScreen() {
 
   return (
     <View style={styles.container}>
-      <HomeHeader />
+      <ContactPageHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    marginTop: 90, // Espace pour le header
+    marginTop: -8, // Réduire l'espace entre header et contenu
     paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
   },
   header: {

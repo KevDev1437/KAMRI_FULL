@@ -1,12 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 export default function HomeHeader() {
   const router = useRouter();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { isAuthenticated, user, login } = useAuth();
   
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -50,8 +55,42 @@ export default function HomeHeader() {
               <ThemedText style={styles.badgeText}>3</ThemedText>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => {
+              if (isAuthenticated) {
+                router.push('/(tabs)/profile-info');
+              } else {
+                setShowAuthModal(true);
+              }
+            }}
+          >
+            {isAuthenticated ? (
+              <View style={styles.avatar}>
+                <ThemedText style={styles.avatarText}>
+                  {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || 'K'}
+                </ThemedText>
+              </View>
+            ) : (
+              <Ionicons name="log-in-outline" size={22} color="#4CAF50" />
+            )}
+          </TouchableOpacity>
         </View>
       </ThemedView>
+      
+      {/* Modal d'authentification */}
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLoginSuccess={() => {
+          setShowAuthModal(false);
+          login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
+        }}
+        onRegisterSuccess={() => {
+          setShowAuthModal(false);
+          login({ firstName: 'Nouveau', lastName: 'Utilisateur', email: 'nouveau@email.com' });
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -117,12 +156,12 @@ const styles = StyleSheet.create({
   iconsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 8,
   },
   iconButton: {
-    padding: 10,
+    padding: 8,
     position: 'relative',
-    borderRadius: 20,
+    borderRadius: 16,
     backgroundColor: '#F8F9FA',
   },
   badge: {
@@ -140,5 +179,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  profileButton: {
+    padding: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 });

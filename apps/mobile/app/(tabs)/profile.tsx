@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AccountPageHeader from '../../components/AccountPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
-import HomeHeader from '../../components/HomeHeader';
 import { ThemedText } from '../../components/themed-text';
 
 export default function ProfileScreen() {
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState('orders');
   const [userInfo] = useState({
     name: 'Ulrich Kevin',
     email: 'ulrich.kevin@email.com',
@@ -56,7 +56,6 @@ export default function ProfileScreen() {
   ]);
 
   const tabs = [
-    { id: 'personal', label: 'Infos', icon: 'person' },
     { id: 'orders', label: 'Commandes', icon: 'receipt' },
     { id: 'addresses', label: 'Adresses', icon: 'home' },
     { id: 'settings', label: 'Paramètres', icon: 'settings' }
@@ -73,58 +72,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const renderPersonalInfo = () => (
-    <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>Informations personnelles</ThemedText>
-      
-      {/* Avatar et infos principales */}
-      <View style={styles.avatarCard}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>
-              {userInfo.name.split(' ').map(n => n[0]).join('')}
-            </ThemedText>
-          </View>
-        </View>
-        <View style={styles.userInfo}>
-          <ThemedText style={styles.userName}>{userInfo.name}</ThemedText>
-          <ThemedText style={styles.userEmail}>{userInfo.email}</ThemedText>
-          <ThemedText style={styles.memberSince}>Membre depuis le {userInfo.memberSince}</ThemedText>
-        </View>
-      </View>
-
-      {/* Détails des informations */}
-      <View style={styles.infoCard}>
-        <View style={styles.infoItem}>
-          <Ionicons name="person" size={20} color="#4CAF50" />
-          <View style={styles.infoContent}>
-            <ThemedText style={styles.infoLabel}>Nom complet</ThemedText>
-            <ThemedText style={styles.infoValue}>{userInfo.name}</ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.infoItem}>
-          <Ionicons name="mail" size={20} color="#4CAF50" />
-          <View style={styles.infoContent}>
-            <ThemedText style={styles.infoLabel}>Email</ThemedText>
-            <ThemedText style={styles.infoValue}>{userInfo.email}</ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.infoItem}>
-          <Ionicons name="call" size={20} color="#4CAF50" />
-          <View style={styles.infoContent}>
-            <ThemedText style={styles.infoLabel}>Téléphone</ThemedText>
-            <ThemedText style={styles.infoValue}>{userInfo.phone}</ThemedText>
-          </View>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.editButton}>
-        <ThemedText style={styles.editButtonText}>Modifier mes informations</ThemedText>
-      </TouchableOpacity>
-    </View>
-  );
 
   const renderOrders = () => (
     <View style={styles.section}>
@@ -500,7 +447,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <HomeHeader />
+      <AccountPageHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>
@@ -547,7 +494,6 @@ export default function ProfileScreen() {
         </View>
 
         {/* Contenu des onglets */}
-        {activeTab === 'personal' && renderPersonalInfo()}
         {activeTab === 'orders' && renderOrders()}
         {activeTab === 'addresses' && renderAddresses()}
         {activeTab === 'settings' && renderSettings()}
@@ -604,7 +550,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    marginTop: 90, // Espace pour le header
+    marginTop: -8, // Réduire l'espace entre header et contenu
     paddingBottom: 140, // Espace suffisant pour la barre de navigation courbée
   },
   // Hero Section

@@ -67,7 +67,7 @@ export default function ModernBottomNavigation() {
     },
     { 
       icon: 'person-outline' as const, 
-      label: 'Profil', 
+      label: 'Compte', 
       route: '/(tabs)/profile',
       iconActive: 'person' as const
     },
