@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import CategoriesPageHeader from '../../components/CategoriesPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
+import UnifiedHeader from '../../components/UnifiedHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -136,7 +136,7 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <CategoriesPageHeader />
+      <UnifiedHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section - Style comme l'accueil */}
         <View style={styles.heroContainer}>

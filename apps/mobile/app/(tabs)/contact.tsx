@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import ContactPageHeader from '../../components/ContactPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
+import UnifiedHeader from '../../components/UnifiedHeader';
 
 export default function ContactScreen() {
   const [formData, setFormData] = useState({
@@ -103,7 +103,7 @@ export default function ContactScreen() {
 
   return (
     <View style={styles.container}>
-      <ContactPageHeader />
+      <UnifiedHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>

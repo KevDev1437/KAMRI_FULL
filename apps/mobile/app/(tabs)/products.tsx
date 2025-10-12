@@ -1,15 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AuthModal from '../../components/AuthModal';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CategoryTabs from '../../components/CategoryTabs';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import ProductCard from '../../components/ProductCard';
+import UnifiedHeader from '../../components/UnifiedHeader';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
-import { useAuth } from '../../contexts/AuthContext';
 
 // Mock data pour les produits
 const mockProducts = [
@@ -132,8 +130,6 @@ export default function ProductsScreen() {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const { isAuthenticated, user, login } = useAuth();
 
   // Filtrage des produits
   useEffect(() => {
@@ -180,92 +176,7 @@ export default function ProductsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header principal */}
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.header}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-
-          {/* Barre de recherche */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher un produit..."
-              placeholderTextColor="#81C784"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          {/* Bouton de connexion */}
-            <TouchableOpacity 
-              style={styles.profileButton}
-              onPress={() => {
-                if (isAuthenticated) {
-                  // Navigation vers profil
-                } else {
-                  setShowAuthModal(true);
-                }
-              }}
-            >
-              {isAuthenticated ? (
-                <View style={styles.avatar}>
-                  <ThemedText style={styles.avatarText}>
-                    {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || 'K'}
-                  </ThemedText>
-                </View>
-              ) : (
-                <Ionicons name="log-in-outline" size={22} color="#4CAF50" />
-              )}
-            </TouchableOpacity>
-        </ThemedView>
-
-        {/* Ligne des actions */}
-        <ThemedView style={styles.actionsRow}>
-          <View style={styles.leftActions}>
-            <View style={styles.titleButton}>
-              <Ionicons name="cube-outline" size={20} color="#4CAF50" />
-              <ThemedText style={styles.titleButtonText}>Produits</ThemedText>
-            </View>
-            <TouchableOpacity 
-              style={styles.filterButton}
-              onPress={() => setShowFilters(!showFilters)}
-            >
-              <Ionicons name="options-outline" size={20} color="#4CAF50" />
-              <ThemedText style={styles.filterButtonText}>Filtres</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {/* Favoris et Panier */}
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => {/* Navigation vers favoris */}}
-            >
-              <Ionicons name="heart-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>2</ThemedText>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => {/* Navigation vers panier */}}
-            >
-              <Ionicons name="bag-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>3</ThemedText>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </ThemedView>
-      </SafeAreaView>
+      <UnifiedHeader />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Catégories */}
@@ -367,16 +278,6 @@ export default function ProductsScreen() {
       </ScrollView>
 
       <CurvedBottomNav />
-      
-      {/* Modal d'authentification */}
-      <AuthModal
-        visible={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onLoginSuccess={() => {
-          setShowAuthModal(false);
-          login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
-        }}
-      />
     </View>
   );
 }

@@ -3,14 +3,14 @@ import BestOffers from '../../components/BestOffers';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import HomeHero from '../../components/HomeHero';
-import HomePageHeader from '../../components/HomePageHeader';
 import ProductGrid from '../../components/ProductGrid';
 import TopSales from '../../components/TopSales';
+import UnifiedHeader from '../../components/UnifiedHeader';
 
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
-      <HomePageHeader />
+      <UnifiedHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <HomeHero />
         <ProductGrid />

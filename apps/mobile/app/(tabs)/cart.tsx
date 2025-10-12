@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import CartPageHeader from '../../components/CartPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
+import UnifiedHeader from '../../components/UnifiedHeader';
 
 export default function CartScreen() {
   const [cartItems, setCartItems] = useState([
@@ -195,7 +195,7 @@ export default function CartScreen() {
 
   return (
     <View style={styles.container}>
-      <CartPageHeader />
+      <UnifiedHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>

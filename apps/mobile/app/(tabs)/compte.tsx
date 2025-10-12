@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import ComptePageHeader from '../../components/ComptePageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
+import UnifiedHeader from '../../components/UnifiedHeader';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfileScreen() {
@@ -443,7 +443,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ComptePageHeader />
+      <UnifiedHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>
