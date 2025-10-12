@@ -54,14 +54,6 @@ export default function PersonalInfo() {
             <p className="text-gray-500 text-sm">Membre depuis le {userInfo.memberSince}</p>
           </div>
 
-          {/* Bouton de déconnexion */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-red-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-600 transition-colors duration-300"
-          >
-            Déconnexion
-          </motion.button>
         </div>
       </motion.div>
 

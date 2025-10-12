@@ -96,10 +96,6 @@ export default function HomePageHeader() {
           setShowAuthModal(false);
           login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
         }}
-        onRegisterSuccess={() => {
-          setShowAuthModal(false);
-          login({ firstName: 'Nouveau', lastName: 'Utilisateur', email: 'nouveau@email.com' });
-        }}
       />
     </SafeAreaView>
   );
@@ -207,8 +203,8 @@ const styles = StyleSheet.create({
   },
   actionBadge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: -8,
+    right: -8,
     backgroundColor: '#4CAF50',
     borderRadius: 10,
     minWidth: 18,

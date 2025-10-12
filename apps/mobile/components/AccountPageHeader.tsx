@@ -213,8 +213,8 @@ const styles = StyleSheet.create({
   },
   actionBadge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: -8,
+    right: -8,
     backgroundColor: '#4CAF50',
     borderRadius: 10,
     minWidth: 18,
