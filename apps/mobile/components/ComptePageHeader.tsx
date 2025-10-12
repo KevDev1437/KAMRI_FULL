@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,11 +9,12 @@ import UserMenu from './UserMenu';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-export default function ContactPageHeader() {
+export default function ComptePageHeader() {
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const { isAuthenticated, user, login } = useAuth();
+  const { isAuthenticated, user, login, logout } = useAuth();
+  const menuRef = useRef<View>(null);
   
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -32,7 +33,7 @@ export default function ContactPageHeader() {
           <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher dans l'aide..."
+            placeholder="Rechercher dans mon profil..."
             placeholderTextColor="#81C784"
           />
         </View>
@@ -42,7 +43,7 @@ export default function ContactPageHeader() {
           style={styles.profileButton}
           onPress={() => {
             if (isAuthenticated) {
-              setShowUserMenu(true);
+              setShowUserMenu(!showUserMenu);
             } else {
               setShowAuthModal(true);
             }
@@ -63,8 +64,8 @@ export default function ContactPageHeader() {
       {/* Ligne des actions */}
       <ThemedView style={styles.actionsRow}>
         <View style={styles.titleButton}>
-          <Ionicons name="call-outline" size={20} color="#4CAF50" />
-          <ThemedText style={styles.titleButtonText}>Contact</ThemedText>
+          <Ionicons name="person-outline" size={20} color="#4CAF50" />
+          <ThemedText style={styles.titleButtonText}>Mon Compte</ThemedText>
         </View>
 
         {/* Favoris et Panier */}
@@ -189,15 +190,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4CAF50',
   },
-  contactActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  contactTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -208,8 +200,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: 14,
     backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   actionBadge: {
     position: 'absolute',

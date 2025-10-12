@@ -376,10 +376,6 @@ export default function ProductsScreen() {
           setShowAuthModal(false);
           login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
         }}
-        onRegisterSuccess={() => {
-          setShowAuthModal(false);
-          login({ firstName: 'Nouveau', lastName: 'Utilisateur', email: 'nouveau@email.com' });
-        }}
       />
     </View>
   );

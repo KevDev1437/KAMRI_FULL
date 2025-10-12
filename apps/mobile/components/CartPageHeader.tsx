@@ -5,12 +5,14 @@ import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
+import UserMenu from './UserMenu';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 export default function CartPageHeader() {
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user, login } = useAuth();
   
   return (
@@ -40,7 +42,7 @@ export default function CartPageHeader() {
           style={styles.profileButton}
           onPress={() => {
             if (isAuthenticated) {
-              router.push('/(tabs)/profile-info');
+              setShowUserMenu(true);
             } else {
               setShowAuthModal(true);
             }
@@ -79,6 +81,12 @@ export default function CartPageHeader() {
         </View>
       </ThemedView>
       
+      {/* Menu utilisateur */}
+      <UserMenu
+        visible={showUserMenu}
+        onClose={() => setShowUserMenu(false)}
+      />
+
       {/* Modal d'authentification */}
       <AuthModal
         visible={showAuthModal}
@@ -86,10 +94,6 @@ export default function CartPageHeader() {
         onLoginSuccess={() => {
           setShowAuthModal(false);
           login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
-        }}
-        onRegisterSuccess={() => {
-          setShowAuthModal(false);
-          login({ firstName: 'Nouveau', lastName: 'Utilisateur', email: 'nouveau@email.com' });
         }}
       />
     </SafeAreaView>

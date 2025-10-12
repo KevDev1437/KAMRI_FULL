@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import ComptePageHeader from '../../components/ComptePageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
-import ProfilePageHeader from '../../components/ProfilePageHeader';
 import { ThemedText } from '../../components/themed-text';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -443,7 +443,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ProfilePageHeader />
+      <ComptePageHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>
@@ -454,7 +454,7 @@ export default function ProfileScreen() {
             style={styles.heroBackground}
           />
           <View style={styles.heroContent}>
-            <ThemedText style={styles.heroTitle}>Mon profil</ThemedText>
+            <ThemedText style={styles.heroTitle}>Mon Compte</ThemedText>
             <ThemedText style={styles.heroSubtitle}>
               Gérez vos informations et suivez vos commandes
             </ThemedText>

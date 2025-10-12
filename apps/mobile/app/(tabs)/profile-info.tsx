@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
-import HomeHeader from '../../components/HomeHeader';
+import ProfileInfoHeader from '../../components/ProfileInfoHeader';
 import { ThemedText } from '../../components/themed-text';
 
 export default function ProfileInfoScreen() {
@@ -182,7 +182,7 @@ export default function ProfileInfoScreen() {
 
   return (
     <View style={styles.container}>
-      <HomeHeader />
+      <ProfileInfoHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>
@@ -193,7 +193,7 @@ export default function ProfileInfoScreen() {
             style={styles.heroBackground}
           />
           <View style={styles.heroContent}>
-            <ThemedText style={styles.heroTitle}>Mes informations</ThemedText>
+            <ThemedText style={styles.heroTitle}>Mes informations de Profil</ThemedText>
             <ThemedText style={styles.heroSubtitle}>
               Gérez vos informations personnelles
             </ThemedText>

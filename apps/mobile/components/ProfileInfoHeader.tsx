@@ -5,12 +5,14 @@ import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
+import UserMenu from './UserMenu';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-export default function ProfilePageHeader() {
+export default function ProfileInfoHeader() {
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user, login } = useAuth();
   
   return (
@@ -30,7 +32,7 @@ export default function ProfilePageHeader() {
           <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher dans mon profil..."
+            placeholder="Rechercher dans mes informations..."
             placeholderTextColor="#81C784"
           />
         </View>
@@ -40,7 +42,7 @@ export default function ProfilePageHeader() {
           style={styles.profileButton}
           onPress={() => {
             if (isAuthenticated) {
-              // Déjà sur la page profil, pas besoin de rediriger
+              setShowUserMenu(true);
             } else {
               setShowAuthModal(true);
             }
@@ -61,8 +63,8 @@ export default function ProfilePageHeader() {
       {/* Ligne des actions */}
       <ThemedView style={styles.actionsRow}>
         <View style={styles.titleButton}>
-          <Ionicons name="person-outline" size={20} color="#4CAF50" />
-          <ThemedText style={styles.titleButtonText}>Mon Profil</ThemedText>
+          <Ionicons name="person-circle-outline" size={20} color="#4CAF50" />
+          <ThemedText style={styles.titleButtonText}>Mes Informations</ThemedText>
         </View>
 
         {/* Favoris et Panier */}
@@ -88,6 +90,12 @@ export default function ProfilePageHeader() {
         </View>
       </ThemedView>
       
+      {/* Menu utilisateur */}
+      <UserMenu
+        visible={showUserMenu}
+        onClose={() => setShowUserMenu(false)}
+      />
+
       {/* Modal d'authentification */}
       <AuthModal
         visible={showAuthModal}
@@ -104,6 +112,11 @@ export default function ProfilePageHeader() {
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   header: {
     flexDirection: 'row',
