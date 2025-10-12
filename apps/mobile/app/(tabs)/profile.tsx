@@ -2,19 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import AccountPageHeader from '../../components/AccountPageHeader';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
+import ProfilePageHeader from '../../components/ProfilePageHeader';
 import { ThemedText } from '../../components/themed-text';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('orders');
-  const [userInfo] = useState({
-    name: 'Ulrich Kevin',
-    email: 'ulrich.kevin@email.com',
-    phone: '+33 6 12 34 56 78',
-    memberSince: '15 Janvier 2024'
-  });
+  const { logout } = useAuth();
 
   const [orders] = useState([
     {
@@ -67,7 +63,7 @@ export default function ProfileScreen() {
       'Êtes-vous sûr de vouloir vous déconnecter ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Déconnexion', style: 'destructive', onPress: () => console.log('Déconnexion') }
+        { text: 'Déconnexion', style: 'destructive', onPress: () => logout() }
       ]
     );
   };
@@ -447,7 +443,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <AccountPageHeader />
+      <ProfilePageHeader />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroContainer}>

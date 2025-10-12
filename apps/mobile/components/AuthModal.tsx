@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
     Alert,
-    Dimensions,
     Image,
     KeyboardAvoidingView,
     Modal,
@@ -14,6 +13,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -21,7 +21,6 @@ interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
   onLoginSuccess?: () => void;
-  onRegisterSuccess?: () => void;
 }
 
 interface PasswordStrength {
@@ -30,47 +29,11 @@ interface PasswordStrength {
   color: string;
 }
 
-export default function AuthModal({ visible, onClose, onLoginSuccess, onRegisterSuccess }: AuthModalProps) {
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+export default function AuthModal({ visible, onClose, onLoginSuccess }: AuthModalProps) {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [registerData, setRegisterData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { login } = useAuth();
 
-  const { width } = Dimensions.get('window');
-
-  // Validation du mot de passe
-  const validatePassword = (password: string): PasswordStrength => {
-    let score = 0;
-    const checks = {
-      length: password.length >= 8,
-      uppercase: /[A-Z]/.test(password),
-      lowercase: /[a-z]/.test(password),
-      number: /\d/.test(password),
-      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    };
-
-    score = Object.values(checks).filter(Boolean).length;
-
-    if (score <= 2) return { score, text: 'Faible', color: '#EF4444' };
-    if (score <= 3) return { score, text: 'Moyen', color: '#F59E0B' };
-    return { score, text: 'Fort', color: '#10B981' };
-  };
-
-  const passwordStrength = validatePassword(registerData.password);
-  const isPasswordValid = passwordStrength.score >= 4;
-  const isFormValid = registerData.firstName && 
-                     registerData.lastName && 
-                     registerData.email && 
-                     isPasswordValid && 
-                     registerData.password === registerData.confirmPassword;
 
   const handleLogin = async () => {
     if (!loginData.email) {
@@ -84,34 +47,20 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
+      const email = loginData.email;
+      const firstName = email.includes('@') ? email.split('@')[0] : 'Utilisateur';
+      const lastName = 'KAMRI';
+      
+      login({ firstName, lastName, email });
       onLoginSuccess?.();
       onClose();
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Une erreur est survenue');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async () => {
-    if (!isFormValid) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs correctement');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simulation d'inscription
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      onRegisterSuccess?.();
-      onClose();
-    } catch (error) {
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la création du compte');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
@@ -193,202 +142,6 @@ export default function AuthModal({ visible, onClose, onLoginSuccess, onRegister
     </View>
   );
 
-  const renderRegisterForm = () => (
-    <View style={styles.formContainer}>
-      <View style={styles.nameRow}>
-        <View style={[styles.inputGroup, styles.halfInput]}>
-          <ThemedText style={styles.inputLabel}>Prénom</ThemedText>
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Prénom"
-              placeholderTextColor="#9CA3AF"
-              value={registerData.firstName}
-              onChangeText={(text) => setRegisterData({ ...registerData, firstName: text })}
-            />
-          </View>
-        </View>
-
-        <View style={[styles.inputGroup, styles.halfInput]}>
-          <ThemedText style={styles.inputLabel}>Nom</ThemedText>
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Nom"
-              placeholderTextColor="#9CA3AF"
-              value={registerData.lastName}
-              onChangeText={(text) => setRegisterData({ ...registerData, lastName: text })}
-            />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <ThemedText style={styles.inputLabel}>Email</ThemedText>
-        <View style={styles.inputContainer}>
-          <Ionicons name="mail-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            placeholder="votre@email.com"
-            placeholderTextColor="#9CA3AF"
-            value={registerData.email}
-            onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <ThemedText style={styles.inputLabel}>Mot de passe</ThemedText>
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            placeholder="Votre mot de passe"
-            placeholderTextColor="#9CA3AF"
-            value={registerData.password}
-            onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
-            secureTextEntry={!showPassword}
-          />
-          <TouchableOpacity 
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-off-outline" : "eye-outline"} 
-              size={20} 
-              color="#9CA3AF" 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Indicateur de force du mot de passe */}
-        {registerData.password.length > 0 && (
-          <View style={styles.passwordStrengthContainer}>
-            <View style={styles.passwordStrengthBar}>
-              <View 
-                style={[
-                  styles.passwordStrengthFill, 
-                  { 
-                    width: `${(passwordStrength.score / 5) * 100}%`,
-                    backgroundColor: passwordStrength.color 
-                  }
-                ]} 
-              />
-            </View>
-            <View style={styles.passwordStrengthInfo}>
-              <ThemedText style={[styles.passwordStrengthText, { color: passwordStrength.color }]}>
-                {passwordStrength.text}
-              </ThemedText>
-              {isPasswordValid && (
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Critères de validation */}
-        <View style={styles.passwordCriteria}>
-          <View style={styles.criteriaRow}>
-            <View style={styles.criteriaItem}>
-              <Ionicons 
-                name={registerData.password.length >= 8 ? "checkmark" : "close"} 
-                size={12} 
-                color={registerData.password.length >= 8 ? "#10B981" : "#EF4444"} 
-              />
-              <ThemedText style={styles.criteriaText}>Au moins 8 caractères</ThemedText>
-            </View>
-            <View style={styles.criteriaItem}>
-              <Ionicons 
-                name={/[A-Z]/.test(registerData.password) ? "checkmark" : "close"} 
-                size={12} 
-                color={/[A-Z]/.test(registerData.password) ? "#10B981" : "#EF4444"} 
-              />
-              <ThemedText style={styles.criteriaText}>Une majuscule</ThemedText>
-            </View>
-          </View>
-          <View style={styles.criteriaRow}>
-            <View style={styles.criteriaItem}>
-              <Ionicons 
-                name={/\d/.test(registerData.password) ? "checkmark" : "close"} 
-                size={12} 
-                color={/\d/.test(registerData.password) ? "#10B981" : "#EF4444"} 
-              />
-              <ThemedText style={styles.criteriaText}>Un chiffre</ThemedText>
-            </View>
-            <View style={styles.criteriaItem}>
-              <Ionicons 
-                name={/[!@#$%^&*(),.?":{}|<>]/.test(registerData.password) ? "checkmark" : "close"} 
-                size={12} 
-                color={/[!@#$%^&*(),.?":{}|<>]/.test(registerData.password) ? "#10B981" : "#EF4444"} 
-              />
-              <ThemedText style={styles.criteriaText}>Un caractère spécial</ThemedText>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <ThemedText style={styles.inputLabel}>Confirmer le mot de passe</ThemedText>
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={20} color="#4CAF50" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            placeholder="Confirmez votre mot de passe"
-            placeholderTextColor="#9CA3AF"
-            value={registerData.confirmPassword}
-            onChangeText={(text) => setRegisterData({ ...registerData, confirmPassword: text })}
-            secureTextEntry={!showConfirmPassword}
-          />
-          <TouchableOpacity 
-            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons 
-              name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
-              size={20} 
-              color="#9CA3AF" 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Validation de confirmation */}
-        {registerData.confirmPassword.length > 0 && (
-          <View style={styles.confirmPasswordContainer}>
-            <Ionicons 
-              name={registerData.password === registerData.confirmPassword ? "checkmark-circle" : "close-circle"} 
-              size={16} 
-              color={registerData.password === registerData.confirmPassword ? "#10B981" : "#EF4444"} 
-            />
-            <ThemedText style={[
-              styles.confirmPasswordText,
-              { color: registerData.password === registerData.confirmPassword ? "#10B981" : "#EF4444" }
-            ]}>
-              {registerData.password === registerData.confirmPassword ? 'Mots de passe identiques' : 'Mots de passe différents'}
-            </ThemedText>
-          </View>
-        )}
-      </View>
-
-      <TouchableOpacity 
-        style={[styles.submitButton, (!isFormValid || isLoading) && styles.submitButtonDisabled]}
-        onPress={handleRegister}
-        disabled={!isFormValid || isLoading}
-      >
-        <LinearGradient
-          colors={['#4CAF50', '#45A049']}
-          style={styles.submitButtonGradient}
-        >
-          <ThemedText style={styles.submitButtonText}>
-            {isLoading ? 'Création...' : 'Créer mon compte'}
-          </ThemedText>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <Modal

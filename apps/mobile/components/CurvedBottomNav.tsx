@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { ThemedText } from './themed-text';
 
 
@@ -10,6 +11,9 @@ export default function CurvedBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const scaleAnim = useState(new Animated.Value(1))[0];
+  const { isAuthenticated, user, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<View>(null);
 
   const navItems = [
     { 
@@ -73,6 +77,24 @@ export default function CurvedBottomNav() {
     ]).start();
   }, [pathname, scaleAnim]);
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Déconnexion', 
+          style: 'destructive', 
+          onPress: () => {
+            logout();
+            setShowUserMenu(false);
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.wrapper}>
       {/* Fond de la barre principale */}
@@ -82,24 +104,83 @@ export default function CurvedBottomNav() {
       </View>
 
       {/* Bouton principal flottant - Page active */}
-      <TouchableOpacity 
-        key={activeItem.route}
-        style={styles.mainButton}
-        onPress={() => router.push(activeItem.route as any)}
-      >
-        <Animated.View 
-          style={[
-            styles.mainButtonContainer,
-            { transform: [{ scale: scaleAnim }] }
-          ]}
+      {isAuthenticated ? (
+        <View style={styles.mainButton} ref={menuRef}>
+          <TouchableOpacity 
+            onPress={() => setShowUserMenu(!showUserMenu)}
+            style={styles.mainButtonContainer}
+          >
+            <View style={styles.avatarContainer}>
+              <ThemedText style={styles.avatarText}>
+                {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || 'K'}
+              </ThemedText>
+            </View>
+          </TouchableOpacity>
+
+          {/* Menu déroulant utilisateur */}
+          <Modal
+            visible={showUserMenu}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowUserMenu(false)}
+          >
+            <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowUserMenu(false)}
+            >
+              <View style={styles.userMenu}>
+                <View style={styles.userInfo}>
+                  <ThemedText style={styles.userName}>
+                    {user?.firstName} {user?.lastName}
+                  </ThemedText>
+                  <ThemedText style={styles.userEmail}>{user?.email}</ThemedText>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => {
+                    router.push('/(tabs)/profile' as any);
+                    setShowUserMenu(false);
+                  }}
+                >
+                  <Ionicons name="person-outline" size={20} color="#4CAF50" />
+                  <ThemedText style={styles.menuItemText}>Mon profil</ThemedText>
+                </TouchableOpacity>
+                
+                <View style={styles.menuSeparator} />
+                
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleLogout}
+                >
+                  <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                  <ThemedText style={[styles.menuItemText, styles.logoutText]}>Se déconnecter</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          key={activeItem.route}
+          style={styles.mainButton}
+          onPress={() => router.push(activeItem.route as any)}
         >
-          <Ionicons 
-            name={activeItem.iconActive as any} 
-            size={28} 
-            color="#4CAF50" 
-          />
-        </Animated.View>
-      </TouchableOpacity>
+          <Animated.View 
+            style={[
+              styles.mainButtonContainer,
+              { transform: [{ scale: scaleAnim }] }
+            ]}
+          >
+            <Ionicons 
+              name={activeItem.iconActive as any} 
+              size={28} 
+              color="#4CAF50" 
+            />
+          </Animated.View>
+        </TouchableOpacity>
+      )}
 
       {/* Éléments secondaires - Toutes les autres pages */}
       <View style={styles.secondaryNav}>
@@ -135,6 +216,13 @@ const styles = StyleSheet.create({
     right: 0,
     height: 100,
     zIndex: 1000,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 100,
   },
   mainBar: {
     position: 'absolute',
@@ -219,5 +307,66 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 8,
     fontWeight: 'bold',
+  },
+  // Menu utilisateur
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#4CAF50',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  userMenu: {
+    width: 280,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+  },
+  userInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  menuItemText: {
+    fontSize: 14,
+    color: '#424242',
+    marginLeft: 12,
+  },
+  logoutText: {
+    color: '#EF4444',
+  },
+  menuSeparator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
   },
 });
