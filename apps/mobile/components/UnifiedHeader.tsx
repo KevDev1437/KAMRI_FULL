@@ -230,18 +230,12 @@ export default function UnifiedHeader() {
               onPress={() => router.push('/(tabs)/favorites')}
             >
               <Ionicons name="heart-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>2</ThemedText>
-              </View>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => router.push('/(tabs)/cart')}
             >
               <Ionicons name="bag-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>3</ThemedText>
-              </View>
             </TouchableOpacity>
           </View>
         </ThemedView>
