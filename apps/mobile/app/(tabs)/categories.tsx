@@ -9,8 +9,58 @@ import UnifiedHeader from '../../components/UnifiedHeader';
 
 const { width } = Dimensions.get('window');
 
-// TODO: Remplacer par des données réelles du backend
-const categories: Category[] = [];
+// Catégories de base - structure fixe avec 0 produits
+const categories: Category[] = [
+  {
+    id: 1,
+    name: 'Mode',
+    icon: '👕',
+    color: '#FF6B6B',
+    count: 0
+  },
+  {
+    id: 2,
+    name: 'Technologie',
+    icon: '💻',
+    color: '#4ECDC4',
+    count: 0
+  },
+  {
+    id: 3,
+    name: 'Maison',
+    icon: '🏠',
+    color: '#45B7D1',
+    count: 0
+  },
+  {
+    id: 4,
+    name: 'Beauté',
+    icon: '💄',
+    color: '#FECA57',
+    count: 0
+  },
+  {
+    id: 5,
+    name: 'Accessoires',
+    icon: '🎒',
+    color: '#96CEB4',
+    count: 0
+  },
+  {
+    id: 6,
+    name: 'Sport',
+    icon: '⚽',
+    color: '#A8E6CF',
+    count: 0
+  },
+  {
+    id: 7,
+    name: 'Enfants',
+    icon: '🧸',
+    color: '#FFB6C1',
+    count: 0
+  }
+];
 
 interface Category {
   id: number;
@@ -47,27 +97,6 @@ const trendingItems = [
 export default function CategoriesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [popularScrollIndex, setPopularScrollIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [categoriesData, setCategoriesData] = useState<Category[]>([]);
-
-  useEffect(() => {
-    // TODO: Remplacer par un appel API réel
-    const fetchCategories = async () => {
-      try {
-        setIsLoading(true);
-        // Simulation d'appel API - pour l'instant retourne un tableau vide
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setCategoriesData([]);
-      } catch (error) {
-        console.error('Erreur lors du chargement des catégories:', error);
-        setCategoriesData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
   const [trendingScrollIndex, setTrendingScrollIndex] = useState(0);
   const popularFlatListRef = useRef<FlatList>(null);
   const trendingFlatListRef = useRef<FlatList>(null);
@@ -180,45 +209,28 @@ export default function CategoriesScreen() {
           </View>
         </View>
 
-        {/* État de chargement */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <ThemedText style={styles.loadingText}>Chargement des catégories...</ThemedText>
+        {/* Grille des catégories */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Toutes les catégories</ThemedText>
+          <View style={styles.categoriesGrid}>
+            {categories.map((category) => (
+              <TouchableOpacity key={category.id} style={styles.categoryCard}>
+                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                  <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
+                </View>
+                <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
+                <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
+              </TouchableOpacity>
+            ))}
           </View>
-        ) : categoriesData.length > 0 ? (
-          /* Grille des catégories */
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Toutes les catégories</ThemedText>
-            <View style={styles.categoriesGrid}>
-              {categoriesData.map((category) => (
-                <TouchableOpacity key={category.id} style={styles.categoryCard}>
-                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                    <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
-                  </View>
-                  <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
-                  <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <ThemedText style={styles.emptyIcon}>📂</ThemedText>
-            <ThemedText style={styles.emptyTitle}>Aucune catégorie disponible</ThemedText>
-            <ThemedText style={styles.emptySubtitle}>
-              Aucune catégorie n'est disponible pour le moment
-            </ThemedText>
-          </View>
-        )}
+        </View>
 
         {/* Catégories Populaires */}
-        {!isLoading && categoriesData.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>🔥 Catégories populaires</ThemedText>
-            <FlatList
-              ref={popularFlatListRef}
-              data={categoriesData.slice(0, 4)}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>🔥 Catégories populaires</ThemedText>
+          <FlatList
+            ref={popularFlatListRef}
+            data={categories.slice(0, 4)}
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.popularCard}>
                 <View style={[styles.popularIcon, { backgroundColor: item.color + '20' }]}>
@@ -247,8 +259,7 @@ export default function CategoriesScreen() {
               }, 100);
             }}
           />
-          </View>
-        )}
+        </View>
 
         {/* Section Tendances */}
         <View style={[styles.section, styles.trendingSection]}>
