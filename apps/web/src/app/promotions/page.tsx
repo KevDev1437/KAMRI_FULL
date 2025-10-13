@@ -7,81 +7,8 @@ import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
 
-// Mock data pour les produits en promotion uniquement
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'promo',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99,
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '11', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  }
-];
+// TODO: Remplacer par des données réelles du backend
+const mockProducts: Product[] = [];
 
 interface Product {
   id: string;
@@ -97,13 +24,36 @@ interface Product {
 }
 
 export default function PromotionsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+
+  // Chargement des produits
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProducts([]);
+        setFilteredProducts([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des promotions:', error);
+        setProducts([]);
+        setFilteredProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Filtrage des produits - SEULEMENT les produits en promotion
   useEffect(() => {
