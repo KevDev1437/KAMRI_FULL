@@ -40,17 +40,27 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  image       String?
-  categoryId  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  originalPrice Float?   // Prix original du fournisseur
+  image         String?
+  images        String[] // Images multiples
+  categoryId    String
+  supplierId    String?  // ID du fournisseur (dropshipping)
+  sku           String?  // SKU du fournisseur
+  stock         Int      @default(0)
+  weight        Float?   // Poids en kg
+  dimensions    Json?    // {length, width, height}
+  attributes    Json?    // Attributs personnalisés
+  status        String   @default("active") // active, inactive, out_of_stock
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   category    Category    @relation(fields: [categoryId], references: [id])
+  supplier    Supplier?   @relation(fields: [supplierId], references: [id])
   images      Image[]
   cartItems   CartItem[]
   orderItems  OrderItem[]
@@ -151,6 +161,56 @@ model Review {
 
   @@unique([userId, productId])
   @@map("reviews")
+}
+
+// ===== DROPSHIPPING MODELS =====
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  apiUrl    String
+  apiKey    String
+  type      String   // dropshipping, wholesale, marketplace
+  status    String   @default("pending") // active, inactive, pending
+  settings  Json     // Configuration du fournisseur
+  lastSync  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  products Product[]
+  syncLogs SyncLog[]
+
+  @@map("suppliers")
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  supplierId  String
+  status      String   // success, failed, partial
+  productsAdded    Int @default(0)
+  productsUpdated  Int @default(0)
+  productsSkipped  Int @default(0)
+  errors      Json?    // Liste des erreurs
+  duration    Int      // Durée en ms
+  createdAt   DateTime @default(now())
+
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@map("sync_logs")
+}
+
+model DashboardUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   @default("admin") // admin, manager, viewer
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("dashboard_users")
 }
 
 
