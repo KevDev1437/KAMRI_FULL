@@ -118,8 +118,8 @@ export default function ProductsScreen() {
             <ThemedText style={styles.loadingText}>Chargement des produits...</ThemedText>
           </View>
         ) : (
-
-        {/* Filtres mobiles */}
+          <>
+            {/* Filtres mobiles */}
         {showFilters && (
           <ThemedView style={styles.filtersContainer}>
             <View style={styles.filtersHeader}>
@@ -209,6 +209,7 @@ export default function ProductsScreen() {
         )}
         
         <HomeFooter />
+          </>
         )}
       </ScrollView>
 
