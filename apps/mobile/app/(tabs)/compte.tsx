@@ -383,19 +383,12 @@ export default function ProfileScreen() {
       <View style={styles.settingsCard}>
         <ThemedText style={styles.cardTitle}>Moyens de paiement</ThemedText>
         
-        <View style={styles.paymentCard}>
-          <View style={styles.paymentInfo}>
-            <View style={styles.paymentIcon}>
-              <Ionicons name="card" size={20} color="#4CAF50" />
-            </View>
-            <View style={styles.paymentDetails}>
-              <ThemedText style={styles.paymentNumber}>**** **** **** 1234</ThemedText>
-              <ThemedText style={styles.paymentExpiry}>Expire le 12/25</ThemedText>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.paymentDelete}>
-            <Ionicons name="trash" size={16} color="#EF4444" />
-          </TouchableOpacity>
+        <View style={styles.emptyPaymentContainer}>
+          <Ionicons name="card-outline" size={48} color="#81C784" />
+          <ThemedText style={styles.emptyPaymentTitle}>Aucun moyen de paiement</ThemedText>
+          <ThemedText style={styles.emptyPaymentSubtitle}>
+            Ajoutez votre première carte pour faciliter vos achats
+          </ThemedText>
         </View>
 
         <TouchableOpacity style={styles.addPaymentButton}>
@@ -1174,5 +1167,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#81C784',
     textAlign: 'center',
+  },
+  // État vide des moyens de paiement
+  emptyPaymentContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyPaymentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#424242',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyPaymentSubtitle: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

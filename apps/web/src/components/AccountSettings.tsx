@@ -224,30 +224,18 @@ export default function AccountSettings() {
       >
         <h3 className="text-xl font-bold text-[#424242] mb-6">Moyens de paiement</h3>
         
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 2v12h16V6H4zm2 2h12v2H6V8zm0 4h8v2H6v-2z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium">**** **** **** 1234</p>
-                <p className="text-sm text-gray-500">Expire le 12/25</p>
-              </div>
-            </div>
-            <button className="text-red-500 hover:text-red-600 transition-colors duration-300">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">💳</div>
+          <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            Aucun moyen de paiement enregistré
+          </h3>
+          <p className="text-gray-500 mb-6">
+            Ajoutez votre première carte pour faciliter vos achats.
+          </p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-full bg-[#4CAF50] text-white py-3 rounded-lg font-medium hover:bg-[#45a049] transition-colors duration-300"
+            className="bg-[#4CAF50] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#45a049] transition-colors"
           >
             Ajouter un moyen de paiement
           </motion.button>

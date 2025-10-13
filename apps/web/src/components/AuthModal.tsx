@@ -63,18 +63,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     setIsLoading(true);
     try {
-      // Simulation d'authentification
+      // TODO: Remplacer par un appel API réel
+      // Simulation d'appel API - pour l'instant retourne une erreur
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
-      const email = loginData.email;
-      const firstName = email.includes('@') ? email.split('@')[0] : 'Utilisateur';
-      const lastName = 'KAMRI';
-      
-      login({ firstName, lastName, email });
-      onClose();
+      alert('L\'authentification sera bientôt disponible. Veuillez réessayer plus tard.');
     } catch (error) {
-      alert('Une erreur est survenue');
+      alert('Erreur de connexion');
     } finally {
       setIsLoading(false);
     }
@@ -88,15 +83,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     setIsLoading(true);
     try {
-      // Simulation d'inscription
+      // TODO: Remplacer par un appel API réel
+      // Simulation d'appel API - pour l'instant retourne une erreur
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      login({ 
-        firstName: registerData.firstName, 
-        lastName: registerData.lastName, 
-        email: registerData.email 
-      });
-      onClose();
+      alert('L\'inscription sera bientôt disponible. Veuillez réessayer plus tard.');
     } catch (error) {
       alert('Une erreur est survenue lors de la création du compte');
     } finally {
@@ -158,13 +149,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         {isLoading ? 'Connexion...' : 'Continuer'}
       </button>
 
-      {/* Bouton de test rapide */}
-      <button
-        onClick={() => setLoginData({ email: 'demo@kamri.com', password: '' })}
-        className="w-full bg-gray-100 text-gray-600 py-1 rounded-md font-medium hover:bg-gray-200 transition-colors duration-300 border border-gray-300 text-xs"
-      >
-        🧪 Test rapide (demo@kamri.com)
-      </button>
 
       {/* Connexion sociale */}
       <div className="text-center">
