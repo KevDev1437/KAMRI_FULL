@@ -2,38 +2,18 @@
 
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
+import RecommendedProducts from '../../components/RecommendedProducts';
+import { useCart } from '../../contexts/CartContext';
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const { cartItems, updateQuantity, removeFromCart, clearCart } = useCart();
   const [promoCode, setPromoCode] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
   const [selectedItems, setSelectedItems] = useState(new Set());
-
-  useEffect(() => {
-    // TODO: Remplacer par un appel API réel
-    const fetchCartItems = async () => {
-      try {
-        setIsLoading(true);
-        // Simulation d'appel API - pour l'instant retourne un tableau vide
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setCartItems([]);
-        setSelectedItems(new Set());
-      } catch (error) {
-        console.error('Erreur lors du chargement du panier:', error);
-        setCartItems([]);
-        setSelectedItems(new Set());
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCartItems();
-  }, []);
 
   // Calculs
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -48,18 +28,9 @@ export default function CartPage() {
     ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
     : 0;
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    setCartItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
-
-  const removeItem = (id: string) => {
+  const handleRemoveItem = (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet article de votre panier ?')) {
-      setCartItems(items => items.filter(item => item.id !== id));
+      removeFromCart(id);
       setSelectedItems(prev => {
         const newSet = new Set(prev);
         newSet.delete(id);
@@ -128,15 +99,8 @@ export default function CartPage() {
         </div>
       </section>
 
-      {/* État de chargement */}
-      {isLoading ? (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
-            <p className="text-gray-600">Chargement de votre panier...</p>
-          </div>
-        </div>
-      ) : cartItems.length > 0 ? (
+      {/* Contenu du panier */}
+      {cartItems.length > 0 ? (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Colonne principale - Articles du panier */}
@@ -172,7 +136,7 @@ export default function CartPage() {
                 <button
                   onClick={() => {
                     if (confirm('Êtes-vous sûr de vouloir vider votre panier ?')) {
-                      setCartItems([]);
+                      clearCart();
                     }
                   }}
                   className="flex items-center gap-2 text-red-500 hover:text-red-600 transition-colors duration-300"
@@ -213,21 +177,29 @@ export default function CartPage() {
                     </button>
 
                     {/* Image du produit */}
-                    <img 
-                      src={item.image} 
-                      alt={item.name}
-                      className="w-24 h-24 object-cover rounded-lg"
-                    />
+                    {item.image ? (
+                      <img 
+                        src={item.image} 
+                        alt={item.name}
+                        className="w-24 h-24 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
                     
                     {/* Détails du produit */}
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h3 className="text-lg font-semibold text-[#424242] mb-1">{item.name}</h3>
-                          <p className="text-sm text-gray-500">{item.size} • {item.color}</p>
+                          <p className="text-sm text-gray-500">Fake Store</p>
                         </div>
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => handleRemoveItem(item.id)}
                           className="text-red-500 hover:text-red-600 transition-colors duration-300 p-2"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,16 +211,8 @@ export default function CartPage() {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#4CAF50]">{item.price}€</span>
-                            {item.originalPrice > item.price && (
-                              <span className="text-sm text-gray-500 line-through">{item.originalPrice}€</span>
-                            )}
+                            <span className="text-xl font-bold text-[#4CAF50]">${item.price}</span>
                           </div>
-                          {item.originalPrice > item.price && (
-                            <span className="bg-[#E8F5E8] text-[#4CAF50] px-2 py-1 rounded-full text-sm font-medium">
-                              {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
-                            </span>
-                          )}
                         </div>
                         
                         <div className="flex items-center gap-2">
@@ -272,13 +236,11 @@ export default function CartPage() {
                         </div>
                       </div>
                       
-                      {!item.inStock && (
-                        <div className="mt-2">
-                          <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-sm font-medium">
-                            Rupture de stock
-                          </span>
-                        </div>
-                      )}
+                      <div className="mt-2">
+                        <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-sm font-medium">
+                          En stock
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -322,27 +284,7 @@ export default function CartPage() {
             </motion.div>
 
             {/* Produits recommandés */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="bg-white rounded-2xl shadow-lg p-6 mt-6"
-            >
-              <h3 className="text-lg font-semibold text-[#424242] mb-4">Vous pourriez aussi aimer</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { name: 'iPhone 15', price: 999, image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=200' },
-                  { name: 'AirPods Max', price: 549, image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=200' },
-                  { name: 'Apple Watch', price: 399, image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=200' }
-                ].map((product, index) => (
-                  <div key={index} className="flex flex-col items-center p-4 hover:bg-gray-50 rounded-lg transition-colors duration-300 cursor-pointer border border-gray-100">
-                    <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg mb-3" />
-                    <h4 className="font-medium text-[#424242] text-center mb-1">{product.name}</h4>
-                    <p className="text-sm text-[#4CAF50] font-semibold">{product.price}€</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+            <RecommendedProducts />
           </div>
 
           {/* Sidebar - Résumé et commande */}
@@ -409,9 +351,9 @@ export default function CartPage() {
                   </svg>
                 </motion.button>
                 
-                <button className="w-full text-[#4CAF50] hover:text-[#45a049] font-medium transition-colors duration-300">
+                <Link href="/products" className="w-full text-[#4CAF50] hover:text-[#45a049] font-medium transition-colors duration-300 text-center block py-2">
                   Continuer mes achats
-                </button>
+                </Link>
               </div>
             </motion.div>
 

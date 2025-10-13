@@ -35,19 +35,69 @@ export default function ProductsPage() {
 
   // Chargement des produits
   useEffect(() => {
-    // TODO: Remplacer par un appel API réel
     const fetchProducts = async () => {
       try {
+        console.log('🔄 [DEBUG] Début du chargement des produits...');
         setIsLoading(true);
-        // Simulation d'appel API - pour l'instant retourne un tableau vide
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setProducts([]);
-        setFilteredProducts([]);
+        
+        console.log('🌐 [DEBUG] Appel API vers: http://localhost:3001/api/web/products');
+        // Appel API vers le backend
+        const response = await fetch('http://localhost:3001/api/web/products', {
+          headers: {
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        console.log('📡 [DEBUG] Réponse reçue:', response.status, response.statusText);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📦 [DEBUG] Données reçues:', data);
+          console.log('📊 [DEBUG] Nombre de produits:', data.data?.length || 0);
+          
+          // Adapter les données du backend au format frontend
+          const adaptedProducts = data.data.map((product: any) => {
+            // Mapping des catégories Fake Store vers français
+            const categoryMapping: { [key: string]: string } = {
+              'electronics': 'Électronique',
+              'jewelery': 'Bijoux',
+              "men's clothing": 'Mode Homme',
+              "women's clothing": 'Mode Femme',
+              'Fake Store': 'Général'
+            };
+            
+            const mappedCategory = categoryMapping[product.category?.name] || product.category?.name || 'Général';
+            
+            console.log('📦 [DEBUG] Produit:', product.name, 'Catégorie originale:', product.category?.name, 'Catégorie mappée:', mappedCategory);
+            
+            return {
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              originalPrice: product.originalPrice,
+              image: product.image,
+              category: mappedCategory,
+              rating: 4.5, // Valeur par défaut
+              reviews: Math.floor(Math.random() * 100), // Valeur aléatoire
+              badge: product.originalPrice ? 'Promo' : null,
+              brand: 'Fake Store', // Valeur par défaut
+            };
+          });
+          
+          console.log('✅ [DEBUG] Produits adaptés:', adaptedProducts.length);
+          setProducts(adaptedProducts);
+          setFilteredProducts(adaptedProducts);
+        } else {
+          console.error('❌ [DEBUG] Erreur API:', response.status, response.statusText);
+          setProducts([]);
+          setFilteredProducts([]);
+        }
       } catch (error) {
-        console.error('Erreur lors du chargement des produits:', error);
+        console.error('💥 [DEBUG] Erreur lors du chargement des produits:', error);
         setProducts([]);
         setFilteredProducts([]);
       } finally {
+        console.log('🏁 [DEBUG] Fin du chargement');
         setIsLoading(false);
       }
     };

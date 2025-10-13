@@ -46,14 +46,13 @@ model Product {
   price         Float
   originalPrice Float?   // Prix original du fournisseur
   image         String?
-  images        String[] // Images multiples
   categoryId    String
   supplierId    String?  // ID du fournisseur (dropshipping)
   sku           String?  // SKU du fournisseur
   stock         Int      @default(0)
   weight        Float?   // Poids en kg
-  dimensions    Json?    // {length, width, height}
-  attributes    Json?    // Attributs personnalisés
+  dimensions    String?  // JSON string: {length, width, height}
+  attributes    String?  // JSON string: Attributs personnalisés
   status        String   @default("active") // active, inactive, out_of_stock
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -172,7 +171,7 @@ model Supplier {
   apiKey    String
   type      String   // dropshipping, wholesale, marketplace
   status    String   @default("pending") // active, inactive, pending
-  settings  Json     // Configuration du fournisseur
+  settings  String   // JSON string: Configuration du fournisseur
   lastSync  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,7 +190,7 @@ model SyncLog {
   productsAdded    Int @default(0)
   productsUpdated  Int @default(0)
   productsSkipped  Int @default(0)
-  errors      Json?    // Liste des erreurs
+  errors      String?  // JSON string: Liste des erreurs
   duration    Int      // Durée en ms
   createdAt   DateTime @default(now())
 

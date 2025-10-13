@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';

@@ -1,14 +1,13 @@
 'use client';
 
-import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
+import { useFavorites } from '../../contexts/FavoritesContext';
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { favorites, removeFromFavorites } = useFavorites();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date'); // date, price, name, rating
   const [filterCategory, setFilterCategory] = useState('all');
@@ -17,30 +16,10 @@ export default function FavoritesPage() {
 
   const categories = ['all', 'Smartphones', 'Ordinateurs', 'Audio', 'Montres', 'Tablettes', 'Accessoires'];
 
-  useEffect(() => {
-    // TODO: Remplacer par un appel API réel
-    const fetchFavorites = async () => {
-      try {
-        setIsLoading(true);
-        // Simulation d'appel API - pour l'instant retourne un tableau vide
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setFavorites([]);
-      } catch (error) {
-        console.error('Erreur lors du chargement des favoris:', error);
-        setFavorites([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFavorites();
-  }, []);
-
   const filteredFavorites = favorites.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    // Note: Les favoris n'ont pas de catégorie dans notre contexte, on ignore le filtre de catégorie pour l'instant
+    return matchesSearch;
   });
 
   const sortedFavorites = [...filteredFavorites].sort((a, b) => {
@@ -53,21 +32,14 @@ export default function FavoritesPage() {
         return b.rating - a.rating;
       case 'date':
       default:
-        return new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime();
+        // Pour l'instant, on trie par nom par défaut
+        return a.name.localeCompare(b.name);
     }
   });
 
-  const toggleFavorite = (id) => {
-    setFavorites(items => 
-      items.map(item => 
-        item.id === id ? { ...item, isLiked: !item.isLiked } : item
-      )
-    );
-  };
-
-  const removeFromFavorites = (id) => {
+  const handleRemoveFromFavorites = (id) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet article de vos favoris ?')) {
-      setFavorites(items => items.filter(item => item.id !== id));
+      removeFromFavorites(id);
       setSelectedItems(prev => {
         const newSet = new Set(prev);
         newSet.delete(id);
@@ -104,7 +76,7 @@ export default function FavoritesPage() {
     if (selectedItems.size === 0) return;
     
     if (confirm(`Êtes-vous sûr de vouloir supprimer ${selectedItems.size} article(s) de vos favoris ?`)) {
-      setFavorites(items => items.filter(item => !selectedItems.has(item.id)));
+      selectedItems.forEach(id => removeFromFavorites(id));
       setSelectedItems(new Set());
     }
   };
@@ -214,13 +186,8 @@ export default function FavoritesPage() {
           </div>
         )}
 
-        {/* État de chargement */}
-        {isLoading ? (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
-            <p className="text-gray-600">Chargement de vos favoris...</p>
-          </div>
-        ) : filteredFavorites.length > 0 ? (
+        {/* Contenu des favoris */}
+        {filteredFavorites.length > 0 ? (
           <div className={`grid gap-6 ${
             viewMode === 'grid' 
               ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
@@ -238,14 +205,17 @@ export default function FavoritesPage() {
                   <div className="flex items-start gap-4">
                     {/* Image */}
                     <div className="relative">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                      {item.isOnSale && (
-                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                          -{formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}%
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
+                          <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
                         </div>
                       )}
                     </div>
@@ -255,48 +225,17 @@ export default function FavoritesPage() {
                       <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
                         {item.name}
                       </h3>
-                      <p className="text-sm text-gray-500 mb-2">{item.category}</p>
+                      <p className="text-sm text-gray-500 mb-2">Fake Store</p>
                       
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center">
-                          <span className="text-yellow-400">★</span>
-                          <span className="text-sm text-gray-600 ml-1">{item.rating}</span>
-                        </div>
-                        <span className="text-sm text-gray-500">({item.reviews} avis)</span>
-                      </div>
-
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg font-bold text-green-600">
                           ${item.price}
                         </span>
-                        {item.originalPrice > item.price && (
-                          <span className="text-sm text-gray-500 line-through">
-                            ${item.originalPrice}
-                          </span>
-                        )}
-                        {item.savings > 0 && (
-                          <span className="text-sm text-green-600 font-medium">
-                            Économie: ${item.savings}
-                          </span>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-2 text-sm">
-                        {item.inStock ? (
-                          <span className="text-green-600">
-                            En stock ({item.stockCount} disponibles)
-                          </span>
-                        ) : (
-                          <span className="text-red-500">Rupture de stock</span>
-                        )}
-                        {item.priceAlert && (
-                          <span className="text-orange-500">⚠️ Alerte prix</span>
-                        )}
+                        <span className="text-green-600">En stock</span>
                       </div>
-
-                      <p className="text-xs text-gray-500 mt-2">
-                        Ajouté le {new Date(item.addedDate).toLocaleDateString('fr-FR')}
-                      </p>
                     </div>
 
                     {/* Actions */}
@@ -314,19 +253,11 @@ export default function FavoritesPage() {
                       </button>
                       
                       <button
-                        onClick={() => toggleFavorite(item.id)}
+                        onClick={() => handleRemoveFromFavorites(item.id)}
                         className="p-2 text-red-500 hover:text-red-700 transition-colors"
                         title="Retirer des favoris"
                       >
                         ❤️
-                      </button>
-                      
-                      <button
-                        onClick={() => removeFromFavorites(item.id)}
-                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                        title="Supprimer"
-                      >
-                        🗑️
                       </button>
                     </div>
                   </div>

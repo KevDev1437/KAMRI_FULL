@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { AnalyticsService } from '../services/analytics.service';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'; // TODO: Créer ce guard
+import { AnalyticsService } from '../services/analytics.service';
 
 @ApiTags('Dashboard - Analytics')
 @Controller('api/dashboard/analytics')

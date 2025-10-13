@@ -10,6 +10,7 @@ export interface ExternalProduct {
   originalPrice?: number;
   images: string[];
   category: string;
+  categoryId?: string;
   brand: string;
   stock: number;
   sku: string;
@@ -79,7 +80,7 @@ export class ProductsSyncService {
             result.productsAdded++;
           }
         } catch (error) {
-          result.errors.push(`Error processing product ${externalProduct.sku}: ${error.message}`);
+          result.errors.push(`Error processing product ${externalProduct.sku}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           result.productsSkipped++;
         }
       }
@@ -92,7 +93,7 @@ export class ProductsSyncService {
 
       result.success = true;
     } catch (error) {
-      result.errors.push(`Sync failed: ${error.message}`);
+      result.errors.push(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       result.duration = Date.now() - startTime;
     }
@@ -146,16 +147,18 @@ export class ProductsSyncService {
         description: externalProduct.description,
         price: markupPrice,
         originalPrice: externalProduct.price,
-        images: externalProduct.images,
-        category: externalProduct.category,
-        brand: externalProduct.brand,
+        image: externalProduct.images?.[0] || '',
+        categoryId: externalProduct.categoryId || 'default-category',
         stock: externalProduct.stock,
         sku: externalProduct.sku,
         weight: externalProduct.weight,
-        dimensions: externalProduct.dimensions,
-        attributes: externalProduct.attributes,
+        dimensions: JSON.stringify(externalProduct.dimensions || {}),
+        attributes: JSON.stringify(externalProduct.attributes || {}),
         supplierId: supplier.id,
         status: 'active',
+        images: {
+          create: externalProduct.images?.map(url => ({ url })) || []
+        },
       },
     });
   }
@@ -170,10 +173,14 @@ export class ProductsSyncService {
         description: externalProduct.description,
         price: markupPrice,
         originalPrice: externalProduct.price,
-        images: externalProduct.images,
+        image: externalProduct.images?.[0] || '',
         stock: externalProduct.stock,
-        attributes: externalProduct.attributes,
+        attributes: JSON.stringify(externalProduct.attributes || {}),
         updatedAt: new Date(),
+        images: {
+          deleteMany: {},
+          create: externalProduct.images?.map(url => ({ url })) || []
+        },
       },
     });
   }

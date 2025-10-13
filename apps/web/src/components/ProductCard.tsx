@@ -1,5 +1,7 @@
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import Link from 'next/link';
+import { useCart } from '../contexts/CartContext';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 interface Product {
   id: string;
@@ -27,14 +29,62 @@ export default function ProductCard({ product }: ProductCardProps) {
     ? calculateDiscountPercentage(product.originalPrice, product.price)
     : 0;
 
+  const { addToCart } = useCart();
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🛒 [ProductCard] Ajouter au panier:', product.name);
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+    });
+  };
+
+  const handleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isFavorite(product.id)) {
+      console.log('💔 [ProductCard] Retirer des favoris:', product.name);
+      removeFromFavorites(product.id);
+    } else {
+      console.log('❤️ [ProductCard] Ajouter aux favoris:', product.name);
+      addToFavorites({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+      });
+    }
+  };
+
   return (
-    <Link href={`/product/${product.id}`}>
-      <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group cursor-pointer">
-      {/* Image placeholder */}
+    <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
+      <Link href={`/product/${product.id}`} className="block">
+      {/* Image */}
       <div className="h-56 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
-        <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              console.log('❌ [ProductCard] Erreur image:', product.image);
+              e.currentTarget.style.display = 'none';
+            }}
+            onLoad={() => {
+              console.log('✅ [ProductCard] Image chargée:', product.image);
+            }}
+          />
+        ) : (
+          <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )}
         
         {/* Badge */}
         {product.badge && (
@@ -53,8 +103,15 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {/* Favorite button */}
-        <button className="absolute top-4 right-4 p-2 bg-white/90 rounded-full shadow-md hover:bg-white hover:shadow-lg transition-all duration-200">
-          <svg className="h-5 w-5 text-[#81C784] hover:text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button 
+          onClick={handleFavorite}
+          className={`absolute top-4 right-4 p-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 ${
+            isFavorite(product.id) 
+              ? 'bg-[#4CAF50] text-white' 
+              : 'bg-white/90 text-[#81C784] hover:text-[#4CAF50]'
+          }`}
+        >
+          <svg className="h-5 w-5" fill={isFavorite(product.id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
@@ -93,14 +150,21 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
         
-        <button className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
+      </div>
+      </Link>
+      
+      {/* Add to cart button - séparé du lien */}
+      <div className="px-6 pb-6">
+        <button 
+          onClick={handleAddToCart}
+          className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2"
+        >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           Ajouter au panier
         </button>
       </div>
-      </div>
-    </Link>
+    </div>
   );
 }

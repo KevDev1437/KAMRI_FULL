@@ -1,7 +1,7 @@
-import { Controller, Get, Query, Headers } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { ProductsService } from '../../products/products.service';
+import { Controller, Get, Headers, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PlatformService } from '../../common/services/platform.service';
+import { ProductsService } from '../../products/products.service';
 
 @ApiTags('Shared Products')
 @Controller('api/shared/products')
@@ -17,40 +17,32 @@ export class SharedProductsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
   @ApiQuery({ name: 'category', required: false, description: 'Product category' })
   async getProducts(
+    @Headers('user-agent') userAgent: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '30',
     @Query('category') category?: string,
-    @Headers('user-agent') userAgent: string,
   ) {
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.max(1, parseInt(limit));
     
-    // Détection automatique de la plateforme
-    const platform = this.platformService.detectPlatform(userAgent);
+    const platform = this.platformService.detectPlatform(userAgent || '');
     
-    // TODO: Remplacer par des données réelles
-    const products = await this.productsService.findAll({
+    const products = await this.productsService.search('', {
       page: pageNum,
       limit: limitNum,
-      category,
     });
 
-    // Optimisation selon la plateforme
-    const optimizedProducts = platform === 'mobile' 
-      ? this.platformService.optimizeForMobile(products)
-      : this.platformService.optimizeForWeb(products);
-
-    return this.platformService.createSharedResponse(optimizedProducts, platform);
+    return this.platformService.optimizeResponse(products, platform, {
+      limit: limitNum,
+      offset: (pageNum - 1) * limitNum
+    });
   }
 
   @Get('categories')
   @ApiOperation({ summary: 'Get product categories (shared endpoint)' })
   async getCategories(@Headers('user-agent') userAgent: string) {
-    const platform = this.platformService.detectPlatform(userAgent);
-    
-    // TODO: Remplacer par des données réelles
+    const platform = this.platformService.detectPlatform(userAgent || '');
     const categories = await this.productsService.getCategories();
-
-    return this.platformService.createSharedResponse(categories, platform);
+    return this.platformService.optimizeResponse(categories, platform);
   }
 }

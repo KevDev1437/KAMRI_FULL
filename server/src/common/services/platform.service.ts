@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PlatformResponse, MobileOptimizedResponse, WebOptimizedResponse } from '../interfaces/platform-response.interface';
+import { MobileOptimizedResponse, PlatformResponse, WebOptimizedResponse } from '../interfaces/platform-response.interface';
 
 @Injectable()
 export class PlatformService {
@@ -54,5 +54,13 @@ export class PlatformService {
   optimizeForWeb<T>(data: T[]): T[] {
     // Optimisations spécifiques web
     return data.slice(0, 50); // Limite web
+  }
+
+  optimizeResponse<T>(data: T, platform: 'mobile' | 'web', options?: any): PlatformResponse<T> {
+    if (platform === 'mobile') {
+      return this.createMobileResponse(data, options);
+    } else {
+      return this.createWebResponse(data, options);
+    }
   }
 }

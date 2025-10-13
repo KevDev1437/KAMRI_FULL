@@ -1,9 +1,9 @@
-import { Body, Controller, Post, Headers, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
+import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../../auth/auth.service';
-import { PlatformService } from '../../common/services/platform.service';
 import { Platform } from '../../common/decorators/platform.decorator';
 import { PlatformGuard } from '../../common/guards/platform.guard';
+import { PlatformService } from '../../common/services/platform.service';
 
 @ApiTags('Web Auth')
 @Controller('api/web/auth')

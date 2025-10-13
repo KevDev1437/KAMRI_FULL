@@ -5,13 +5,11 @@ interface CategoryTabsProps {
 
 const categories = [
   { id: 'tous', name: 'Tous', icon: '🛍️' },
-  { id: 'mode', name: 'Mode', icon: '👕' },
-  { id: 'technologie', name: 'Technologie', icon: '💻' },
-  { id: 'maison', name: 'Maison', icon: '🏠' },
-  { id: 'beaute', name: 'Beauté', icon: '💅' },
-  { id: 'accessoires', name: 'Accessoires', icon: '🎒' },
-  { id: 'sport', name: 'Sport', icon: '⚽' },
-  { id: 'enfants', name: 'Enfants', icon: '🧸' },
+  { id: 'Électronique', name: 'Électronique', icon: '💻' },
+  { id: 'Bijoux', name: 'Bijoux', icon: '💎' },
+  { id: 'Mode Homme', name: 'Mode Homme', icon: '👔' },
+  { id: 'Mode Femme', name: 'Mode Femme', icon: '👗' },
+  { id: 'Général', name: 'Général', icon: '🛍️' },
 ];
 
 export default function CategoryTabs({ selectedCategory, setSelectedCategory }: CategoryTabsProps) {

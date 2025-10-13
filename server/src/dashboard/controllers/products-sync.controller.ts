@@ -1,7 +1,7 @@
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ProductsSyncService } from '../services/products-sync.service';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'; // TODO: Créer ce guard
+import { ProductsSyncService } from '../services/products-sync.service';
 
 @ApiTags('Dashboard - Products Sync')
 @Controller('api/dashboard/sync')

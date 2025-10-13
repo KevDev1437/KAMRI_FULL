@@ -30,7 +30,7 @@ export class SuppliersService {
         apiKey: supplierData.apiKey,
         type: supplierData.type,
         status: supplierData.status,
-        settings: supplierData.settings,
+        settings: JSON.stringify(supplierData.settings),
       },
     });
   }
@@ -53,7 +53,7 @@ export class SuppliersService {
       status: supplier.status as any,
       productsCount: supplier._count.products,
       lastSync: supplier.lastSync,
-      settings: supplier.settings as any,
+      settings: JSON.parse(supplier.settings),
     }));
   }
 
@@ -78,7 +78,7 @@ export class SuppliersService {
       status: supplier.status as any,
       productsCount: supplier._count.products,
       lastSync: supplier.lastSync,
-      settings: supplier.settings as any,
+      settings: JSON.parse(supplier.settings),
     };
   }
 
@@ -91,7 +91,7 @@ export class SuppliersService {
         apiKey: updateData.apiKey,
         type: updateData.type,
         status: updateData.status,
-        settings: updateData.settings,
+        settings: updateData.settings ? JSON.stringify(updateData.settings) : undefined,
       },
     });
   }
@@ -123,7 +123,7 @@ export class SuppliersService {
         return { success: false, message: 'Connection failed' };
       }
     } catch (error) {
-      return { success: false, message: `Connection error: ${error.message}` };
+      return { success: false, message: `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import CategoryCard from '../../components/CategoryCard';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';

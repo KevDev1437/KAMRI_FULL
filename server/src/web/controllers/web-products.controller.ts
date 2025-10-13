@@ -1,9 +1,9 @@
-import { Controller, Get, Query, Headers, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
-import { ProductsService } from '../../products/products.service';
-import { PlatformService } from '../../common/services/platform.service';
+import { Controller, Get, Headers, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Platform } from '../../common/decorators/platform.decorator';
 import { PlatformGuard } from '../../common/guards/platform.guard';
+import { PlatformService } from '../../common/services/platform.service';
+import { ProductsService } from '../../products/products.service';
 
 @ApiTags('Web Products')
 @Controller('api/web/products')
@@ -24,35 +24,28 @@ export class WebProductsController {
   @ApiQuery({ name: 'sort', required: false, description: 'Sort order' })
   @ApiQuery({ name: 'filters', required: false, description: 'JSON filters' })
   async getProducts(
+    @Headers('user-agent') userAgent: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '50',
     @Query('category') category?: string,
     @Query('sort') sort?: string,
     @Query('filters') filters?: string,
-    @Headers('user-agent') userAgent: string,
   ) {
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50 pour web
     
     // TODO: Remplacer par des données réelles
-    const products = await this.productsService.findAll({
+    const products = await this.productsService.search('', {
       page: pageNum,
       limit: limitNum,
-      category,
       sort,
       filters: filters ? JSON.parse(filters) : undefined,
     });
 
-    // Optimisations spécifiques web
-    const optimizedProducts = this.platformService.optimizeForWeb(products);
-
-    return this.platformService.createWebResponse(optimizedProducts, {
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total: products.length,
-      },
-      cache: { ttl: 600, key: `web_products_${category || 'all'}_${pageNum}_${sort || 'default'}` }
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse(products, 'web', { 
+      limit: limitNum, 
+      offset: (pageNum - 1) * limitNum 
     });
   }
 
@@ -60,12 +53,9 @@ export class WebProductsController {
   @ApiOperation({ summary: 'Get featured products for web' })
   @ApiHeader({ name: 'x-platform', description: 'Platform identifier', required: true })
   async getFeaturedProducts(@Headers('user-agent') userAgent: string) {
-    // TODO: Remplacer par des données réelles
     const featuredProducts = await this.productsService.findFeatured();
-
-    return this.platformService.createWebResponse(featuredProducts, {
-      cache: { ttl: 1200, key: 'web_featured_products' }
-    });
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse(featuredProducts, 'web');
   }
 
   @Get('search')
@@ -76,11 +66,11 @@ export class WebProductsController {
   @ApiQuery({ name: 'sort', required: false, description: 'Sort order' })
   @ApiQuery({ name: 'filters', required: false, description: 'JSON filters' })
   async searchProducts(
+    @Headers('user-agent') userAgent: string,
     @Query('q') query: string,
     @Query('page') page: string = '1',
     @Query('sort') sort?: string,
     @Query('filters') filters?: string,
-    @Headers('user-agent') userAgent: string,
   ) {
     const pageNum = Math.max(1, parseInt(page));
     
@@ -92,13 +82,10 @@ export class WebProductsController {
       filters: filters ? JSON.parse(filters) : undefined,
     });
 
-    return this.platformService.createWebResponse(searchResults, {
-      pagination: {
-        page: pageNum,
-        limit: 30,
-        total: searchResults.length,
-      },
-      cache: { ttl: 600, key: `web_search_${query}_${pageNum}_${sort || 'default'}` }
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse(searchResults, 'web', {
+      limit: 30,
+      offset: (pageNum - 1) * 30
     });
   }
 
@@ -106,23 +93,30 @@ export class WebProductsController {
   @ApiOperation({ summary: 'Get product categories for web' })
   @ApiHeader({ name: 'x-platform', description: 'Platform identifier', required: true })
   async getCategories(@Headers('user-agent') userAgent: string) {
-    // TODO: Remplacer par des données réelles
     const categories = await this.productsService.getCategories();
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse(categories, 'web');
+  }
 
-    return this.platformService.createWebResponse(categories, {
-      cache: { ttl: 3600, key: 'web_categories' }
-    });
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a specific product by ID for web' })
+  @ApiHeader({ name: 'x-platform', description: 'Platform identifier', required: true })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  async getProductById(
+    @Headers('user-agent') userAgent: string,
+    @Param('id') id: string,
+  ) {
+    const product = await this.productsService.findById(id);
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse(product, 'web');
   }
 
   @Get('analytics')
   @ApiOperation({ summary: 'Get product analytics for web dashboard' })
   @ApiHeader({ name: 'x-platform', description: 'Platform identifier', required: true })
   async getAnalytics(@Headers('user-agent') userAgent: string) {
-    // TODO: Remplacer par des données réelles
     const analytics = await this.productsService.getAnalytics();
-
-    return this.platformService.createWebResponse(analytics, {
-      cache: { ttl: 1800, key: 'web_product_analytics' }
-    });
+    const platform = this.platformService.detectPlatform(userAgent || '');
+    return this.platformService.optimizeResponse([analytics], 'web');
   }
 }
