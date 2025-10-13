@@ -7,103 +7,7 @@ import BottomNavigation from '../../components/BottomNavigation';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
-// Mock data pour les produits (même que web)
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'mode',
-    type: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'tendance',
-    brand: 'KAMRI',
-    description: 'T-shirt en coton bio premium avec coupe moderne et confortable. Parfait pour toutes les occasions.',
-    sizes: ['S', 'M', 'L', 'XL'],
-    colors: ['Blanc', 'Noir', 'Gris'],
-    specifications: null,
-    inStock: true,
-    stockCount: 15
-  },
-  { 
-    id: '2', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'technologie',
-    type: 'tech',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand',
-    description: 'Smartphone haut de gamme avec écran OLED 6.7", processeur 8 cœurs et caméra 108MP.',
-    sizes: null,
-    colors: ['Noir', 'Blanc', 'Bleu'],
-    specifications: {
-      'Écran': '6.7" OLED',
-      'Processeur': '8 cœurs 3.2GHz',
-      'Mémoire': '256GB',
-      'Caméra': '108MP',
-      'Batterie': '5000mAh',
-      'OS': 'Android 14'
-    },
-    inStock: true,
-    stockCount: 8
-  },
-  { 
-    id: '3', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'mode',
-    type: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
-    brand: 'KAMRI',
-    description: 'Jean slim fit en denim stretch pour un confort optimal et un style moderne.',
-    sizes: ['28', '30', '32', '34', '36'],
-    colors: ['Bleu', 'Noir'],
-    specifications: null,
-    inStock: true,
-    stockCount: 12
-  },
-  { 
-    id: '4', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'technologie',
-    type: 'tech',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech',
-    description: 'Laptop gaming haute performance avec carte graphique dédiée et écran 144Hz.',
-    sizes: null,
-    colors: ['Noir', 'Rouge'],
-    specifications: {
-      'Processeur': 'Intel i7-12700H',
-      'Carte Graphique': 'RTX 4060 8GB',
-      'RAM': '16GB DDR5',
-      'Stockage': '512GB SSD',
-      'Écran': '15.6" 144Hz',
-      'OS': 'Windows 11'
-    },
-    inStock: true,
-    stockCount: 5
-  }
-];
+// TODO: Remplacer par des appels API réels
 
 interface Product {
   id: string;
@@ -126,16 +30,30 @@ interface Product {
   stockCount: number;
 }
 
-// Fonction pour récupérer un produit par ID
-function getProductById(id: string): Product | null {
-  return mockProducts.find(product => product.id === id) || null;
+// Fonction pour récupérer un produit par ID depuis l'API
+async function getProductById(id: string): Promise<Product | null> {
+  try {
+    // TODO: Remplacer par un appel API réel
+    // Simulation d'appel API - pour l'instant retourne null
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return null;
+  } catch (error) {
+    console.error('Erreur lors du chargement du produit:', error);
+    return null;
+  }
 }
 
-// Fonction pour récupérer des produits similaires
-function getSimilarProducts(category: string, currentId: string): Product[] {
-  return mockProducts
-    .filter(product => product.category === category && product.id !== currentId)
-    .slice(0, 3);
+// Fonction pour récupérer des produits similaires depuis l'API
+async function getSimilarProducts(category: string, currentId: string): Promise<Product[]> {
+  try {
+    // TODO: Remplacer par un appel API réel
+    // Simulation d'appel API - pour l'instant retourne un tableau vide
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return [];
+  } catch (error) {
+    console.error('Erreur lors du chargement des produits similaires:', error);
+    return [];
+  }
 }
 
 export default function ProductDetailsScreen() {
@@ -151,13 +69,26 @@ export default function ProductDetailsScreen() {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
-    const foundProduct = getProductById(id);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      setSimilarProducts(getSimilarProducts(foundProduct.category, foundProduct.id));
-      setSelectedColor(foundProduct.colors[0]);
-    }
-    setLoading(false);
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const foundProduct = await getProductById(id);
+        if (foundProduct) {
+          setProduct(foundProduct);
+          const similar = await getSimilarProducts(foundProduct.category, foundProduct.id);
+          setSimilarProducts(similar);
+          if (foundProduct.colors.length > 0) {
+            setSelectedColor(foundProduct.colors[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du produit:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
   }, [id]);
 
   if (loading) {
