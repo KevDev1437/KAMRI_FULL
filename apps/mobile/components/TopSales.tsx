@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
+import { getBadgeConfig } from '@kamri/lib';
 import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-// Mock data pour les top ventes
+// Mock data pour les top ventes - 6 produits optimaux
 const topSales = [
   { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
   { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
   { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
   { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
+  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
+  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
 ];
 
 const { width } = Dimensions.get('window');
@@ -27,6 +30,9 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  // Utilisation des couleurs d'étiquettes cohérentes pour "top-ventes"
+  const badgeConfig = getBadgeConfig('top-ventes');
+  
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
       {/* Image placeholder */}
@@ -36,8 +42,10 @@ function ProductCard({ product }: ProductCardProps) {
         </ThemedView>
         
         {/* Badge Top Vente */}
-        <View style={styles.badge}>
-          <ThemedText style={styles.badgeText}>Top Vente</ThemedText>
+        <View style={[styles.badge, { backgroundColor: badgeConfig.backgroundColor }]}>
+          <ThemedText style={[styles.badgeText, { color: badgeConfig.color }]}>
+            {badgeConfig.icon} {badgeConfig.text}
+          </ThemedText>
         </View>
       </View>
       

@@ -29,16 +29,16 @@ export default function CurvedBottomNav() {
       iconActive: 'grid' as const
     },
     { 
+      icon: 'pricetag-outline' as const, 
+      label: 'Promos', 
+      route: '/(tabs)/promotions',
+      iconActive: 'pricetag' as const
+    },
+    { 
       icon: 'list-outline' as const, 
       label: 'Catégorie', 
       route: '/(tabs)/categories',
       iconActive: 'list' as const
-    },
-    { 
-      icon: 'call-outline' as const, 
-      label: 'Contact', 
-      route: '/(tabs)/contact',
-      iconActive: 'call' as const
     },
     { 
       icon: 'person-outline' as const, 

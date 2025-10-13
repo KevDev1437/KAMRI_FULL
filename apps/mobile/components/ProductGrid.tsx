@@ -3,7 +3,7 @@ import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-// Mock data pour les produits
+// Mock data pour les produits - 8 produits optimaux
 const mockProducts = [
   { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
   { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
@@ -11,6 +11,8 @@ const mockProducts = [
   { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
   { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
   { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
+  { id: '7', name: 'Sac à Dos', price: '39.99€', image: null },
+  { id: '8', name: 'Montre Connectée', price: '199.99€', image: null },
 ];
 
 const { width } = Dimensions.get('window');

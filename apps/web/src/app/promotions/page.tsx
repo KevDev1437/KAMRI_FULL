@@ -7,7 +7,7 @@ import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
 
-// Mock data pour les produits avec les 7 catégories fixes
+// Mock data pour les produits en promotion uniquement
 const mockProducts = [
   { 
     id: '1', 
@@ -18,19 +18,7 @@ const mockProducts = [
     category: 'mode',
     rating: 4.5,
     reviews: 128,
-    badge: 'tendances',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '2', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
+    badge: 'promo',
     brand: 'KAMRI'
   },
   { 
@@ -46,18 +34,6 @@ const mockProducts = [
     brand: 'TechBrand'
   },
   { 
-    id: '4', 
-    name: 'Veste Denim', 
-    price: 79.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.3,
-    reviews: 67,
-    badge: null,
-    brand: 'KAMRI'
-  },
-  { 
     id: '5', 
     name: 'Laptop Gaming', 
     price: 1299.99, 
@@ -70,21 +46,9 @@ const mockProducts = [
     brand: 'GameTech'
   },
   { 
-    id: '6', 
-    name: 'Sac à Main', 
-    price: 49.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.1,
-    reviews: 45,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
     id: '7', 
     name: 'Parfum Élégant', 
-    price: 89.99, 
+    price: 89.99,
     originalPrice: 119.99,
     image: null, 
     category: 'beaute',
@@ -92,18 +56,6 @@ const mockProducts = [
     reviews: 203,
     badge: 'promo',
     brand: 'Luxury'
-  },
-  { 
-    id: '8', 
-    name: 'Chaise Design', 
-    price: 199.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'maison',
-    rating: 4.4,
-    reviews: 78,
-    badge: 'tendances',
-    brand: 'HomeStyle'
   },
   { 
     id: '9', 
@@ -118,7 +70,7 @@ const mockProducts = [
     brand: 'TechWatch'
   },
   { 
-    id: '10', 
+    id: '11', 
     name: 'Chaussures Sport', 
     price: 79.99, 
     originalPrice: 99.99,
@@ -128,31 +80,7 @@ const mockProducts = [
     reviews: 89,
     badge: 'promo',
     brand: 'SportBrand'
-  },
-  { 
-    id: '11', 
-    name: 'Jouet Éducatif', 
-    price: 29.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'enfants',
-    rating: 4.5,
-    reviews: 67,
-    badge: 'nouveau',
-    brand: 'KidsBrand'
-  },
-  { 
-    id: '12', 
-    name: 'Crème Hydratante', 
-    price: 24.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'beaute',
-    rating: 4.2,
-    reviews: 134,
-    badge: 'top-ventes',
-    brand: 'BeautyBrand'
-  },
+  }
 ];
 
 interface Product {
@@ -168,7 +96,7 @@ interface Product {
   brand: string;
 }
 
-export default function ProductsPage() {
+export default function PromotionsPage() {
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
@@ -177,9 +105,9 @@ export default function ProductsPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
-  // Filtrage des produits
+  // Filtrage des produits - SEULEMENT les produits en promotion
   useEffect(() => {
-    let filtered = products;
+    let filtered = products.filter(product => product.badge === 'promo');
 
     // Filtre par catégorie
     if (selectedCategory !== 'tous') {
@@ -223,8 +151,10 @@ export default function ProductsPage() {
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       <ModernHeader />
-
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-3xl font-bold text-[#424242] mb-8 text-center">🔥 Promotions</h1>
+
         <div className="flex gap-8">
           {/* Sidebar avec filtres */}
           <div className="hidden lg:block w-80 flex-shrink-0">
@@ -250,7 +180,7 @@ export default function ProductsPage() {
             <div className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-[#424242]">
-                  {filteredProducts.length} produits trouvés
+                  {filteredProducts.length} produits en promotion trouvés
                 </h2>
                 <button 
                   className="lg:hidden bg-[#4CAF50] text-white px-4 py-2 rounded-lg"
@@ -269,12 +199,12 @@ export default function ProductsPage() {
 
               {/* Message si aucun produit */}
               {filteredProducts.length === 0 && (
-                <div className="text-center py-16">
+                <div className="text-center py-20">
                   <div className="text-6xl mb-4">🔍</div>
-                  <h3 className="text-xl font-semibold text-[#424242] mb-2">
-                    Aucun produit trouvé
-                  </h3>
-                  <p className="text-[#81C784]">
+                  <h2 className="text-2xl font-bold text-[#424242] mb-2">
+                    Aucune promotion trouvée
+                  </h2>
+                  <p className="text-lg text-[#81C784]">
                     Essayez de modifier vos critères de recherche
                   </p>
                 </div>
@@ -283,7 +213,7 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
-      
+
       <HomeFooter />
     </div>
   );

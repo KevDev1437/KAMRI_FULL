@@ -10,7 +10,7 @@ import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useFilter } from '../../contexts/FilterContext';
 
-// Mock data pour les produits avec les 7 catégories fixes
+// Mock data pour les produits en promotion uniquement
 const mockProducts = [
   { 
     id: '1', 
@@ -21,19 +21,7 @@ const mockProducts = [
     category: 'mode',
     rating: 4.5,
     reviews: 128,
-    badge: 'tendances',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '2', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
+    badge: 'promo',
     brand: 'KAMRI'
   },
   { 
@@ -49,18 +37,6 @@ const mockProducts = [
     brand: 'TechBrand'
   },
   { 
-    id: '4', 
-    name: 'Veste Denim', 
-    price: 79.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.3,
-    reviews: 67,
-    badge: null,
-    brand: 'KAMRI'
-  },
-  { 
     id: '5', 
     name: 'Laptop Gaming', 
     price: 1299.99, 
@@ -73,21 +49,9 @@ const mockProducts = [
     brand: 'GameTech'
   },
   { 
-    id: '6', 
-    name: 'Sac à Main', 
-    price: 49.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.1,
-    reviews: 45,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
     id: '7', 
     name: 'Parfum Élégant', 
-    price: 89.99, 
+    price: 89.99,
     originalPrice: 119.99,
     image: null, 
     category: 'beaute',
@@ -95,18 +59,6 @@ const mockProducts = [
     reviews: 203,
     badge: 'promo',
     brand: 'Luxury'
-  },
-  { 
-    id: '8', 
-    name: 'Chaise Design', 
-    price: 199.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'maison',
-    rating: 4.4,
-    reviews: 78,
-    badge: 'tendances',
-    brand: 'HomeStyle'
   },
   { 
     id: '9', 
@@ -121,7 +73,7 @@ const mockProducts = [
     brand: 'TechWatch'
   },
   { 
-    id: '10', 
+    id: '11', 
     name: 'Chaussures Sport', 
     price: 79.99, 
     originalPrice: 99.99,
@@ -131,31 +83,7 @@ const mockProducts = [
     reviews: 89,
     badge: 'promo',
     brand: 'SportBrand'
-  },
-  { 
-    id: '11', 
-    name: 'Jouet Éducatif', 
-    price: 29.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'enfants',
-    rating: 4.5,
-    reviews: 67,
-    badge: 'nouveau',
-    brand: 'KidsBrand'
-  },
-  { 
-    id: '12', 
-    name: 'Crème Hydratante', 
-    price: 24.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'beaute',
-    rating: 4.2,
-    reviews: 134,
-    badge: 'top-ventes',
-    brand: 'BeautyBrand'
-  },
+  }
 ];
 
 interface Product {
@@ -171,7 +99,7 @@ interface Product {
   brand: string;
 }
 
-export default function ProductsScreen() {
+export default function PromotionsScreen() {
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
@@ -180,9 +108,9 @@ export default function ProductsScreen() {
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
 
-  // Filtrage des produits
+  // Filtrage des produits - SEULEMENT les produits en promotion
   useEffect(() => {
-    let filtered = products;
+    let filtered = products.filter(product => product.badge === 'promo');
 
     // Filtre par catégorie
     if (selectedCategory !== 'tous') {
@@ -228,6 +156,14 @@ export default function ProductsScreen() {
       <UnifiedHeader />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* En-tête de la page */}
+        <View style={styles.headerContainer}>
+          <ThemedText style={styles.headerTitle}>🎉 Promotions</ThemedText>
+          <ThemedText style={styles.headerSubtitle}>
+            Découvrez nos meilleures offres et économisez sur vos achats
+          </ThemedText>
+        </View>
+
         {/* Catégories */}
         <CategoryTabs
           selectedCategory={selectedCategory}
@@ -301,7 +237,7 @@ export default function ProductsScreen() {
         {/* Résultats */}
         <View style={styles.resultsContainer}>
           <ThemedText style={styles.resultsText}>
-            {filteredProducts.length} produits trouvés
+            {filteredProducts.length} produits en promotion trouvés
           </ThemedText>
         </View>
 
@@ -316,7 +252,7 @@ export default function ProductsScreen() {
         {filteredProducts.length === 0 && (
           <View style={styles.emptyState}>
             <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
-            <ThemedText style={styles.emptyTitle}>Aucun produit trouvé</ThemedText>
+            <ThemedText style={styles.emptyTitle}>Aucune promotion trouvée</ThemedText>
             <ThemedText style={styles.emptySubtitle}>
               Essayez de modifier vos critères de recherche
             </ThemedText>
@@ -337,163 +273,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     paddingBottom: 120, // Espace pour la barre de navigation courbée
   },
-  safeArea: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  logoContainer: {
-    marginRight: 12,
-  },
-  logo: {
-    width: 80,
-    height: 30,
-    transform: [{ scale: 2.5 }],
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E8',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#424242',
-    paddingVertical: 0,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  leftActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  titleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
-    gap: 4,
-  },
-  titleButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#E8F5E8',
-    gap: 4,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 6,
-    position: 'relative',
-    borderRadius: 14,
-    backgroundColor: '#F8F9FA',
-  },
-  actionBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: 8,
-  },
-  iconButton: {
-    padding: 8,
-    position: 'relative',
-    borderRadius: 16,
-    backgroundColor: '#F8F9FA',
-  },
-  badge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  profileButton: {
-    padding: 8,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
   scrollView: {
     flex: 1,
     marginTop: -2, // Réduire l'espace entre header et contenu
     paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
+  },
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
   filtersContainer: {
     backgroundColor: '#FFFFFF',

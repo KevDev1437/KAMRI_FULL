@@ -1,10 +1,12 @@
 export default function BestOffers() {
-  // Mock data pour les meilleures offres
+  // Mock data pour les meilleures offres - 6 produits optimaux
   const bestOffers = [
     { id: '1', name: 'Pull Cachemire', price: '99.99€', originalPrice: '149.99€', image: null },
     { id: '2', name: 'Chaussures Cuir', price: '119.99€', originalPrice: '179.99€', image: null },
     { id: '3', name: 'Sac à Main', price: '49.99€', originalPrice: '79.99€', image: null },
     { id: '4', name: 'Montre Élégante', price: '89.99€', originalPrice: '129.99€', image: null },
+    { id: '5', name: 'Veste Cuir', price: '199.99€', originalPrice: '299.99€', image: null },
+    { id: '6', name: 'Smartphone Pro', price: '599.99€', originalPrice: '799.99€', image: null },
   ];
 
   interface Product {

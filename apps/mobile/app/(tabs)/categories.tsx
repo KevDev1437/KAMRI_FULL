@@ -9,49 +9,56 @@ import UnifiedHeader from '../../components/UnifiedHeader';
 
 const { width } = Dimensions.get('window');
 
-// Données mock pour les catégories
+// Données mock pour les 7 catégories fixes
 const categories = [
   {
     id: 1,
-    name: 'Mode & Vêtements',
-    icon: '👗',
+    name: 'Mode',
+    icon: '👕',
     color: '#FF6B6B',
     count: 156
   },
   {
     id: 2,
-    name: 'Électronique',
-    icon: '📱',
+    name: 'Technologie',
+    icon: '💻',
     color: '#4ECDC4',
     count: 89
   },
   {
     id: 3,
-    name: 'Maison & Déco',
+    name: 'Maison',
     icon: '🏠',
     color: '#45B7D1',
     count: 234
   },
   {
     id: 4,
-    name: 'Sport & Fitness',
-    icon: '⚽',
-    color: '#96CEB4',
-    count: 67
-  },
-  {
-    id: 5,
-    name: 'Beauté & Santé',
+    name: 'Beauté',
     icon: '💄',
     color: '#FECA57',
     count: 123
   },
   {
+    id: 5,
+    name: 'Accessoires',
+    icon: '🎒',
+    color: '#96CEB4',
+    count: 67
+  },
+  {
     id: 6,
-    name: 'Livre & Média',
-    icon: '📚',
+    name: 'Sport',
+    icon: '⚽',
     color: '#A8E6CF',
     count: 45
+  },
+  {
+    id: 7,
+    name: 'Enfants',
+    icon: '🧸',
+    color: '#FFB6C1',
+    count: 78
   }
 ];
 
@@ -86,13 +93,15 @@ export default function CategoriesScreen() {
   const popularFlatListRef = useRef<FlatList>(null);
   const trendingFlatListRef = useRef<FlatList>(null);
 
-  // Auto-scroll pour les catégories populaires
+  // Auto-scroll pour les catégories populaires - adaptatif selon le nombre de catégories affichées
   useEffect(() => {
     const interval = setInterval(() => {
-      if (popularFlatListRef.current && categories.length > 2) {
-        setPopularScrollIndex((prev) => (prev + 1) % Math.ceil(categories.length / 2));
+      if (popularFlatListRef.current && categories.length > 0) {
+        const popularCategories = categories.slice(0, 4); // Seulement les 4 premières catégories
+        const totalPages = Math.ceil(popularCategories.length / 2); // 2 catégories par page
+        setPopularScrollIndex((prev) => (prev + 1) % totalPages);
         popularFlatListRef.current.scrollToIndex({
-          index: (popularScrollIndex + 1) % Math.ceil(categories.length / 2),
+          index: (popularScrollIndex + 1) % totalPages,
           animated: true,
         });
       }

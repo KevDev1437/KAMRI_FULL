@@ -33,7 +33,7 @@ export default function ModernHeader() {
     { name: 'Produits', href: '/products', icon: '🛍️' },
     { name: 'Catégories', href: '/categories', icon: '📋' },
     { name: 'Contact', href: '/contact', icon: '📞' },
-    { name: 'Promos', href: '/products?category=promotions', icon: '💸' },
+    { name: 'Promos', href: '/promotions', icon: '💸' },
   ];
 
   return (

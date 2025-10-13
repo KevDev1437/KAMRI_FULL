@@ -13,8 +13,9 @@ const categories = [
   { id: 'technologie', name: 'Tech', icon: '💻' },
   { id: 'maison', name: 'Maison', icon: '🏠' },
   { id: 'beaute', name: 'Beauté', icon: '💅' },
-  { id: 'accessoires', name: 'Jeux', icon: '🎮' },
-  { id: 'promotions', name: 'Promos', icon: '💸' },
+  { id: 'accessoires', name: 'Accessoires', icon: '🎒' },
+  { id: 'sport', name: 'Sport', icon: '⚽' },
+  { id: 'enfants', name: 'Enfants', icon: '🧸' },
 ];
 
 export default function CategoryTabs({ selectedCategory, setSelectedCategory }: CategoryTabsProps) {

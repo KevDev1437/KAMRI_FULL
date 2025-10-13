@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
@@ -23,31 +24,14 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const router = useRouter();
-  const getBadgeColor = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return '#FF7043';
-      case 'nouveau':
-        return '#4CAF50';
-      case 'promo':
-        return '#FF5722';
-      default:
-        return '';
-    }
-  };
-
-  const getBadgeText = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return '🔥 Tendance';
-      case 'nouveau':
-        return '🆕 Nouveau';
-      case 'promo':
-        return '💸 Promo';
-      default:
-        return '';
-    }
-  };
+  
+  // Utilisation des couleurs d'étiquettes cohérentes
+  const badgeConfig = getBadgeConfig(product.badge as any);
+  
+  // Calcul du pourcentage de réduction pour les promos
+  const discountPercentage = product.originalPrice 
+    ? calculateDiscountPercentage(product.originalPrice, product.price)
+    : 0;
 
   return (
     <TouchableOpacity 
@@ -63,8 +47,13 @@ export default function ProductCard({ product }: ProductCardProps) {
         
         {/* Badge */}
         {product.badge && (
-          <View style={[styles.badge, { backgroundColor: getBadgeColor(product.badge) }]}>
-            <ThemedText style={styles.badgeText}>{getBadgeText(product.badge)}</ThemedText>
+          <View style={[styles.badge, { backgroundColor: badgeConfig.backgroundColor }]}>
+            <ThemedText style={[styles.badgeText, { color: badgeConfig.color }]}>
+              {product.badge === 'promo' && discountPercentage > 0 
+                ? formatDiscountPercentage(discountPercentage)
+                : `${badgeConfig.icon} ${badgeConfig.text}`
+              }
+            </ThemedText>
           </View>
         )}
 

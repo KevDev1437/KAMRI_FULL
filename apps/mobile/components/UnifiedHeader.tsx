@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { useFilter } from '../contexts/FilterContext';
 import AuthModal from './AuthModal';
 import UserMenu from './UserMenu';
 import { ThemedText } from './themed-text';
@@ -107,6 +108,18 @@ const pageConfig = {
     showSearch: true,
     showActions: true,
   },
+  '/promotions': {
+    title: 'Promotions',
+    icon: 'pricetag-outline',
+    showSearch: true,
+    showActions: true,
+  },
+  '/(tabs)/promotions': {
+    title: 'Promotions',
+    icon: 'pricetag-outline',
+    showSearch: true,
+    showActions: true,
+  },
 };
 
 export default function UnifiedHeader() {
@@ -115,6 +128,7 @@ export default function UnifiedHeader() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user, login } = useAuth();
+  const { toggleFilters } = useFilter();
 
   // Détection de la page active
   const getPageConfig = () => {
@@ -197,6 +211,17 @@ export default function UnifiedHeader() {
             <Ionicons name={currentConfig.icon as any} size={20} color="#4CAF50" />
             <ThemedText style={styles.titleButtonText}>{currentConfig.title}</ThemedText>
           </View>
+
+          {/* Bouton Filtres (pour les pages qui en ont besoin) */}
+          {(pathname.includes('/products') || pathname.includes('/promotions')) && (
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={toggleFilters}
+            >
+              <Ionicons name="filter-outline" size={18} color="#4CAF50" />
+              <ThemedText style={styles.filterButtonText}>Filtres</ThemedText>
+            </TouchableOpacity>
+          )}
 
           {/* Favoris et Panier */}
           <View style={styles.actionsContainer}>
@@ -317,6 +342,21 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   titleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#E8F5E8',
+    gap: 4,
+    marginRight: 8,
+  },
+  filterButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4CAF50',

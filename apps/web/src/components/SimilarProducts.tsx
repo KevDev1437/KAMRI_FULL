@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { getBadgeConfig, calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 
 interface Product {
   id: string;
@@ -32,31 +33,39 @@ export default function SimilarProducts({ products }: SimilarProductsProps) {
     <div>
       <h2 className="text-2xl font-bold text-[#424242] mb-6">Produits similaires</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {products.map((product) => (
-          <Link key={product.id} href={`/product/${product.id}`}>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
-              {/* Image */}
-              <div className="h-48 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-                
-                {/* Badge */}
-                {product.badge && (
-                  <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold ${
-                    product.badge === 'tendance' 
-                      ? 'bg-[#FF7043] text-white' 
-                      : product.badge === 'nouveau'
-                      ? 'bg-[#4CAF50] text-white'
-                      : 'bg-[#FF5722] text-white'
-                  }`}>
-                    {product.badge === 'tendance' ? '🔥' : 
-                     product.badge === 'nouveau' ? '🆕' : '💸'}
-                  </div>
-                )}
-              </div>
+        {products.map((product) => {
+          const badgeConfig = getBadgeConfig(product.badge as any);
+          const discountPercentage = product.originalPrice 
+            ? calculateDiscountPercentage(product.originalPrice, product.price)
+            : 0;
+          
+          return (
+            <Link key={product.id} href={`/product/${product.id}`}>
+              <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
+                {/* Image */}
+                <div className="h-48 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Badge */}
+                  {product.badge && (
+                    <div 
+                      className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold"
+                      style={{ 
+                        backgroundColor: badgeConfig.backgroundColor, 
+                        color: badgeConfig.color 
+                      }}
+                    >
+                      {product.badge === 'promo' && discountPercentage > 0 
+                        ? formatDiscountPercentage(discountPercentage)
+                        : badgeConfig.icon
+                      }
+                    </div>
+                  )}
+                </div>
               
               {/* Product info */}
               <div className="p-4">

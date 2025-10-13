@@ -8,27 +8,27 @@ import ModernHeader from '../../components/ModernHeader';
 import PopularCategoriesSlider from '../../components/PopularCategoriesSlider';
 import TrendingSection from '../../components/TrendingSection';
 
-// Données mock pour les catégories
+// Données mock pour les 7 catégories fixes
 const categories = [
   {
     id: 1,
-    name: 'Mode & Vêtements',
+    name: 'Mode',
     image: '/api/placeholder/300/200',
     count: 156,
     color: '#FF6B6B',
-    icon: '👗'
+    icon: '👕'
   },
   {
     id: 2,
-    name: 'Électronique',
+    name: 'Technologie',
     image: '/api/placeholder/300/200',
     count: 89,
     color: '#4ECDC4',
-    icon: '📱'
+    icon: '💻'
   },
   {
     id: 3,
-    name: 'Maison & Déco',
+    name: 'Maison',
     image: '/api/placeholder/300/200',
     count: 234,
     color: '#45B7D1',
@@ -36,43 +36,35 @@ const categories = [
   },
   {
     id: 4,
-    name: 'Sport & Fitness',
-    image: '/api/placeholder/300/200',
-    count: 67,
-    color: '#96CEB4',
-    icon: '⚽'
-  },
-  {
-    id: 5,
-    name: 'Beauté & Santé',
+    name: 'Beauté',
     image: '/api/placeholder/300/200',
     count: 123,
     color: '#FECA57',
     icon: '💄'
   },
   {
+    id: 5,
+    name: 'Accessoires',
+    image: '/api/placeholder/300/200',
+    count: 67,
+    color: '#96CEB4',
+    icon: '🎒'
+  },
+  {
     id: 6,
-    name: 'Livre & Média',
+    name: 'Sport',
     image: '/api/placeholder/300/200',
     count: 45,
     color: '#A8E6CF',
-    icon: '📚'
+    icon: '⚽'
   },
   {
     id: 7,
-    name: 'Jouets & Enfants',
+    name: 'Enfants',
     image: '/api/placeholder/300/200',
     count: 78,
     color: '#FFB6C1',
     icon: '🧸'
-  },
-  {
-    id: 8,
-    name: 'Automobile',
-    image: '/api/placeholder/300/200',
-    count: 34,
-    color: '#DDA0DD',
-    icon: '🚗'
   }
 ];
 

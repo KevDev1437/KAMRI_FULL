@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
+import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-// Mock data pour les meilleures offres
+// Mock data pour les meilleures offres - 6 produits optimaux
 const bestOffers = [
   { id: '1', name: 'Pull Cachemire', price: '99.99€', originalPrice: '149.99€', image: null },
   { id: '2', name: 'Chaussures Cuir', price: '119.99€', originalPrice: '179.99€', image: null },
   { id: '3', name: 'Sac à Main', price: '49.99€', originalPrice: '79.99€', image: null },
   { id: '4', name: 'Montre Élégante', price: '89.99€', originalPrice: '129.99€', image: null },
+  { id: '5', name: 'Veste Cuir', price: '199.99€', originalPrice: '299.99€', image: null },
+  { id: '6', name: 'Smartphone Pro', price: '599.99€', originalPrice: '799.99€', image: null },
 ];
 
 const { width } = Dimensions.get('window');
@@ -28,6 +31,16 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  // Utilisation des couleurs d'étiquettes cohérentes pour "promo"
+  const badgeConfig = getBadgeConfig('promo');
+  
+  // Calcul du pourcentage de réduction
+  const originalPrice = parseFloat(product.originalPrice?.replace('€', '') || '0');
+  const currentPrice = parseFloat(product.price.replace('€', ''));
+  const discountPercentage = originalPrice > 0 
+    ? calculateDiscountPercentage(originalPrice, currentPrice)
+    : 0;
+  
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
       {/* Image placeholder */}
@@ -36,9 +49,14 @@ function ProductCard({ product }: ProductCardProps) {
           <Ionicons name="image-outline" size={32} color="#81C784" />
         </ThemedView>
         
-        {/* Badge Meilleure Offre */}
-        <View style={styles.badge}>
-          <ThemedText style={styles.badgeText}>Meilleure Offre</ThemedText>
+        {/* Badge Promo */}
+        <View style={[styles.badge, { backgroundColor: badgeConfig.backgroundColor }]}>
+          <ThemedText style={[styles.badgeText, { color: badgeConfig.color }]}>
+            {discountPercentage > 0 
+              ? formatDiscountPercentage(discountPercentage)
+              : `${badgeConfig.icon} ${badgeConfig.text}`
+            }
+          </ThemedText>
         </View>
       </View>
       

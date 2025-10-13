@@ -1,10 +1,12 @@
 export default function TopSales() {
-  // Mock data pour les top ventes
+  // Mock data pour les top ventes - 6 produits optimaux
   const topSales = [
     { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
     { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
     { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
     { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
+    { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
+    { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
   ];
 
   interface Product {

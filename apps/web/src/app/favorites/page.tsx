@@ -1,5 +1,6 @@
 'use client';
 
+import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
@@ -436,9 +437,9 @@ export default function FavoritesPage() {
                         
                         {/* Badges */}
                         <div className="absolute top-3 left-3 flex flex-col gap-2">
-                          {item.isOnSale && (
+                          {item.isOnSale && item.originalPrice > item.price && (
                             <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                              -{item.savings}€
+                              {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
                             </span>
                           )}
                           {!item.inStock && (

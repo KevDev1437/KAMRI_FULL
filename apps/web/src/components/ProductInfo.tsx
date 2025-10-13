@@ -1,5 +1,6 @@
 'use client';
 
+import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { useState } from 'react';
 
 interface Product {
@@ -32,38 +33,29 @@ export default function ProductInfo({ product }: ProductInfoProps) {
   const [selectedColor, setSelectedColor] = useState<string | null>(product.colors[0]);
   const [quantity, setQuantity] = useState(1);
 
-  const getBadgeColor = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return 'bg-[#FF7043] text-white';
-      case 'nouveau':
-        return 'bg-[#4CAF50] text-white';
-      case 'promo':
-        return 'bg-[#FF5722] text-white';
-      default:
-        return '';
-    }
-  };
-
-  const getBadgeText = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return '🔥 Tendance';
-      case 'nouveau':
-        return '🆕 Nouveau';
-      case 'promo':
-        return '💸 Promo';
-      default:
-        return '';
-    }
-  };
+  // Utilisation des couleurs d'étiquettes cohérentes
+  const badgeConfig = getBadgeConfig(product.badge as any);
+  
+  // Calcul du pourcentage de réduction pour les promos
+  const discountPercentage = product.originalPrice 
+    ? calculateDiscountPercentage(product.originalPrice, product.price)
+    : 0;
 
   return (
     <div className="space-y-6">
       {/* Badge */}
       {product.badge && (
-        <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getBadgeColor(product.badge)}`}>
-          {getBadgeText(product.badge)}
+        <div 
+          className="inline-block px-3 py-1 rounded-full text-sm font-bold"
+          style={{ 
+            backgroundColor: badgeConfig.backgroundColor, 
+            color: badgeConfig.color 
+          }}
+        >
+          {product.badge === 'promo' && discountPercentage > 0 
+            ? formatDiscountPercentage(discountPercentage)
+            : `${badgeConfig.icon} ${badgeConfig.text}`
+          }
         </div>
       )}
 

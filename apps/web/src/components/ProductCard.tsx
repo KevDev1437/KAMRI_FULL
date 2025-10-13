@@ -1,3 +1,6 @@
+import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
+import Link from 'next/link';
+
 interface Product {
   id: string;
   name: string;
@@ -11,38 +14,18 @@ interface Product {
   brand: string;
 }
 
-import Link from 'next/link';
-
 interface ProductCardProps {
   product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const getBadgeColor = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return 'bg-[#FF7043] text-white';
-      case 'nouveau':
-        return 'bg-[#4CAF50] text-white';
-      case 'promo':
-        return 'bg-[#FF5722] text-white';
-      default:
-        return '';
-    }
-  };
-
-  const getBadgeText = (badge: string | null) => {
-    switch (badge) {
-      case 'tendance':
-        return '🔥 Tendance';
-      case 'nouveau':
-        return '🆕 Nouveau';
-      case 'promo':
-        return '💸 Promo';
-      default:
-        return '';
-    }
-  };
+  // Utilisation des couleurs d'étiquettes cohérentes
+  const badgeConfig = getBadgeConfig(product.badge as any);
+  
+  // Calcul du pourcentage de réduction pour les promos
+  const discountPercentage = product.originalPrice 
+    ? calculateDiscountPercentage(product.originalPrice, product.price)
+    : 0;
 
   return (
     <Link href={`/product/${product.id}`}>
@@ -55,8 +38,17 @@ export default function ProductCard({ product }: ProductCardProps) {
         
         {/* Badge */}
         {product.badge && (
-          <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold ${getBadgeColor(product.badge)}`}>
-            {getBadgeText(product.badge)}
+          <div 
+            className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold"
+            style={{ 
+              backgroundColor: badgeConfig.backgroundColor, 
+              color: badgeConfig.color 
+            }}
+          >
+            {product.badge === 'promo' && discountPercentage > 0 
+              ? formatDiscountPercentage(discountPercentage)
+              : `${badgeConfig.icon} ${badgeConfig.text}`
+            }
           </div>
         )}
 

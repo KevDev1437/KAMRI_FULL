@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
@@ -57,6 +58,12 @@ export default function CartScreen() {
   const shipping = subtotal > 100 ? 0 : 9.99;
   const promoDiscount = promoCode === 'WELCOME10' ? subtotal * 0.1 : 0;
   const total = subtotal + shipping - promoDiscount;
+  
+  // Calcul du pourcentage moyen de réduction
+  const itemsWithDiscount = cartItems.filter(item => item.originalPrice > item.price);
+  const averageDiscountPercentage = itemsWithDiscount.length > 0 
+    ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
+    : 0;
 
   const updateQuantity = (id: string, newQuantity: number) => {
     if (newQuantity < 1) return;
@@ -152,9 +159,11 @@ export default function CartScreen() {
               <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
             )}
           </View>
-          {item.savings > 0 && (
+          {item.originalPrice > item.price && (
             <View style={styles.savingsBadge}>
-              <ThemedText style={styles.savingsText}>-{item.savings}€</ThemedText>
+              <ThemedText style={styles.savingsText}>
+                {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
+              </ThemedText>
             </View>
           )}
         </View>
@@ -281,10 +290,12 @@ export default function CartScreen() {
             <ThemedText style={styles.summaryValue}>{subtotal.toFixed(2)}€</ThemedText>
           </View>
           
-          {totalSavings > 0 && (
+          {averageDiscountPercentage > 0 && (
             <View style={styles.summaryRow}>
               <ThemedText style={styles.summaryLabel}>Économies</ThemedText>
-              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>-{totalSavings.toFixed(2)}€</ThemedText>
+              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>
+                {formatDiscountPercentage(Math.round(averageDiscountPercentage))}
+              </ThemedText>
             </View>
           )}
           

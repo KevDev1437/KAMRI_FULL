@@ -36,18 +36,20 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
   };
 
   const nextSlide = () => {
-    const nextIndex = (currentIndex + 1) % Math.ceil(categories.length / 2);
+    const totalPages = Math.ceil(categories.length / 2); // 2 catégories par page
+    const nextIndex = (currentIndex + 1) % totalPages;
     scrollToIndex(nextIndex);
   };
 
   const prevSlide = () => {
-    const prevIndex = currentIndex === 0 ? Math.ceil(categories.length / 2) - 1 : currentIndex - 1;
+    const totalPages = Math.ceil(categories.length / 2); // 2 catégories par page
+    const prevIndex = currentIndex === 0 ? totalPages - 1 : currentIndex - 1;
     scrollToIndex(prevIndex);
   };
 
-  // Auto-scroll effect
+  // Auto-scroll effect - adaptatif selon le nombre de catégories
   useEffect(() => {
-    if (isAutoScrolling && categories.length > 2) {
+    if (isAutoScrolling && categories.length > 0) {
       autoScrollRef.current = setInterval(() => {
         nextSlide();
       }, 3000); // Change slide every 3 seconds
@@ -185,12 +187,6 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
         </div>
       </div>
 
-      {/* Indicateurs de progression */}
-      <div className="mt-6 text-center">
-        <span className="text-sm text-gray-500">
-          {currentIndex + 1} sur {Math.ceil(categories.length / 2)} pages
-        </span>
-      </div>
     </div>
   );
 }

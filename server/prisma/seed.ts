@@ -5,30 +5,48 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Create categories
+  // Create categories - 7 catégories fixes
   const categories = await Promise.all([
     prisma.category.create({
       data: {
-        name: 'Electronics',
-        description: 'Electronic devices and gadgets',
+        name: 'Mode',
+        description: 'Vêtements et accessoires de mode',
       },
     }),
     prisma.category.create({
       data: {
-        name: 'Clothing',
-        description: 'Fashion and apparel',
+        name: 'Technologie',
+        description: 'Électronique et gadgets technologiques',
       },
     }),
     prisma.category.create({
       data: {
-        name: 'Books',
-        description: 'Books and literature',
+        name: 'Maison',
+        description: 'Décoration et équipement de la maison',
       },
     }),
     prisma.category.create({
       data: {
-        name: 'Home & Garden',
-        description: 'Home improvement and gardening',
+        name: 'Beauté',
+        description: 'Produits de beauté et soins',
+      },
+    }),
+    prisma.category.create({
+      data: {
+        name: 'Accessoires',
+        description: 'Accessoires et petits objets',
+      },
+    }),
+    prisma.category.create({
+      data: {
+        name: 'Sport',
+        description: 'Équipement et vêtements de sport',
+      },
+    }),
+    prisma.category.create({
+      data: {
+        name: 'Enfants',
+        description: 'Produits pour enfants et bébés',
       },
     }),
   ]);

@@ -1,5 +1,6 @@
 'use client';
 
+import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
@@ -55,6 +56,12 @@ export default function CartPage() {
   const shipping = subtotal > 100 ? 0 : 9.99;
   const promoDiscount = promoCode === 'WELCOME10' ? subtotal * 0.1 : 0;
   const total = subtotal + shipping - promoDiscount;
+  
+  // Calcul du pourcentage moyen de réduction
+  const itemsWithDiscount = cartItems.filter(item => item.originalPrice > item.price);
+  const averageDiscountPercentage = itemsWithDiscount.length > 0 
+    ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
+    : 0;
 
   const updateQuantity = (id: string, newQuantity: number) => {
     if (newQuantity < 1) return;
@@ -243,9 +250,9 @@ export default function CartPage() {
                               <span className="text-sm text-gray-500 line-through">{item.originalPrice}€</span>
                             )}
                           </div>
-                          {item.savings > 0 && (
+                          {item.originalPrice > item.price && (
                             <span className="bg-[#E8F5E8] text-[#4CAF50] px-2 py-1 rounded-full text-sm font-medium">
-                              -{item.savings}€
+                              {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
                             </span>
                           )}
                         </div>
@@ -360,10 +367,12 @@ export default function CartPage() {
                   <span className="font-medium">{subtotal.toFixed(2)}€</span>
                 </div>
                 
-                {totalSavings > 0 && (
+                {averageDiscountPercentage > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Économies</span>
-                    <span className="text-[#4CAF50] font-medium">-{totalSavings.toFixed(2)}€</span>
+                    <span className="text-[#4CAF50] font-medium">
+                      {formatDiscountPercentage(Math.round(averageDiscountPercentage))}
+                    </span>
                   </div>
                 )}
                 

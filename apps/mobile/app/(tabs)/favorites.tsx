@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
@@ -223,9 +224,11 @@ export default function FavoritesScreen() {
               <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
             )}
           </View>
-          {item.savings > 0 && (
+          {item.originalPrice > item.price && (
             <View style={styles.savingsBadge}>
-              <ThemedText style={styles.savingsText}>-{item.savings}€</ThemedText>
+              <ThemedText style={styles.savingsText}>
+                {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
+              </ThemedText>
             </View>
           )}
         </View>
