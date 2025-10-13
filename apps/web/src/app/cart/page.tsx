@@ -2,53 +2,38 @@
 
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      quantity: 1,
-      size: '256GB',
-      color: 'Titanium Naturel',
-      inStock: true,
-      savings: 100
-    },
-    {
-      id: '2',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      quantity: 2,
-      size: 'Standard',
-      color: 'Blanc',
-      inStock: true,
-      savings: 60
-    },
-    {
-      id: '3',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      quantity: 1,
-      size: '13"',
-      color: 'Gris sidéral',
-      inStock: false,
-      savings: 0
-    }
-  ]);
+  const [cartItems, setCartItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [promoCode, setPromoCode] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
-  const [selectedItems, setSelectedItems] = useState(new Set(['1', '2', '3']));
+  const [selectedItems, setSelectedItems] = useState(new Set());
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchCartItems = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCartItems([]);
+        setSelectedItems(new Set());
+      } catch (error) {
+        console.error('Erreur lors du chargement du panier:', error);
+        setCartItems([]);
+        setSelectedItems(new Set());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCartItems();
+  }, []);
 
   // Calculs
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -143,7 +128,16 @@ export default function CartPage() {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* État de chargement */}
+      {isLoading ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
+            <p className="text-gray-600">Chargement de votre panier...</p>
+          </div>
+        </div>
+      ) : cartItems.length > 0 ? (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Colonne principale - Articles du panier */}
           <div className="lg:col-span-2">
@@ -423,7 +417,20 @@ export default function CartPage() {
 
           </div>
         </div>
-      </main>
+        </main>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <div className="text-6xl mb-4">🛒</div>
+            <h3 className="text-xl font-semibold text-[#424242] mb-2">
+              Votre panier est vide
+            </h3>
+            <p className="text-[#81C784]">
+              Ajoutez des produits à votre panier pour commencer vos achats
+            </p>
+          </div>
+        </div>
+      )}
       
       <HomeFooter />
     </div>

@@ -1,13 +1,6 @@
 export default function TopSales() {
-  // Mock data pour les top ventes - 6 produits optimaux
-  const topSales = [
-    { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-    { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-    { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-    { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-    { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-    { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-  ];
+  // TODO: Remplacer par des données réelles du backend
+  const topSales: Product[] = [];
 
   interface Product {
     id: string;
@@ -63,11 +56,23 @@ export default function TopSales() {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {topSales.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {topSales.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {topSales.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">📈</div>
+            <h3 className="text-xl font-semibold text-[#424242] mb-2">
+              Aucun produit en top ventes
+            </h3>
+            <p className="text-[#81C784]">
+              Aucun produit n'est disponible dans les top ventes pour le moment
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

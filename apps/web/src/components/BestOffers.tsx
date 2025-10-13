@@ -1,13 +1,6 @@
 export default function BestOffers() {
-  // Mock data pour les meilleures offres - 6 produits optimaux
-  const bestOffers = [
-    { id: '1', name: 'Pull Cachemire', price: '99.99€', originalPrice: '149.99€', image: null },
-    { id: '2', name: 'Chaussures Cuir', price: '119.99€', originalPrice: '179.99€', image: null },
-    { id: '3', name: 'Sac à Main', price: '49.99€', originalPrice: '79.99€', image: null },
-    { id: '4', name: 'Montre Élégante', price: '89.99€', originalPrice: '129.99€', image: null },
-    { id: '5', name: 'Veste Cuir', price: '199.99€', originalPrice: '299.99€', image: null },
-    { id: '6', name: 'Smartphone Pro', price: '599.99€', originalPrice: '799.99€', image: null },
-  ];
+  // TODO: Remplacer par des données réelles du backend
+  const bestOffers: Product[] = [];
 
   interface Product {
     id: string;
@@ -67,11 +60,23 @@ export default function BestOffers() {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {bestOffers.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {bestOffers.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {bestOffers.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">🏷️</div>
+            <h3 className="text-xl font-semibold text-[#424242] mb-2">
+              Aucune offre disponible
+            </h3>
+            <p className="text-[#81C784]">
+              Aucune offre n'est disponible pour le moment
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
