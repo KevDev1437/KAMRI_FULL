@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import UnifiedHeader from '../../components/UnifiedHeader';
@@ -9,17 +9,62 @@ import { ThemedText } from '../../components/themed-text';
 
 export default function ProfileInfoScreen() {
   const [userInfo, setUserInfo] = useState({
-    firstName: 'Ulrich',
-    lastName: 'Kevin',
-    email: 'ulrich.kevin@email.com',
-    phone: '+33 6 12 34 56 78',
-    birthDate: '15 Janvier 1990',
-    address: '123 Rue de la Paix, 75001 Paris',
-    memberSince: '15 Janvier 2024'
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    birthDate: '',
+    address: '',
+    memberSince: ''
   });
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editedInfo, setEditedInfo] = useState(userInfo);
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchUserInfo = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne des données vides
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setUserInfo({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          birthDate: '',
+          address: '',
+          memberSince: ''
+        });
+        setEditedInfo({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          birthDate: '',
+          address: '',
+          memberSince: ''
+        });
+      } catch (error) {
+        console.error('Erreur lors du chargement des informations utilisateur:', error);
+        setUserInfo({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          birthDate: '',
+          address: '',
+          memberSince: ''
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
 
   const handleSave = () => {
     setUserInfo(editedInfo);
@@ -200,8 +245,18 @@ export default function ProfileInfoScreen() {
           </View>
         </View>
 
-        {/* Contenu principal */}
-        {renderPersonalInfo()}
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement de vos informations...</ThemedText>
+          </View>
+        ) : (
+          <>
+            {/* Contenu principal */}
+            {renderPersonalInfo()}
+          </>
+        )}
         
         <HomeFooter />
       </ScrollView>
@@ -406,5 +461,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
 });
