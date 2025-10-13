@@ -1,77 +1,50 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import CategoryCard from '../../components/CategoryCard';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import PopularCategoriesSlider from '../../components/PopularCategoriesSlider';
 import TrendingSection from '../../components/TrendingSection';
 
-// Données mock pour les 7 catégories fixes
-const categories = [
-  {
-    id: 1,
-    name: 'Mode',
-    image: '/api/placeholder/300/200',
-    count: 156,
-    color: '#FF6B6B',
-    icon: '👕'
-  },
-  {
-    id: 2,
-    name: 'Technologie',
-    image: '/api/placeholder/300/200',
-    count: 89,
-    color: '#4ECDC4',
-    icon: '💻'
-  },
-  {
-    id: 3,
-    name: 'Maison',
-    image: '/api/placeholder/300/200',
-    count: 234,
-    color: '#45B7D1',
-    icon: '🏠'
-  },
-  {
-    id: 4,
-    name: 'Beauté',
-    image: '/api/placeholder/300/200',
-    count: 123,
-    color: '#FECA57',
-    icon: '💄'
-  },
-  {
-    id: 5,
-    name: 'Accessoires',
-    image: '/api/placeholder/300/200',
-    count: 67,
-    color: '#96CEB4',
-    icon: '🎒'
-  },
-  {
-    id: 6,
-    name: 'Sport',
-    image: '/api/placeholder/300/200',
-    count: 45,
-    color: '#A8E6CF',
-    icon: '⚽'
-  },
-  {
-    id: 7,
-    name: 'Enfants',
-    image: '/api/placeholder/300/200',
-    count: 78,
-    color: '#FFB6C1',
-    icon: '🧸'
-  }
-];
+// TODO: Remplacer par des données réelles du backend
+const categories: Category[] = [];
+
+interface Category {
+  id: number;
+  name: string;
+  image: string;
+  count: number;
+  color: string;
+  icon: string;
+}
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [categoriesData, setCategoriesData] = useState<Category[]>([]);
 
-  const filteredCategories = categories.filter(category =>
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchCategories = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCategoriesData([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+        setCategoriesData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  const filteredCategories = categoriesData.filter(category =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -160,43 +133,63 @@ export default function CategoriesPage() {
       </section>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Grille des catégories */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-16"
-        >
-          <h2 className="text-2xl font-bold text-[#424242] mb-8 text-center">
-            Toutes les catégories
-          </h2>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCategories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <CategoryCard category={category} />
-              </motion.div>
-            ))}
+        {/* État de chargement */}
+        {isLoading ? (
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
+            <p className="text-gray-600">Chargement des catégories...</p>
           </div>
-        </motion.section>
+        ) : filteredCategories.length > 0 ? (
+          /* Grille des catégories */
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="mb-16"
+          >
+            <h2 className="text-2xl font-bold text-[#424242] mb-8 text-center">
+              Toutes les catégories
+            </h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredCategories.map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <CategoryCard category={category} />
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">📂</div>
+            <h3 className="text-xl font-semibold text-[#424242] mb-2">
+              Aucune catégorie disponible
+            </h3>
+            <p className="text-[#81C784]">
+              Aucune catégorie n'est disponible pour le moment
+            </p>
+          </div>
+        )}
 
         {/* Catégories populaires - Slider */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="mb-16"
-        >
-          <h2 className="text-2xl font-bold text-[#424242] mb-8 text-center">
-            Catégories populaires
-          </h2>
-          <PopularCategoriesSlider categories={categories.slice(0, 6)} />
-        </motion.section>
+        {!isLoading && filteredCategories.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mb-16"
+          >
+            <h2 className="text-2xl font-bold text-[#424242] mb-8 text-center">
+              Catégories populaires
+            </h2>
+            <PopularCategoriesSlider categories={filteredCategories.slice(0, 6)} />
+          </motion.section>
+        )}
 
         {/* Section Tendances */}
         <motion.section

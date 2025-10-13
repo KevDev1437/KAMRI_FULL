@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
@@ -9,58 +9,16 @@ import UnifiedHeader from '../../components/UnifiedHeader';
 
 const { width } = Dimensions.get('window');
 
-// Données mock pour les 7 catégories fixes
-const categories = [
-  {
-    id: 1,
-    name: 'Mode',
-    icon: '👕',
-    color: '#FF6B6B',
-    count: 156
-  },
-  {
-    id: 2,
-    name: 'Technologie',
-    icon: '💻',
-    color: '#4ECDC4',
-    count: 89
-  },
-  {
-    id: 3,
-    name: 'Maison',
-    icon: '🏠',
-    color: '#45B7D1',
-    count: 234
-  },
-  {
-    id: 4,
-    name: 'Beauté',
-    icon: '💄',
-    color: '#FECA57',
-    count: 123
-  },
-  {
-    id: 5,
-    name: 'Accessoires',
-    icon: '🎒',
-    color: '#96CEB4',
-    count: 67
-  },
-  {
-    id: 6,
-    name: 'Sport',
-    icon: '⚽',
-    color: '#A8E6CF',
-    count: 45
-  },
-  {
-    id: 7,
-    name: 'Enfants',
-    icon: '🧸',
-    color: '#FFB6C1',
-    count: 78
-  }
-];
+// TODO: Remplacer par des données réelles du backend
+const categories: Category[] = [];
+
+interface Category {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  count: number;
+}
 
 const trendingItems = [
   {
@@ -89,6 +47,27 @@ const trendingItems = [
 export default function CategoriesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [popularScrollIndex, setPopularScrollIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [categoriesData, setCategoriesData] = useState<Category[]>([]);
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchCategories = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCategoriesData([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+        setCategoriesData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
   const [trendingScrollIndex, setTrendingScrollIndex] = useState(0);
   const popularFlatListRef = useRef<FlatList>(null);
   const trendingFlatListRef = useRef<FlatList>(null);
@@ -201,28 +180,45 @@ export default function CategoriesScreen() {
           </View>
         </View>
 
-        {/* Grille des catégories */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Toutes les catégories</ThemedText>
-          <View style={styles.categoriesGrid}>
-            {categories.map((category) => (
-              <TouchableOpacity key={category.id} style={styles.categoryCard}>
-                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                  <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
-                </View>
-                <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
-                <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
-              </TouchableOpacity>
-            ))}
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement des catégories...</ThemedText>
           </View>
-        </View>
+        ) : categoriesData.length > 0 ? (
+          /* Grille des catégories */
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Toutes les catégories</ThemedText>
+            <View style={styles.categoriesGrid}>
+              {categoriesData.map((category) => (
+                <TouchableOpacity key={category.id} style={styles.categoryCard}>
+                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                    <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
+                  </View>
+                  <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
+                  <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <ThemedText style={styles.emptyIcon}>📂</ThemedText>
+            <ThemedText style={styles.emptyTitle}>Aucune catégorie disponible</ThemedText>
+            <ThemedText style={styles.emptySubtitle}>
+              Aucune catégorie n'est disponible pour le moment
+            </ThemedText>
+          </View>
+        )}
 
         {/* Catégories Populaires */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>🔥 Catégories populaires</ThemedText>
-          <FlatList
-            ref={popularFlatListRef}
-            data={categories.slice(0, 4)}
+        {!isLoading && categoriesData.length > 0 && (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>🔥 Catégories populaires</ThemedText>
+            <FlatList
+              ref={popularFlatListRef}
+              data={categoriesData.slice(0, 4)}
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.popularCard}>
                 <View style={[styles.popularIcon, { backgroundColor: item.color + '20' }]}>
@@ -251,7 +247,8 @@ export default function CategoriesScreen() {
               }, 100);
             }}
           />
-        </View>
+          </View>
+        )}
 
         {/* Section Tendances */}
         <View style={[styles.section, styles.trendingSection]}>
@@ -581,5 +578,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#81C784',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
