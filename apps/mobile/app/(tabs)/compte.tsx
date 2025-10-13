@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
@@ -10,46 +10,32 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('orders');
+  const [isLoading, setIsLoading] = useState(true);
   const { logout } = useAuth();
 
-  const [orders] = useState([
-    {
-      id: 'CMD-2024-001',
-      date: '15 Jan 2024',
-      total: 89.99,
-      status: 'Livrée',
-      statusColor: '#4CAF50'
-    },
-    {
-      id: 'CMD-2024-002',
-      date: '10 Jan 2024',
-      total: 156.50,
-      status: 'En cours',
-      statusColor: '#2196F3'
-    },
-    {
-      id: 'CMD-2024-003',
-      date: '5 Jan 2024',
-      total: 45.00,
-      status: 'Expédiée',
-      statusColor: '#FF9800'
-    }
-  ]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
 
-  const [addresses] = useState([
-    {
-      id: 1,
-      name: 'Domicile',
-      address: '123 Rue de la Paix, 75001 Paris',
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: 'Bureau',
-      address: '456 Avenue des Champs-Élysées, 75008 Paris',
-      isDefault: false
-    }
-  ]);
+  useEffect(() => {
+    // TODO: Remplacer par des appels API réels
+    const fetchProfileData = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne des tableaux vides
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setOrders([]);
+        setAddresses([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des données du profil:', error);
+        setOrders([]);
+        setAddresses([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, []);
 
   const tabs = [
     { id: 'orders', label: 'Commandes', icon: 'receipt' },
@@ -489,10 +475,20 @@ export default function ProfileScreen() {
           </ScrollView>
         </View>
 
-        {/* Contenu des onglets */}
-        {activeTab === 'orders' && renderOrders()}
-        {activeTab === 'addresses' && renderAddresses()}
-        {activeTab === 'settings' && renderSettings()}
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement de vos données...</ThemedText>
+          </View>
+        ) : (
+          <>
+            {/* Contenu des onglets */}
+            {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'addresses' && renderAddresses()}
+            {activeTab === 'settings' && renderSettings()}
+          </>
+        )}
         
         <HomeFooter />
       </ScrollView>
@@ -1167,5 +1163,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
 });

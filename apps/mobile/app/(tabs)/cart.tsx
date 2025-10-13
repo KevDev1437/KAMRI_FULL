@@ -1,56 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
 
 export default function CartScreen() {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      quantity: 1,
-      size: '256GB',
-      color: 'Titanium Naturel',
-      inStock: true,
-      savings: 100
-    },
-    {
-      id: '2',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      quantity: 2,
-      size: 'Standard',
-      color: 'Blanc',
-      inStock: true,
-      savings: 60
-    },
-    {
-      id: '3',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      quantity: 1,
-      size: '13"',
-      color: 'Gris sidéral',
-      inStock: false,
-      savings: 0
-    }
-  ]);
-
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [promoCode, setPromoCode] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
-  const [selectedItems, setSelectedItems] = useState(new Set(['1', '2', '3']));
+  const [selectedItems, setSelectedItems] = useState(new Set());
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchCartItems = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCartItems([]);
+        setSelectedItems(new Set());
+      } catch (error) {
+        console.error('Erreur lors du chargement du panier:', error);
+        setCartItems([]);
+        setSelectedItems(new Set());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCartItems();
+  }, []);
 
   // Calculs
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -58,15 +42,20 @@ export default function CartScreen() {
   const shipping = subtotal > 100 ? 0 : 9.99;
   const promoDiscount = promoCode === 'WELCOME10' ? subtotal * 0.1 : 0;
   const total = subtotal + shipping - promoDiscount;
-  
-  // Calcul du pourcentage moyen de réduction
-  const itemsWithDiscount = cartItems.filter(item => item.originalPrice > item.price);
-  const averageDiscountPercentage = itemsWithDiscount.length > 0 
-    ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
-    : 0;
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === cartItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(cartItems.map(item => item.id)));
+    }
+  };
 
   const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
+    if (newQuantity <= 0) {
+      removeItem(id);
+      return;
+    }
     setCartItems(items => 
       items.map(item => 
         item.id === id ? { ...item, quantity: newQuantity } : item
@@ -96,15 +85,7 @@ export default function CartScreen() {
     );
   };
 
-  const toggleSelectAll = () => {
-    if (selectedItems.size === cartItems.length) {
-      setSelectedItems(new Set());
-    } else {
-      setSelectedItems(new Set(cartItems.map(item => item.id)));
-    }
-  };
-
-  const toggleItemSelection = (id: string) => {
+  const toggleSelection = (id: string) => {
     setSelectedItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -118,89 +99,97 @@ export default function CartScreen() {
 
   const applyPromoCode = () => {
     if (promoCode === 'WELCOME10') {
-      Alert.alert('Code appliqué !', 'Réduction de 10% appliquée');
+      Alert.alert('Code appliqué !', 'Vous avez 10% de réduction sur votre commande');
     } else {
       Alert.alert('Code invalide', 'Le code promo n\'est pas valide');
     }
   };
 
   const proceedToCheckout = () => {
-    const selectedCount = selectedItems.size;
-    if (selectedCount === 0) {
+    if (selectedItems.size === 0) {
       Alert.alert('Panier vide', 'Veuillez sélectionner au moins un article');
       return;
     }
-    Alert.alert('Commande', `Procéder au paiement de ${selectedCount} article(s) pour ${total.toFixed(2)}€`);
+    Alert.alert('Commande', 'Fonctionnalité de commande bientôt disponible');
   };
 
-  const renderCartItem = ({ item }: { item: any }) => (
-    <View style={styles.cartItem}>
-      <TouchableOpacity 
-        style={styles.selectButton}
-        onPress={() => toggleItemSelection(item.id)}
-      >
-        <Ionicons 
-          name={selectedItems.has(item.id) ? "checkbox" : "square-outline"} 
-          size={24} 
-          color={selectedItems.has(item.id) ? "#4CAF50" : "#9CA3AF"} 
-        />
-      </TouchableOpacity>
+  const renderCartItem = ({ item }: { item: any }) => {
+    const isSelected = selectedItems.has(item.id);
+    const discountPercentage = item.originalPrice > item.price 
+      ? calculateDiscountPercentage(item.originalPrice, item.price)
+      : 0;
 
-      <Image source={{ uri: item.image }} style={styles.itemImage} />
-      
-      <View style={styles.itemDetails}>
-        <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-        <ThemedText style={styles.itemVariant}>{item.size} • {item.color}</ThemedText>
+    return (
+      <View style={styles.cartItem}>
+        <TouchableOpacity 
+          style={styles.selectButton}
+          onPress={() => toggleSelection(item.id)}
+        >
+          <Ionicons 
+            name={isSelected ? "checkbox" : "square-outline"} 
+            size={20} 
+            color={isSelected ? "#4CAF50" : "#9CA3AF"} 
+          />
+        </TouchableOpacity>
+
+        <Image source={{ uri: item.image }} style={styles.itemImage} />
         
-        <View style={styles.priceRow}>
-          <View style={styles.priceContainer}>
-            <ThemedText style={styles.currentPrice}>{item.price}€</ThemedText>
-            {item.originalPrice > item.price && (
-              <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
-            )}
+        <View style={styles.itemDetails}>
+          <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+          <ThemedText style={styles.itemVariant}>
+            {item.size} • {item.color}
+          </ThemedText>
+          
+          <View style={styles.priceRow}>
+            <View style={styles.priceContainer}>
+              <ThemedText style={styles.currentPrice}>${item.price}</ThemedText>
+              {item.originalPrice > item.price && (
+                <ThemedText style={styles.originalPrice}>${item.originalPrice}</ThemedText>
+              )}
+              {item.savings > 0 && (
+                <View style={styles.savingsBadge}>
+                  <ThemedText style={styles.savingsText}>
+                    -${item.savings}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
           </View>
-          {item.originalPrice > item.price && (
-            <View style={styles.savingsBadge}>
-              <ThemedText style={styles.savingsText}>
-                {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
-              </ThemedText>
+
+          <View style={styles.quantityRow}>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => updateQuantity(item.id, item.quantity - 1)}
+              >
+                <Ionicons name="remove" size={16} color="#424242" />
+              </TouchableOpacity>
+              <ThemedText style={styles.quantityText}>{item.quantity}</ThemedText>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => updateQuantity(item.id, item.quantity + 1)}
+              >
+                <Ionicons name="add" size={16} color="#424242" />
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.removeButton}
+              onPress={() => removeItem(item.id)}
+            >
+              <Ionicons name="trash-outline" size={20} color="#FF5722" />
+            </TouchableOpacity>
+          </View>
+
+          {!item.inStock && (
+            <View style={styles.outOfStockBadge}>
+              <ThemedText style={styles.outOfStockText}>Rupture de stock</ThemedText>
             </View>
           )}
         </View>
-
-        <View style={styles.quantityRow}>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => updateQuantity(item.id, item.quantity - 1)}
-            >
-              <Ionicons name="remove" size={16} color="#4CAF50" />
-            </TouchableOpacity>
-            <ThemedText style={styles.quantityText}>{item.quantity}</ThemedText>
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => updateQuantity(item.id, item.quantity + 1)}
-            >
-              <Ionicons name="add" size={16} color="#4CAF50" />
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.removeButton}
-            onPress={() => removeItem(item.id)}
-          >
-            <Ionicons name="trash-outline" size={20} color="#FF5722" />
-          </TouchableOpacity>
-        </View>
-
-        {!item.inStock && (
-          <View style={styles.outOfStockBadge}>
-            <ThemedText style={styles.outOfStockText}>Rupture de stock</ThemedText>
-          </View>
-        )}
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -215,141 +204,146 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {/* Header avec sélection */}
-        <View style={styles.cartHeader}>
-          <TouchableOpacity style={styles.selectAllButton} onPress={toggleSelectAll}>
-            <Ionicons 
-              name={selectedItems.size === cartItems.length ? "checkbox" : "square-outline"} 
-              size={20} 
-              color={selectedItems.size === cartItems.length ? "#4CAF50" : "#9CA3AF"} 
-            />
-            <ThemedText style={styles.selectAllText}>
-              {selectedItems.size === cartItems.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-            </ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.clearButton}
-            onPress={() => {
-              Alert.alert('Vider le panier', 'Êtes-vous sûr de vouloir vider votre panier ?', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Vider', style: 'destructive', onPress: () => setCartItems([]) }
-              ]);
-            }}
-          >
-            <Ionicons name="trash-outline" size={18} color="#FF5722" />
-            <ThemedText style={styles.clearText}>Vider</ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Liste des articles */}
-        <FlatList
-          data={cartItems}
-          renderItem={renderCartItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={styles.cartList}
-        />
-
-        {/* Code promo */}
-        <View style={styles.promoSection}>
-          <View style={styles.promoHeader}>
-            <ThemedText style={styles.promoTitle}>Code promo</ThemedText>
-            <TouchableOpacity 
-              style={styles.promoToggle}
-              onPress={() => setShowPromoInput(!showPromoInput)}
-            >
-              <ThemedText style={styles.promoToggleText}>
-                {showPromoInput ? 'Masquer' : 'J\'ai un code'}
-              </ThemedText>
-            </TouchableOpacity>
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement de votre panier...</ThemedText>
           </View>
-          
-          {showPromoInput && (
-            <View style={styles.promoInputContainer}>
-              <TextInput
-                style={styles.promoInput}
-                placeholder="Entrez votre code promo"
-                value={promoCode}
-                onChangeText={setPromoCode}
-                placeholderTextColor="#9CA3AF"
+        ) : cartItems.length > 0 ? (
+          <>
+            {/* Header avec sélection */}
+            <View style={styles.cartHeader}>
+              <TouchableOpacity style={styles.selectAllButton} onPress={toggleSelectAll}>
+                <Ionicons 
+                  name={selectedItems.size === cartItems.length ? "checkbox" : "square-outline"} 
+                  size={20} 
+                  color={selectedItems.size === cartItems.length ? "#4CAF50" : "#9CA3AF"} 
+                />
+                <ThemedText style={styles.selectAllText}>
+                  {selectedItems.size === cartItems.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </ThemedText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.clearButton}>
+                <Ionicons name="trash-outline" size={16} color="#FF5722" />
+                <ThemedText style={styles.clearText}>Vider</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            {/* Liste des articles */}
+            <View style={styles.cartList}>
+              <FlatList
+                data={cartItems}
+                renderItem={renderCartItem}
+                keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
               />
-              <TouchableOpacity style={styles.applyButton} onPress={applyPromoCode}>
-                <ThemedText style={styles.applyButtonText}>Appliquer</ThemedText>
+            </View>
+
+            {/* Section Promo */}
+            <View style={styles.promoSection}>
+              <View style={styles.promoHeader}>
+                <ThemedText style={styles.promoTitle}>Code promo</ThemedText>
+                <TouchableOpacity 
+                  style={styles.promoToggle}
+                  onPress={() => setShowPromoInput(!showPromoInput)}
+                >
+                  <ThemedText style={styles.promoToggleText}>
+                    {showPromoInput ? 'Masquer' : 'Ajouter'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+              
+              {showPromoInput && (
+                <View style={styles.promoInputContainer}>
+                  <TextInput
+                    style={styles.promoInput}
+                    placeholder="Entrez votre code promo"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  <TouchableOpacity style={styles.applyButton} onPress={applyPromoCode}>
+                    <ThemedText style={styles.applyButtonText}>Appliquer</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Résumé de la commande */}
+            <View style={styles.summaryContainer}>
+              <ThemedText style={styles.summaryTitle}>Résumé de la commande</ThemedText>
+              
+              <View style={styles.summaryRow}>
+                <ThemedText style={styles.summaryLabel}>Sous-total</ThemedText>
+                <ThemedText style={styles.summaryValue}>${subtotal.toFixed(2)}</ThemedText>
+              </View>
+              
+              {totalSavings > 0 && (
+                <View style={styles.summaryRow}>
+                  <ThemedText style={styles.summaryLabel}>Économies</ThemedText>
+                  <ThemedText style={[styles.summaryValue, styles.savingsValue]}>
+                    -${totalSavings.toFixed(2)}
+                  </ThemedText>
+                </View>
+              )}
+              
+              <View style={styles.summaryRow}>
+                <ThemedText style={styles.summaryLabel}>Livraison</ThemedText>
+                <ThemedText style={styles.summaryValue}>
+                  {shipping === 0 ? 'Gratuite' : `$${shipping.toFixed(2)}`}
+                </ThemedText>
+              </View>
+              
+              {promoDiscount > 0 && (
+                <View style={styles.summaryRow}>
+                  <ThemedText style={styles.summaryLabel}>Réduction promo</ThemedText>
+                  <ThemedText style={[styles.summaryValue, styles.savingsValue]}>
+                    -${promoDiscount.toFixed(2)}
+                  </ThemedText>
+                </View>
+              )}
+              
+              <View style={[styles.summaryRow, styles.totalRow]}>
+                <ThemedText style={styles.totalLabel}>Total</ThemedText>
+                <ThemedText style={styles.totalValue}>${total.toFixed(2)}</ThemedText>
+              </View>
+            </View>
+
+            {/* Recommandations */}
+            <View style={styles.recommendationsSection}>
+              <ThemedText style={styles.recommendationsTitle}>Vous pourriez aussi aimer</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recommendationsList}>
+                {/* TODO: Ajouter des recommandations depuis l'API */}
+              </ScrollView>
+            </View>
+
+            {/* Section Checkout */}
+            <View style={styles.checkoutSection}>
+              <View style={styles.checkoutInfo}>
+                <ThemedText style={styles.checkoutCount}>
+                  {selectedItems.size} article(s) sélectionné(s)
+                </ThemedText>
+                <ThemedText style={styles.checkoutTotal}>
+                  ${total.toFixed(2)}
+                </ThemedText>
+              </View>
+              <TouchableOpacity style={styles.checkoutButton} onPress={proceedToCheckout}>
+                <Ionicons name="card" size={20} color="#FFFFFF" />
+                <ThemedText style={styles.checkoutButtonText}>Commander</ThemedText>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
-
-        {/* Résumé des prix */}
-        <View style={styles.summaryContainer}>
-          <ThemedText style={styles.summaryTitle}>Résumé de la commande</ThemedText>
-          
-          <View style={styles.summaryRow}>
-            <ThemedText style={styles.summaryLabel}>Sous-total</ThemedText>
-            <ThemedText style={styles.summaryValue}>{subtotal.toFixed(2)}€</ThemedText>
-          </View>
-          
-          {averageDiscountPercentage > 0 && (
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Économies</ThemedText>
-              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>
-                {formatDiscountPercentage(Math.round(averageDiscountPercentage))}
-              </ThemedText>
-            </View>
-          )}
-          
-          <View style={styles.summaryRow}>
-            <ThemedText style={styles.summaryLabel}>Livraison</ThemedText>
-            <ThemedText style={styles.summaryValue}>
-              {shipping === 0 ? 'Gratuite' : `${shipping.toFixed(2)}€`}
+          </>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="cart-outline" size={64} color="#9CA3AF" />
+            <ThemedText style={styles.emptyTitle}>Votre panier est vide</ThemedText>
+            <ThemedText style={styles.emptySubtitle}>
+              Ajoutez des produits à votre panier pour commencer vos achats
             </ThemedText>
           </View>
-          
-          {promoDiscount > 0 && (
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Réduction promo</ThemedText>
-              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>-{promoDiscount.toFixed(2)}€</ThemedText>
-            </View>
-          )}
-          
-          <View style={[styles.summaryRow, styles.totalRow]}>
-            <ThemedText style={styles.totalLabel}>Total</ThemedText>
-            <ThemedText style={styles.totalValue}>{total.toFixed(2)}€</ThemedText>
-          </View>
-        </View>
-
-        {/* Section de commande intégrée */}
-        <View style={styles.checkoutSection}>
-          <View style={styles.checkoutInfo}>
-            <ThemedText style={styles.checkoutCount}>
-              {selectedItems.size} article(s) sélectionné(s)
-            </ThemedText>
-            <ThemedText style={styles.checkoutTotal}>{total.toFixed(2)}€</ThemedText>
-          </View>
-          <TouchableOpacity style={styles.checkoutButton} onPress={proceedToCheckout}>
-            <ThemedText style={styles.checkoutButtonText}>Commander</ThemedText>
-            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Produits recommandés */}
-        <View style={styles.recommendationsSection}>
-          <ThemedText style={styles.recommendationsTitle}>Vous pourriez aussi aimer</ThemedText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recommendationsList}>
-            {[
-              { name: 'iPhone 15', price: 999, image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=200' },
-              { name: 'AirPods Max', price: 549, image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=200' },
-              { name: 'Apple Watch', price: 399, image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=200' }
-            ].map((product, index) => (
-              <TouchableOpacity key={index} style={styles.recommendationCard}>
-                <Image source={{ uri: product.image }} style={styles.recommendationImage} />
-                <ThemedText style={styles.recommendationName}>{product.name}</ThemedText>
-                <ThemedText style={styles.recommendationPrice}>{product.price}€</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        )}
 
         <HomeFooter />
       </ScrollView>
@@ -363,14 +357,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingBottom: 100, // Espace pour la barre de navigation courbée
+    paddingBottom: 100,
   },
   scrollView: {
     flex: 1,
-    marginTop: -8, // Réduire l'espace entre header et contenu
-    paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
+    marginTop: -8,
+    paddingBottom: 120,
   },
-  // Hero Section
   heroContainer: {
     height: 180,
     position: 'relative',
@@ -402,7 +395,6 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     textAlign: 'center',
   },
-  // Cart Header
   cartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -432,7 +424,6 @@ const styles = StyleSheet.create({
     color: '#FF5722',
     fontWeight: '500',
   },
-  // Cart List
   cartList: {
     paddingHorizontal: 20,
   },
@@ -553,7 +544,6 @@ const styles = StyleSheet.create({
     color: '#FF5722',
     fontWeight: '600',
   },
-  // Promo Section
   promoSection: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
@@ -611,7 +601,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  // Summary Section
   summaryContainer: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
@@ -664,7 +653,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4CAF50',
   },
-  // Recommendations
   recommendationsSection: {
     marginHorizontal: 20,
     marginBottom: 20,
@@ -707,7 +695,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4CAF50',
   },
-  // Checkout Section (intégrée dans le scroll)
   checkoutSection: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
@@ -749,5 +736,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
