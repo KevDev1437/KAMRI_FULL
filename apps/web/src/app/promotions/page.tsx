@@ -35,19 +35,61 @@ export default function PromotionsPage() {
 
   // Chargement des produits
   useEffect(() => {
-    // TODO: Remplacer par un appel API réel
     const fetchProducts = async () => {
       try {
+        console.log('🔄 [PromotionsPage] Début du chargement des produits...');
         setIsLoading(true);
-        // Simulation d'appel API - pour l'instant retourne un tableau vide
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setProducts([]);
-        setFilteredProducts([]);
+        
+        console.log('🌐 [PromotionsPage] Appel API vers: http://localhost:3001/api/web/products');
+        // Appel API vers le backend
+        const response = await fetch('http://localhost:3001/api/web/products', {
+          headers: {
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        console.log('📡 [PromotionsPage] Réponse reçue:', response.status, response.statusText);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📦 [PromotionsPage] Données reçues:', data);
+          console.log('📊 [PromotionsPage] Nombre de produits:', data.data?.length || 0);
+          
+          // Adapter les données du backend au format frontend
+          const adaptedProducts = data.data.map((product: any) => {
+            // Utiliser directement le nom de la catégorie du backend (nos 7 catégories fixes)
+            const categoryName = product.category?.name || 'Mode';
+            
+            console.log('📦 [PromotionsPage] Produit:', product.name, 'Catégorie:', categoryName);
+            
+            return {
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              originalPrice: product.originalPrice,
+              image: product.image,
+              category: categoryName,
+              rating: 4.5, // Valeur par défaut
+              reviews: Math.floor(Math.random() * 100), // Valeur aléatoire
+              badge: product.originalPrice ? 'Promo' : null,
+              brand: 'Fake Store', // Valeur par défaut
+            };
+          });
+          
+          console.log('✅ [PromotionsPage] Produits adaptés:', adaptedProducts.length);
+          setProducts(adaptedProducts);
+          setFilteredProducts(adaptedProducts);
+        } else {
+          console.error('❌ [PromotionsPage] Erreur API:', response.status, response.statusText);
+          setProducts([]);
+          setFilteredProducts([]);
+        }
       } catch (error) {
-        console.error('Erreur lors du chargement des promotions:', error);
+        console.error('💥 [PromotionsPage] Erreur lors du chargement des produits:', error);
         setProducts([]);
         setFilteredProducts([]);
       } finally {
+        console.log('🏁 [PromotionsPage] Fin du chargement');
         setIsLoading(false);
       }
     };
@@ -126,40 +168,46 @@ export default function PromotionsPage() {
               setSelectedCategory={setSelectedCategory}
             />
 
-            {/* Résultats */}
-            <div className="mt-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-[#424242]">
-                  {filteredProducts.length} produits en promotion trouvés
-                </h2>
-                <button 
-                  className="lg:hidden bg-[#4CAF50] text-white px-4 py-2 rounded-lg"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  Filtres
-                </button>
+            {/* État de chargement */}
+            {isLoading ? (
+              <div className="text-center py-16">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
+                <p className="text-gray-600">Chargement des promotions...</p>
               </div>
-
-              {/* Grille de produits */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-
-              {/* Message si aucun produit */}
-              {filteredProducts.length === 0 && (
-                <div className="text-center py-20">
-                  <div className="text-6xl mb-4">🔍</div>
-                  <h2 className="text-2xl font-bold text-[#424242] mb-2">
-                    Aucune promotion trouvée
+            ) : (
+              <div className="mt-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-[#424242]">
+                    {filteredProducts.length} produits en promotion trouvés
                   </h2>
-                  <p className="text-lg text-[#81C784]">
-                    Essayez de modifier vos critères de recherche
-                  </p>
+                  <button 
+                    className="lg:hidden bg-[#4CAF50] text-white px-4 py-2 rounded-lg"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    Filtres
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {/* Grille de produits */}
+                {filteredProducts.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20">
+                    <div className="text-6xl mb-4">🔍</div>
+                    <h2 className="text-2xl font-bold text-[#424242] mb-2">
+                      Aucune promotion trouvée
+                    </h2>
+                    <p className="text-lg text-[#81C784]">
+                      Essayez de modifier vos critères de recherche
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

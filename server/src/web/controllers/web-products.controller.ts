@@ -19,34 +19,45 @@ export class WebProductsController {
   @ApiOperation({ summary: 'Get products optimized for web' })
   @ApiHeader({ name: 'x-platform', description: 'Platform identifier', required: true })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (max 50 for web)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (max 100 for web)' })
   @ApiQuery({ name: 'category', required: false, description: 'Product category' })
   @ApiQuery({ name: 'sort', required: false, description: 'Sort order' })
   @ApiQuery({ name: 'filters', required: false, description: 'JSON filters' })
   async getProducts(
     @Headers('user-agent') userAgent: string,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '50',
+    @Query('limit') limit: string = '100',
     @Query('category') category?: string,
     @Query('sort') sort?: string,
     @Query('filters') filters?: string,
   ) {
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50 pour web
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit))); // Max 100 pour web
     
-    // TODO: Remplacer par des données réelles
-    const products = await this.productsService.search('', {
-      page: pageNum,
-      limit: limitNum,
-      sort,
-      filters: filters ? JSON.parse(filters) : undefined,
-    });
+    // Récupérer tous les produits avec pagination
+    let products;
+    if (category) {
+      // Filtrer par catégorie si spécifiée
+      products = await this.productsService.findByCategoryName(category);
+    } else {
+      products = await this.productsService.findAll();
+    }
 
     const platform = this.platformService.detectPlatform(userAgent || '');
-    return this.platformService.optimizeResponse(products, 'web', { 
-      limit: limitNum, 
-      offset: (pageNum - 1) * limitNum 
-    });
+    
+    // Appliquer la pagination manuellement si nécessaire
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedProducts = products.slice(startIndex, endIndex);
+    
+    return {
+      success: true,
+      data: paginatedProducts,
+      total: products.length,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(products.length / limitNum)
+    };
   }
 
   @Get('featured')

@@ -19,11 +19,12 @@ export class AuthService {
     return null;
   }
 
-  async createUser(email: string, name: string) {
+  async createUser(email: string, name: string, username?: string) {
     return this.prisma.user.create({
       data: {
         email,
         name,
+        username: username || email.split('@')[0], // Utilise l'email comme username par défaut
       },
     });
   }

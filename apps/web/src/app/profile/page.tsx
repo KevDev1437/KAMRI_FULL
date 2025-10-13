@@ -13,14 +13,17 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personal');
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, loadUserProfile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/');
+    } else if (user?.id) {
+      // Charger les informations complètes du profil
+      loadUserProfile(user.id);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, user?.id, loadUserProfile]);
 
   if (!isAuthenticated) {
     return (

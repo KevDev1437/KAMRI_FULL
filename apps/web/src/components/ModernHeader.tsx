@@ -7,11 +7,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import AuthModal from './AuthModal';
+import UserLoginModal from './UserLoginModal';
 
 export default function ModernHeader() {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserLoginModal, setShowUserLoginModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
   const { getTotalItems: getCartTotal } = useCart();
@@ -107,7 +109,7 @@ export default function ModernHeader() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
                 {favorites.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#4CAF50] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
                     {favorites.length}
                   </span>
                 )}
@@ -119,7 +121,7 @@ export default function ModernHeader() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
                 {getCartTotal() > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#4CAF50] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
                     {getCartTotal()}
                   </span>
                 )}
@@ -133,7 +135,7 @@ export default function ModernHeader() {
                     className="p-2 lg:p-3 text-[#4CAF50] hover:bg-[#E8F5E8] rounded-full transition-all duration-300 ease-in-out hover:scale-110"
                   >
                     <div className="w-8 h-8 lg:w-10 lg:h-10 bg-[#4CAF50] rounded-full flex items-center justify-center text-white font-bold text-sm lg:text-base">
-                      {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || 'K'}
+                      {user?.name?.[0] || 'U'}
                     </div>
                   </button>
 
@@ -142,9 +144,10 @@ export default function ModernHeader() {
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       <div className="px-4 py-2 border-b border-gray-100">
                         <p className="text-sm font-semibold text-gray-900">
-                          {user?.firstName} {user?.lastName}
+                          {user?.name}
                         </p>
                         <p className="text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-xs text-[#81C784]">@{user?.username}</p>
                       </div>
                       
                       <Link 
@@ -176,7 +179,7 @@ export default function ModernHeader() {
                 </div>
               ) : (
                 <button 
-                  onClick={() => setShowAuthModal(true)}
+                  onClick={() => setShowUserLoginModal(true)}
                   className="p-2 lg:p-3 text-[#424242] hover:text-[#4CAF50] hover:bg-[#E8F5E8] rounded-full transition-all duration-300 ease-in-out hover:scale-110"
                 >
                   <svg className="h-5 w-5 lg:h-6 lg:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,6 +217,12 @@ export default function ModernHeader() {
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
+      />
+
+      {/* Modal de connexion utilisateur */}
+      <UserLoginModal 
+        isOpen={showUserLoginModal} 
+        onClose={() => setShowUserLoginModal(false)} 
       />
     </>
   );

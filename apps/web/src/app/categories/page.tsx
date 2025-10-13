@@ -1,15 +1,24 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import CategoryCard from '../../components/CategoryCard';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import PopularCategoriesSlider from '../../components/PopularCategoriesSlider';
 import TrendingSection from '../../components/TrendingSection';
 
-// Catégories de base - structure fixe avec 0 produits
-const categories: Category[] = [
+interface Category {
+  id: number;
+  name: string;
+  image: string;
+  count: number;
+  color: string;
+  icon: string;
+}
+
+// Tes 7 catégories fixes - structure inchangée
+const baseCategories: Category[] = [
   {
     id: 1,
     name: 'Mode',
@@ -68,17 +77,47 @@ const categories: Category[] = [
   }
 ];
 
-interface Category {
-  id: number;
-  name: string;
-  image: string;
-  count: number;
-  color: string;
-  icon: string;
-}
-
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>(baseCategories);
+  const [loading, setLoading] = useState(true);
+
+  // Charger les comptes de produits depuis le backend
+  useEffect(() => {
+    const fetchCategoryCounts = async () => {
+      try {
+        console.log('🔄 [CategoriesPage] Chargement des comptes de catégories...');
+        const response = await fetch('http://localhost:3001/api/web/categories');
+        const data = await response.json();
+        
+        if (data.success) {
+          // Mettre à jour les comptes de tes catégories fixes
+          const updatedCategories = baseCategories.map(category => {
+            const backendCategory = data.categories.find((bc: any) => bc.name === category.name);
+            return {
+              ...category,
+              count: backendCategory ? backendCategory.count : 0
+            };
+          });
+          
+          setCategories(updatedCategories);
+          console.log('✅ [CategoriesPage] Comptes mis à jour:', updatedCategories.map(c => `${c.name}: ${c.count}`));
+        } else {
+          console.error('❌ [CategoriesPage] Erreur:', data.message);
+          // Garder les catégories de base même en cas d'erreur
+          setCategories(baseCategories);
+        }
+      } catch (error) {
+        console.error('💥 [CategoriesPage] Erreur lors du chargement:', error);
+        // Garder les catégories de base même en cas d'erreur
+        setCategories(baseCategories);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategoryCounts();
+  }, []);
 
   const filteredCategories = categories.filter(category =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -180,18 +219,25 @@ export default function CategoriesPage() {
             Toutes les catégories
           </h2>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCategories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <CategoryCard category={category} />
-              </motion.div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4CAF50]"></div>
+              <span className="ml-4 text-[#424242]">Chargement des catégories...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredCategories.map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <CategoryCard category={category} />
+                </motion.div>
+              ))}
+            </div>
+          )}
         </motion.section>
 
         {/* Catégories populaires - Slider */}

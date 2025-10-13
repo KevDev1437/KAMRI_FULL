@@ -41,8 +41,11 @@ export default function ProductsPage() {
         setIsLoading(true);
         
         console.log('🌐 [DEBUG] Appel API vers: http://localhost:3001/api/web/products');
-        // Appel API vers le backend
-        const response = await fetch('http://localhost:3001/api/web/products', {
+        // Appel API vers le backend avec limite élevée pour éviter la pagination
+        const apiUrl = selectedCategory !== 'tous' 
+          ? `http://localhost:3001/api/web/products?category=${selectedCategory}&limit=100`
+          : 'http://localhost:3001/api/web/products?limit=100';
+        const response = await fetch(apiUrl, {
           headers: {
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
@@ -57,18 +60,10 @@ export default function ProductsPage() {
           
           // Adapter les données du backend au format frontend
           const adaptedProducts = data.data.map((product: any) => {
-            // Mapping des catégories Fake Store vers français
-            const categoryMapping: { [key: string]: string } = {
-              'electronics': 'Électronique',
-              'jewelery': 'Bijoux',
-              "men's clothing": 'Mode Homme',
-              "women's clothing": 'Mode Femme',
-              'Fake Store': 'Général'
-            };
+            // Utiliser directement le nom de la catégorie du backend (nos 7 catégories fixes)
+            const categoryName = product.category?.name || 'Mode';
             
-            const mappedCategory = categoryMapping[product.category?.name] || product.category?.name || 'Général';
-            
-            console.log('📦 [DEBUG] Produit:', product.name, 'Catégorie originale:', product.category?.name, 'Catégorie mappée:', mappedCategory);
+            console.log('📦 [DEBUG] Produit:', product.name, 'Catégorie:', categoryName);
             
             return {
               id: product.id,
@@ -76,7 +71,7 @@ export default function ProductsPage() {
               price: product.price,
               originalPrice: product.originalPrice,
               image: product.image,
-              category: mappedCategory,
+              category: categoryName,
               rating: 4.5, // Valeur par défaut
               reviews: Math.floor(Math.random() * 100), // Valeur aléatoire
               badge: product.originalPrice ? 'Promo' : null,
@@ -103,16 +98,14 @@ export default function ProductsPage() {
     };
 
     fetchProducts();
-  }, []);
+  }, [selectedCategory]); // Recharger quand la catégorie change
 
-  // Filtrage des produits
+  // Filtrage des produits (maintenant géré côté serveur)
   useEffect(() => {
     let filtered = products;
 
-    // Filtre par catégorie
-    if (selectedCategory !== 'tous') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
-    }
+    // Le filtrage par catégorie est maintenant géré côté serveur
+    // On garde seulement les autres filtres
 
     // Filtre par recherche
     if (searchQuery) {

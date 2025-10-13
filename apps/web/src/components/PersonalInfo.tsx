@@ -1,9 +1,11 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PersonalInfo() {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [userInfo, setUserInfo] = useState({
     name: '',
@@ -14,6 +16,21 @@ export default function PersonalInfo() {
   });
 
   const [formData, setFormData] = useState(userInfo);
+
+  // Charger les données utilisateur depuis le contexte
+  useEffect(() => {
+    if (user) {
+      const userData = {
+        name: user.name || '',
+        email: user.email || '',
+        phone: '', // Pas disponible dans les données Fake Store
+        address: '', // Pas disponible dans les données Fake Store
+        memberSince: user.memberSince ? new Date(user.memberSince).toLocaleDateString('fr-FR') : ''
+      };
+      setUserInfo(userData);
+      setFormData(userData);
+    }
+  }, [user]);
 
   const handleSave = () => {
     setUserInfo(formData);

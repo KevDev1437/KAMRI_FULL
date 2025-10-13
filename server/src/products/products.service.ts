@@ -19,9 +19,13 @@ export class ProductsService {
 
   async findAll() {
     return this.prisma.product.findMany({
+      where: {
+        status: 'active', // Seulement les produits actifs
+      },
       include: {
         category: true,
         images: true,
+        supplier: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -72,10 +76,30 @@ export class ProductsService {
 
   async findByCategory(categoryId: string) {
     return this.prisma.product.findMany({
-      where: { categoryId },
+      where: { 
+        categoryId,
+        status: 'active' // Seulement les produits actifs
+      },
       include: {
         category: true,
         images: true,
+        supplier: true,
+      },
+    });
+  }
+
+  async findByCategoryName(categoryName: string) {
+    return this.prisma.product.findMany({
+      where: { 
+        category: {
+          name: categoryName
+        },
+        status: 'active' // Seulement les produits actifs
+      },
+      include: {
+        category: true,
+        images: true,
+        supplier: true,
       },
     });
   }
@@ -94,10 +118,11 @@ export class ProductsService {
   }
 
   async search(query: string, options?: { page?: number; limit?: number; sort?: string; filters?: any }) {
-    const { page = 1, limit = 30, sort, filters } = options || {};
+    const { page = 1, limit = 100, sort, filters } = options || {};
     const skip = (page - 1) * limit;
     
     const where: any = {
+      status: 'active', // Seulement les produits actifs
       OR: [
         { name: { contains: query } },
         { description: { contains: query } },
@@ -133,7 +158,11 @@ export class ProductsService {
     return this.prisma.category.findMany({
       include: {
         _count: {
-          select: { products: true }
+          select: { 
+            products: {
+              where: { status: 'active' } // Seulement les produits actifs
+            }
+          }
         }
       }
     });

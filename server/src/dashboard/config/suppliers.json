@@ -1,0 +1,53 @@
+{
+  "fake-store": {
+    "name": "Fake Store",
+    "baseUrl": "https://fakestoreapi.com",
+    "endpoints": {
+      "products": "/products",
+      "users": "/users",
+      "categories": "/products/categories"
+    },
+    "auth": {
+      "type": "none"
+    },
+    "rateLimit": {
+      "requests": 100,
+      "window": "1m"
+    }
+  },
+  "dummy-json": {
+    "name": "Dummy JSON",
+    "baseUrl": "https://dummyjson.com",
+    "endpoints": {
+      "products": "/products",
+      "users": "/users",
+      "categories": "/products/categories",
+      "carts": "/carts"
+    },
+    "auth": {
+      "type": "none"
+    },
+    "rateLimit": {
+      "requests": 1000,
+      "window": "1m"
+    }
+  },
+  "amazon": {
+    "name": "Amazon",
+    "baseUrl": "https://api.amazon.com",
+    "endpoints": {
+      "products": "/products",
+      "users": "/users",
+      "categories": "/categories"
+    },
+    "auth": {
+      "type": "oauth2",
+      "clientId": "${AMAZON_CLIENT_ID}",
+      "clientSecret": "${AMAZON_CLIENT_SECRET}"
+    },
+    "rateLimit": {
+      "requests": 200,
+      "window": "1m"
+    }
+  }
+}

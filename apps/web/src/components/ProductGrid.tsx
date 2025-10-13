@@ -116,6 +116,10 @@ function ProductCard({ product }: ProductCardProps) {
 export default function ProductGrid() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const productsPerPage = 20;
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -123,7 +127,7 @@ export default function ProductGrid() {
         console.log('🔄 [ProductGrid] Chargement des produits...');
         setIsLoading(true);
         
-        const response = await fetch('http://localhost:3001/api/web/products', {
+        const response = await fetch(`http://localhost:3001/api/web/products?limit=${productsPerPage}&page=${currentPage}`, {
           headers: {
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
@@ -133,8 +137,8 @@ export default function ProductGrid() {
           const data = await response.json();
           console.log('📦 [ProductGrid] Produits reçus:', data.data?.length || 0);
           
-          // Prendre seulement les 8 premiers produits pour la page d'accueil
-          const homeProducts = data.data.slice(0, 8).map((product: any) => ({
+          // Prendre les produits pour la page d'accueil avec pagination
+          const homeProducts = data.data.map((product: any) => ({
             id: product.id,
             name: product.name,
             price: product.price,
@@ -142,6 +146,8 @@ export default function ProductGrid() {
           }));
           
           setProducts(homeProducts);
+          setTotalPages(data.totalPages || 1);
+          setTotalProducts(data.total || 0);
         } else {
           console.error('❌ [ProductGrid] Erreur API:', response.status);
           setProducts([]);
@@ -155,7 +161,7 @@ export default function ProductGrid() {
     };
 
     fetchProducts();
-  }, []);
+  }, [currentPage]);
 
   return (
     <div className="py-20 px-6 bg-[#E8F5E8]/30">
@@ -164,9 +170,18 @@ export default function ProductGrid() {
           <h2 className="text-4xl md:text-5xl font-bold text-[#424242] mb-4 tracking-tight font-['Inter']">
             Nos produits
           </h2>
-          <p className="text-xl text-[#81C784] font-light font-['Inter']">
+          <p className="text-xl text-[#81C784] font-light font-['Inter'] mb-6">
             Découvrez notre sélection exclusive
           </p>
+          <Link 
+            href="/products"
+            className="inline-flex items-center gap-2 bg-[#4CAF50] text-white px-8 py-3 rounded-full font-semibold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-300 ease-in-out"
+          >
+            Voir tous les produits
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
         
         {isLoading ? (
@@ -175,11 +190,58 @@ export default function ProductGrid() {
             <p className="text-gray-600">Chargement des produits...</p>
           </div>
         ) : products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          <>
+            <div className="text-center mb-8">
+              <p className="text-lg text-[#81C784] font-medium">
+                {products.length} produits disponibles (page {currentPage} sur {totalPages})
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex justify-center">
+                <nav className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Précédent
+                  </button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = i + 1;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${
+                          currentPage === page
+                            ? 'bg-[#4CAF50] text-white'
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Suivant
+                  </button>
+                </nav>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">📦</div>
