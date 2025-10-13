@@ -6,11 +6,11 @@ import { useState } from 'react';
 export default function PersonalInfo() {
   const [isEditing, setIsEditing] = useState(false);
   const [userInfo, setUserInfo] = useState({
-    name: 'Ulrich Kevin',
-    email: 'ulrich.kevin@email.com',
-    phone: '+33 6 12 34 56 78',
-    address: '123 Rue de la Paix, 75001 Paris',
-    memberSince: '15 Janvier 2024'
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    memberSince: ''
   });
 
   const [formData, setFormData] = useState(userInfo);

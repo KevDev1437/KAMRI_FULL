@@ -6,26 +6,7 @@ import { useState } from 'react';
 export default function AddressSection() {
   const [showModal, setShowModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
-  const [addresses, setAddresses] = useState([
-    {
-      id: 1,
-      name: 'Domicile',
-      fullName: 'Jean Dupont',
-      address: '123 Rue de la Paix',
-      city: '75001 Paris',
-      phone: '+33 6 12 34 56 78',
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: 'Bureau',
-      fullName: 'Jean Dupont',
-      address: '456 Avenue des Champs-Élysées',
-      city: '75008 Paris',
-      phone: '+33 6 12 34 56 78',
-      isDefault: false
-    }
-  ]);
+  const [addresses, setAddresses] = useState([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -110,8 +91,9 @@ export default function AddressSection() {
         </div>
 
         {/* Liste des adresses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {addresses.map((address, index) => (
+        {addresses.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {addresses.map((address, index) => (
             <motion.div
               key={address.id}
               initial={{ opacity: 0, y: 20 }}
@@ -169,8 +151,25 @@ export default function AddressSection() {
                 </button>
               )}
             </motion.div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🏠</div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              Aucune adresse enregistrée
+            </h3>
+            <p className="text-gray-500 mb-6">
+              Ajoutez votre première adresse pour faciliter vos commandes.
+            </p>
+            <button
+              onClick={handleAddAddress}
+              className="bg-[#4CAF50] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#45a049] transition-colors"
+            >
+              Ajouter une adresse
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* Modal d'ajout/modification d'adresse */}
