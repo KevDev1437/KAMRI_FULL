@@ -1,85 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
 
 export default function FavoritesScreen() {
-  const [favorites, setFavorites] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      category: 'Smartphones',
-      rating: 4.8,
-      reviews: 1247,
-      inStock: true,
-      stockCount: 15,
-      isOnSale: true,
-      savings: 100,
-      addedDate: '2024-01-15',
-      priceAlert: false,
-      isLiked: true
-    },
-    {
-      id: '2',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      category: 'Ordinateurs',
-      rating: 4.9,
-      reviews: 892,
-      inStock: false,
-      stockCount: 0,
-      isOnSale: false,
-      savings: 0,
-      addedDate: '2024-01-10',
-      priceAlert: true,
-      isLiked: true
-    },
-    {
-      id: '3',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      category: 'Audio',
-      rating: 4.7,
-      reviews: 2156,
-      inStock: true,
-      stockCount: 8,
-      isOnSale: true,
-      savings: 30,
-      addedDate: '2024-01-12',
-      priceAlert: false,
-      isLiked: true
-    },
-    {
-      id: '4',
-      name: 'Apple Watch Series 9',
-      price: 399,
-      originalPrice: 449,
-      image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=300',
-      category: 'Montres',
-      rating: 4.6,
-      reviews: 1834,
-      inStock: true,
-      stockCount: 22,
-      isOnSale: true,
-      savings: 50,
-      addedDate: '2024-01-08',
-      priceAlert: true,
-      isLiked: true
-    }
-  ]);
-
+  const [favorites, setFavorites] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date'); // date, price, name, rating
   const [filterCategory, setFilterCategory] = useState('all');
@@ -87,6 +18,25 @@ export default function FavoritesScreen() {
   const [showFilters, setShowFilters] = useState(false);
 
   const categories = ['all', 'Smartphones', 'Ordinateurs', 'Audio', 'Montres', 'Accessoires'];
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchFavorites = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setFavorites([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des favoris:', error);
+        setFavorites([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFavorites();
+  }, []);
 
   const filteredFavorites = favorites.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -152,150 +102,142 @@ export default function FavoritesScreen() {
   };
 
   const selectAll = () => {
-    if (selectedItems.size === sortedFavorites.length) {
+    if (selectedItems.size === filteredFavorites.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(sortedFavorites.map(item => item.id)));
+      setSelectedItems(new Set(filteredFavorites.map(item => item.id)));
     }
   };
 
-  const addSelectedToCart = () => {
-    const selectedCount = selectedItems.size;
-    if (selectedCount === 0) {
-      Alert.alert('Aucune sélection', 'Veuillez sélectionner au moins un article');
-      return;
-    }
-    Alert.alert('Ajout au panier', `${selectedCount} article(s) ajouté(s) au panier`);
-  };
-
-  const togglePriceAlert = (id: string) => {
-    setFavorites(items => 
-      items.map(item => 
-        item.id === id ? { ...item, priceAlert: !item.priceAlert } : item
-      )
+  const removeSelected = () => {
+    if (selectedItems.size === 0) return;
+    
+    Alert.alert(
+      'Supprimer les favoris sélectionnés',
+      `Êtes-vous sûr de vouloir supprimer ${selectedItems.size} article(s) de vos favoris ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: () => {
+            setFavorites(items => items.filter(item => !selectedItems.has(item.id)));
+            setSelectedItems(new Set());
+          }
+        }
+      ]
     );
   };
 
-  const renderFavoriteItem = ({ item }: { item: any }) => (
-    <View style={styles.favoriteItem}>
-      <TouchableOpacity 
-        style={styles.selectButton}
-        onPress={() => toggleSelection(item.id)}
-      >
-        <Ionicons 
-          name={selectedItems.has(item.id) ? "checkbox" : "square-outline"} 
-          size={20} 
-          color={selectedItems.has(item.id) ? "#4CAF50" : "#9CA3AF"} 
-        />
-      </TouchableOpacity>
+  const renderFavoriteItem = ({ item }) => {
+    const isSelected = selectedItems.has(item.id);
+    const discountPercentage = item.originalPrice > item.price 
+      ? calculateDiscountPercentage(item.originalPrice, item.price)
+      : 0;
 
-      <Image source={{ uri: item.image }} style={styles.itemImage} />
-      
-      <View style={styles.itemDetails}>
-        <View style={styles.itemHeader}>
-          <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-          <TouchableOpacity 
-            style={styles.likeButton}
-            onPress={() => toggleFavorite(item.id)}
-          >
-            <Ionicons 
-              name={item.isLiked ? "heart" : "heart-outline"} 
-              size={20} 
-              color={item.isLiked ? "#FF5722" : "#9CA3AF"} 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        <ThemedText style={styles.itemCategory}>{item.category}</ThemedText>
-        
-        <View style={styles.ratingRow}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#FFD700" />
-            <ThemedText style={styles.ratingText}>{item.rating}</ThemedText>
-            <ThemedText style={styles.reviewsText}>({item.reviews})</ThemedText>
-          </View>
-          <ThemedText style={styles.addedDate}>Ajouté le {new Date(item.addedDate).toLocaleDateString('fr-FR')}</ThemedText>
-        </View>
+    return (
+      <View style={[styles.favoriteItem, isSelected && styles.selectedItem]}>
+        <TouchableOpacity 
+          style={styles.checkbox}
+          onPress={() => toggleSelection(item.id)}
+        >
+          <Ionicons 
+            name={isSelected ? "checkbox" : "square-outline"} 
+            size={20} 
+            color={isSelected ? "#4CAF50" : "#9CA3AF"} 
+          />
+        </TouchableOpacity>
 
-        <View style={styles.priceRow}>
-          <View style={styles.priceContainer}>
-            <ThemedText style={styles.currentPrice}>{item.price}€</ThemedText>
-            {item.originalPrice > item.price && (
-              <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
-            )}
-          </View>
-          {item.originalPrice > item.price && (
-            <View style={styles.savingsBadge}>
-              <ThemedText style={styles.savingsText}>
-                {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
+        <View style={styles.itemImageContainer}>
+          {item.image ? (
+            <Image source={{ uri: item.image }} style={styles.itemImage} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color="#9CA3AF" />
+            </View>
+          )}
+          
+          {item.isOnSale && (
+            <View style={styles.saleBadge}>
+              <ThemedText style={styles.saleBadgeText}>
+                {formatDiscountPercentage(discountPercentage)}
               </ThemedText>
             </View>
           )}
         </View>
 
-        <View style={styles.stockRow}>
-          <View style={styles.stockInfo}>
-            <Ionicons 
-              name={item.inStock ? "checkmark-circle" : "close-circle"} 
-              size={16} 
-              color={item.inStock ? "#4CAF50" : "#FF5722"} 
-            />
-            <ThemedText style={[
-              styles.stockText, 
-              { color: item.inStock ? "#4CAF50" : "#FF5722" }
-            ]}>
-              {item.inStock ? `${item.stockCount} en stock` : 'Rupture de stock'}
-            </ThemedText>
-          </View>
+        <View style={styles.itemDetails}>
+          <ThemedText style={styles.itemName} numberOfLines={2}>
+            {item.name}
+          </ThemedText>
           
-          <TouchableOpacity 
-            style={styles.priceAlertButton}
-            onPress={() => togglePriceAlert(item.id)}
-          >
-            <Ionicons 
-              name={item.priceAlert ? "notifications" : "notifications-outline"} 
-              size={16} 
-              color={item.priceAlert ? "#4CAF50" : "#9CA3AF"} 
-            />
-          </TouchableOpacity>
+          <ThemedText style={styles.itemCategory}>{item.category}</ThemedText>
+          
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <ThemedText style={styles.ratingText}>{item.rating}</ThemedText>
+            <ThemedText style={styles.reviewsText}>({item.reviews})</ThemedText>
+          </View>
+
+          <View style={styles.priceContainer}>
+            <ThemedText style={styles.currentPrice}>${item.price}</ThemedText>
+            {item.originalPrice > item.price && (
+              <ThemedText style={styles.originalPrice}>${item.originalPrice}</ThemedText>
+            )}
+          </View>
+
+          <View style={styles.stockContainer}>
+            {item.inStock ? (
+              <ThemedText style={styles.inStockText}>
+                En stock ({item.stockCount} disponibles)
+              </ThemedText>
+            ) : (
+              <ThemedText style={styles.outOfStockText}>Rupture de stock</ThemedText>
+            )}
+          </View>
+
+          <ThemedText style={styles.addedDate}>
+            Ajouté le {new Date(item.addedDate).toLocaleDateString('fr-FR')}
+          </ThemedText>
         </View>
 
-        <View style={styles.actionRow}>
+        <View style={styles.itemActions}>
           <TouchableOpacity 
-            style={[styles.actionButton, styles.addToCartButton]}
-            disabled={!item.inStock}
+            style={styles.actionButton}
+            onPress={() => toggleFavorite(item.id)}
           >
-            <Ionicons name="cart-outline" size={16} color="#FFFFFF" />
-            <ThemedText style={styles.addToCartText}>Ajouter au panier</ThemedText>
+            <Ionicons 
+              name={item.isLiked ? "heart" : "heart-outline"} 
+              size={20} 
+              color={item.isLiked ? "#E91E63" : "#9CA3AF"} 
+            />
           </TouchableOpacity>
-          
+
           <TouchableOpacity 
-            style={styles.removeButton}
+            style={styles.actionButton}
             onPress={() => removeFromFavorites(item.id)}
           >
-            <Ionicons name="trash-outline" size={16} color="#FF5722" />
+            <Ionicons name="trash-outline" size={20} color="#F44336" />
           </TouchableOpacity>
+
+          {item.priceAlert && (
+            <TouchableOpacity style={styles.alertButton}>
+              <Ionicons name="notifications" size={16} color="#FF9800" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
       <UnifiedHeader />
+      
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={styles.heroContainer}>
-          <LinearGradient colors={['#EAF3EE', '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroBackground} />
-          <View style={styles.heroContent}>
-            <ThemedText style={styles.heroTitle}>Mes Favoris</ThemedText>
-            <ThemedText style={styles.heroSubtitle}>{favorites.length} article(s) dans vos favoris</ThemedText>
-          </View>
-        </View>
-
-        {/* Search and Filters */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
+        {/* Header avec recherche et filtres */}
+        <View style={styles.header}>
+          <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
@@ -304,13 +246,8 @@ export default function FavoritesScreen() {
               onChangeText={setSearchQuery}
               placeholderTextColor="#9CA3AF"
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
           </View>
-          
+
           <TouchableOpacity 
             style={styles.filterButton}
             onPress={() => setShowFilters(!showFilters)}
@@ -319,126 +256,113 @@ export default function FavoritesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Filters */}
+        {/* Filtres */}
         {showFilters && (
           <View style={styles.filtersContainer}>
             <View style={styles.filterSection}>
-              <ThemedText style={styles.filterTitle}>Trier par</ThemedText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortOptions}>
+              <ThemedText style={styles.filterLabel}>Trier par</ThemedText>
+              <View style={styles.sortButtons}>
                 {[
-                  { key: 'date', label: 'Date d\'ajout' },
+                  { key: 'date', label: 'Date' },
                   { key: 'price', label: 'Prix' },
                   { key: 'name', label: 'Nom' },
                   { key: 'rating', label: 'Note' }
-                ].map((option) => (
+                ].map(({ key, label }) => (
                   <TouchableOpacity
-                    key={option.key}
-                    style={[
-                      styles.sortOption,
-                      sortBy === option.key && styles.sortOptionActive
-                    ]}
-                    onPress={() => setSortBy(option.key)}
+                    key={key}
+                    style={[styles.sortButton, sortBy === key && styles.activeSortButton]}
+                    onPress={() => setSortBy(key)}
                   >
                     <ThemedText style={[
-                      styles.sortOptionText,
-                      sortBy === option.key && styles.sortOptionTextActive
+                      styles.sortButtonText, 
+                      sortBy === key && styles.activeSortButtonText
                     ]}>
-                      {option.label}
+                      {label}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </View>
             </View>
 
             <View style={styles.filterSection}>
-              <ThemedText style={styles.filterTitle}>Catégorie</ThemedText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryOptions}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.categoryOption,
-                      filterCategory === category && styles.categoryOptionActive
-                    ]}
-                    onPress={() => setFilterCategory(category)}
-                  >
-                    <ThemedText style={[
-                      styles.categoryOptionText,
-                      filterCategory === category && styles.categoryOptionTextActive
-                    ]}>
-                      {category === 'all' ? 'Toutes' : category}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
+              <ThemedText style={styles.filterLabel}>Catégorie</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.categoryButtons}>
+                  {categories.map(category => (
+                    <TouchableOpacity
+                      key={category}
+                      style={[
+                        styles.categoryButton, 
+                        filterCategory === category && styles.activeCategoryButton
+                      ]}
+                      onPress={() => setFilterCategory(category)}
+                    >
+                      <ThemedText style={[
+                        styles.categoryButtonText,
+                        filterCategory === category && styles.activeCategoryButtonText
+                      ]}>
+                        {category === 'all' ? 'Toutes' : category}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </ScrollView>
             </View>
           </View>
         )}
 
-        {/* Header avec actions */}
-        <View style={styles.favoritesHeader}>
-          <TouchableOpacity style={styles.selectAllButton} onPress={selectAll}>
-            <Ionicons 
-              name={selectedItems.size === sortedFavorites.length ? "checkbox" : "square-outline"} 
-              size={20} 
-              color={selectedItems.size === sortedFavorites.length ? "#4CAF50" : "#9CA3AF"} 
-            />
-            <ThemedText style={styles.selectAllText}>
-              {selectedItems.size === sortedFavorites.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-            </ThemedText>
-          </TouchableOpacity>
-          
-          {selectedItems.size > 0 && (
-            <TouchableOpacity style={styles.addSelectedButton} onPress={addSelectedToCart}>
-              <Ionicons name="cart" size={18} color="#4CAF50" />
-              <ThemedText style={styles.addSelectedText}>Ajouter ({selectedItems.size})</ThemedText>
+        {/* Actions en lot */}
+        {filteredFavorites.length > 0 && (
+          <View style={styles.bulkActions}>
+            <TouchableOpacity style={styles.selectAllButton} onPress={selectAll}>
+              <ThemedText style={styles.selectAllText}>
+                {selectedItems.size === filteredFavorites.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </ThemedText>
             </TouchableOpacity>
-          )}
-        </View>
 
-        {/* Liste des favoris */}
-        <FlatList
-          data={sortedFavorites}
-          renderItem={renderFavoriteItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={styles.favoritesList}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <ThemedText style={styles.emptyIcon}>❤️</ThemedText>
-              <ThemedText style={styles.emptyTitle}>Aucun favori trouvé</ThemedText>
-              <ThemedText style={styles.emptySubtitle}>
-                {searchQuery ? 'Essayez avec d\'autres mots-clés' : 'Commencez à ajouter des produits à vos favoris'}
-              </ThemedText>
-            </View>
-          }
-        />
-
-        {/* Statistiques */}
-        <View style={styles.statsContainer}>
-          <ThemedText style={styles.statsTitle}>Vos statistiques</ThemedText>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>{favorites.length}</ThemedText>
-              <ThemedText style={styles.statLabel}>Articles favoris</ThemedText>
-            </View>
-            <View style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>
-                {favorites.filter(item => item.priceAlert).length}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>Alertes prix</ThemedText>
-            </View>
-            <View style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>
-                {favorites.filter(item => item.isOnSale).length}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>En promotion</ThemedText>
-            </View>
+            {selectedItems.size > 0 && (
+              <TouchableOpacity style={styles.removeSelectedButton} onPress={removeSelected}>
+                <Ionicons name="trash" size={16} color="#FFFFFF" />
+                <ThemedText style={styles.removeSelectedText}>
+                  Supprimer ({selectedItems.size})
+                </ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
-        </View>
+        )}
+
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement de vos favoris...</ThemedText>
+          </View>
+        ) : filteredFavorites.length > 0 ? (
+          <FlatList
+            data={sortedFavorites}
+            renderItem={renderFavoriteItem}
+            keyExtractor={item => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.favoritesList}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="heart-outline" size={64} color="#E91E63" />
+            <ThemedText style={styles.emptyTitle}>
+              {searchQuery || filterCategory !== 'all' ? 'Aucun favori trouvé' : 'Aucun favori pour le moment'}
+            </ThemedText>
+            <ThemedText style={styles.emptySubtitle}>
+              {searchQuery || filterCategory !== 'all' 
+                ? 'Essayez de modifier vos critères de recherche'
+                : 'Commencez à ajouter des produits à vos favoris !'
+              }
+            </ThemedText>
+          </View>
+        )}
 
         <HomeFooter />
       </ScrollView>
+
       <CurvedBottomNav />
     </View>
   );
@@ -448,65 +372,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingBottom: 100, // Espace pour la barre de navigation courbée
+    paddingBottom: 120,
   },
   scrollView: {
     flex: 1,
-    marginTop: -8, // Réduire l'espace entre header et contenu
-    paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
   },
-  // Hero Section
-  heroContainer: {
-    height: 180,
-    position: 'relative',
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
-  heroBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  heroContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#424242',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: '#4CAF50',
-    textAlign: 'center',
-  },
-  // Search and Filters
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
-  },
-  searchBar: {
-    flex: 1,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 12,
   },
   searchIcon: {
     marginRight: 8,
@@ -517,320 +405,278 @@ const styles = StyleSheet.create({
     color: '#424242',
   },
   filterButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 8,
+    backgroundColor: '#E8F5E8',
+    borderRadius: 20,
   },
-  // Filters
   filtersContainer: {
     backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
   filterSection: {
     marginBottom: 16,
   },
-  filterTitle: {
+  filterLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#424242',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  sortOptions: {
+  sortButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  sortOption: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F8F9FA',
   },
-  sortOptionActive: {
+  activeSortButton: {
     backgroundColor: '#4CAF50',
   },
-  sortOptionText: {
+  sortButtonText: {
     fontSize: 14,
     color: '#424242',
     fontWeight: '500',
   },
-  sortOptionTextActive: {
+  activeSortButtonText: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
-  categoryOptions: {
+  categoryButtons: {
     flexDirection: 'row',
+    gap: 8,
   },
-  categoryOption: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+  categoryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F8F9FA',
   },
-  categoryOptionActive: {
+  activeCategoryButton: {
     backgroundColor: '#4CAF50',
   },
-  categoryOptionText: {
+  categoryButtonText: {
     fontSize: 14,
     color: '#424242',
     fontWeight: '500',
   },
-  categoryOptionTextActive: {
+  activeCategoryButtonText: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
-  // Favorites Header
-  favoritesHeader: {
+  bulkActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   selectAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#E8F5E8',
   },
   selectAllText: {
-    fontSize: 16,
-    color: '#424242',
-    fontWeight: '500',
-  },
-  addSelectedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  addSelectedText: {
     fontSize: 14,
     color: '#4CAF50',
     fontWeight: '600',
   },
-  // Favorites List
+  removeSelectedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F44336',
+    gap: 4,
+  },
+  removeSelectedText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
   favoritesList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   favoriteItem: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
-  selectButton: {
+  selectedItem: {
+    backgroundColor: '#E8F5E8',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  checkbox: {
     marginRight: 12,
     justifyContent: 'center',
   },
-  itemImage: {
+  itemImageContainer: {
     width: 80,
     height: 80,
     borderRadius: 8,
     marginRight: 12,
+    position: 'relative',
+  },
+  itemImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saleBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF5722',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  saleBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   itemDetails: {
     flex: 1,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+    marginRight: 8,
   },
   itemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#424242',
-    flex: 1,
-    marginRight: 8,
-  },
-  likeButton: {
-    padding: 4,
+    marginBottom: 4,
+    lineHeight: 20,
   },
   itemCategory: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#9CA3AF',
-    marginBottom: 8,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginBottom: 4,
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#424242',
-    fontWeight: '600',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   reviewsText: {
     fontSize: 12,
     color: '#9CA3AF',
-  },
-  addedDate: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginLeft: 4,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 4,
   },
   currentPrice: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#4CAF50',
+    marginRight: 8,
   },
   originalPrice: {
     fontSize: 14,
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
   },
-  savingsBadge: {
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  stockContainer: {
+    marginBottom: 4,
   },
-  savingsText: {
+  inStockText: {
     fontSize: 12,
     color: '#4CAF50',
-    fontWeight: '600',
-  },
-  stockRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stockInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  stockText: {
-    fontSize: 14,
     fontWeight: '500',
   },
-  priceAlertButton: {
-    padding: 4,
+  outOfStockText: {
+    fontSize: 12,
+    color: '#F44336',
+    fontWeight: '500',
   },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  addedDate: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  itemActions: {
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  addToCartButton: {
-    backgroundColor: '#4CAF50',
-    flex: 1,
-    marginRight: 8,
-  },
-  addToCartText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  removeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
   },
-  // Empty State
-  emptyContainer: {
+  alertButton: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#FFF3E0',
+  },
+  loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 32,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#424242',
+    marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 16,
     color: '#9CA3AF',
     textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  // Statistics
-  statsContainer: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#424242',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
+    lineHeight: 22,
   },
 });

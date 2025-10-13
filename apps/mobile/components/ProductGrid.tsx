@@ -1,19 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les produits - 8 produits optimaux
-const mockProducts = [
-  { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-  { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-  { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-  { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-  { id: '7', name: 'Sac à Dos', price: '39.99€', image: null },
-  { id: '8', name: 'Montre Connectée', price: '199.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -60,6 +49,28 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function ProductGrid() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProducts([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des produits:', error);
+        setProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -69,11 +80,23 @@ export default function ProductGrid() {
         </ThemedText>
       </View>
       
-      <View style={styles.grid}>
-        {mockProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </View>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <ThemedText style={styles.loadingText}>Chargement des produits...</ThemedText>
+        </View>
+      ) : products.length > 0 ? (
+        <View style={styles.grid}>
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="grid-outline" size={48} color="#9CA3AF" />
+          <ThemedText style={styles.emptyText}>Aucun produit disponible pour le moment</ThemedText>
+        </View>
+      )}
     </View>
   );
 }
@@ -175,5 +198,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });

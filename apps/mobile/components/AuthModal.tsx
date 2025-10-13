@@ -43,19 +43,16 @@ export default function AuthModal({ visible, onClose, onLoginSuccess }: AuthModa
 
     setIsLoading(true);
     try {
-      // Simulation d'authentification
+      // TODO: Remplacer par un appel API réel
+      // Simulation d'appel API - pour l'instant retourne une erreur
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
-      const email = loginData.email;
-      const firstName = email.includes('@') ? email.split('@')[0] : 'Utilisateur';
-      const lastName = 'KAMRI';
-      
-      login({ firstName, lastName, email });
-      onLoginSuccess?.();
-      onClose();
-    } catch {
-      Alert.alert('Erreur', 'Une erreur est survenue');
+      Alert.alert(
+        'Authentification non disponible', 
+        'L\'authentification sera bientôt disponible. Veuillez réessayer plus tard.'
+      );
+    } catch (error) {
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
     }

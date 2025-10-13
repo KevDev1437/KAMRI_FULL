@@ -1,18 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les meilleures offres - 6 produits optimaux
-const bestOffers = [
-  { id: '1', name: 'Pull Cachemire', price: '99.99€', originalPrice: '149.99€', image: null },
-  { id: '2', name: 'Chaussures Cuir', price: '119.99€', originalPrice: '179.99€', image: null },
-  { id: '3', name: 'Sac à Main', price: '49.99€', originalPrice: '79.99€', image: null },
-  { id: '4', name: 'Montre Élégante', price: '89.99€', originalPrice: '129.99€', image: null },
-  { id: '5', name: 'Veste Cuir', price: '199.99€', originalPrice: '299.99€', image: null },
-  { id: '6', name: 'Smartphone Pro', price: '599.99€', originalPrice: '799.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -81,6 +72,28 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function BestOffers() {
+  const [bestOffers, setBestOffers] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchBestOffers = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setBestOffers([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des meilleures offres:', error);
+        setBestOffers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBestOffers();
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -90,11 +103,23 @@ export default function BestOffers() {
         </ThemedText>
       </View>
       
-      <View style={styles.grid}>
-        {bestOffers.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </View>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <ThemedText style={styles.loadingText}>Chargement des meilleures offres...</ThemedText>
+        </View>
+      ) : bestOffers.length > 0 ? (
+        <View style={styles.grid}>
+          {bestOffers.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="pricetag-outline" size={48} color="#81C784" />
+          <ThemedText style={styles.emptyText}>Aucune offre disponible pour le moment</ThemedText>
+        </View>
+      )}
     </View>
   );
 }
@@ -209,5 +234,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
 });

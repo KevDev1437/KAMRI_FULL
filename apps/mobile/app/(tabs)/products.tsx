@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CategoryTabs from '../../components/CategoryTabs';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
@@ -10,153 +10,7 @@ import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useFilter } from '../../contexts/FilterContext';
 
-// Mock data pour les produits avec les 7 catégories fixes
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'tendances',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '2', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '4', 
-    name: 'Veste Denim', 
-    price: 79.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.3,
-    reviews: 67,
-    badge: null,
-    brand: 'KAMRI'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '6', 
-    name: 'Sac à Main', 
-    price: 49.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.1,
-    reviews: 45,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99, 
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '8', 
-    name: 'Chaise Design', 
-    price: 199.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'maison',
-    rating: 4.4,
-    reviews: 78,
-    badge: 'tendances',
-    brand: 'HomeStyle'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '10', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  },
-  { 
-    id: '11', 
-    name: 'Jouet Éducatif', 
-    price: 29.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'enfants',
-    rating: 4.5,
-    reviews: 67,
-    badge: 'nouveau',
-    brand: 'KidsBrand'
-  },
-  { 
-    id: '12', 
-    name: 'Crème Hydratante', 
-    price: 24.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'beaute',
-    rating: 4.2,
-    reviews: 134,
-    badge: 'top-ventes',
-    brand: 'BeautyBrand'
-  },
-];
+// TODO: Remplacer par des appels API réels
 
 interface Product {
   id: string;
@@ -172,13 +26,36 @@ interface Product {
 }
 
 export default function ProductsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { showFilters, setShowFilters } = useFilter();
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+
+  // Chargement des produits depuis l'API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        // TODO: Remplacer par un appel API réel
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProducts([]);
+        setFilteredProducts([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des produits:', error);
+        setProducts([]);
+        setFilteredProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Filtrage des produits
   useEffect(() => {
@@ -233,6 +110,14 @@ export default function ProductsScreen() {
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
         />
+
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement des produits...</ThemedText>
+          </View>
+        ) : (
 
         {/* Filtres mobiles */}
         {showFilters && (
@@ -313,7 +198,7 @@ export default function ProductsScreen() {
         </View>
 
         {/* Message si aucun produit */}
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !isLoading && (
           <View style={styles.emptyState}>
             <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
             <ThemedText style={styles.emptyTitle}>Aucun produit trouvé</ThemedText>
@@ -324,6 +209,7 @@ export default function ProductsScreen() {
         )}
         
         <HomeFooter />
+        )}
       </ScrollView>
 
       <CurvedBottomNav />
@@ -603,6 +489,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptySubtitle: {
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
     color: '#81C784',
     textAlign: 'center',

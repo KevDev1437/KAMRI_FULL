@@ -1,18 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { getBadgeConfig } from '@kamri/lib';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les top ventes - 6 produits optimaux
-const topSales = [
-  { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-  { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-  { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-  { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -67,6 +58,28 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function TopSales() {
+  const [topSales, setTopSales] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Remplacer par un appel API réel
+    const fetchTopSales = async () => {
+      try {
+        setIsLoading(true);
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setTopSales([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des top ventes:', error);
+        setTopSales([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTopSales();
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -76,11 +89,23 @@ export default function TopSales() {
         </ThemedText>
       </View>
       
-      <View style={styles.grid}>
-        {topSales.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </View>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <ThemedText style={styles.loadingText}>Chargement des top ventes...</ThemedText>
+        </View>
+      ) : topSales.length > 0 ? (
+        <View style={styles.grid}>
+          {topSales.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="trending-up-outline" size={48} color="#81C784" />
+          <ThemedText style={styles.emptyText}>Aucun produit en top ventes pour le moment</ThemedText>
+        </View>
+      )}
     </View>
   );
 }
@@ -185,5 +210,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
 });

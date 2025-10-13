@@ -259,7 +259,7 @@ export default function UnifiedHeader() {
         onClose={() => setShowAuthModal(false)}
         onLoginSuccess={() => {
           setShowAuthModal(false);
-          login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
+          // TODO: L'authentification sera gérée par l'API
         }}
       />
     </SafeAreaView>

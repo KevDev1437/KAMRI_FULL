@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CategoryTabs from '../../components/CategoryTabs';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
@@ -10,81 +10,7 @@ import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useFilter } from '../../contexts/FilterContext';
 
-// Mock data pour les produits en promotion uniquement
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'promo',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99,
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '11', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  }
-];
+// TODO: Remplacer par des appels API réels
 
 interface Product {
   id: string;
@@ -100,13 +26,36 @@ interface Product {
 }
 
 export default function PromotionsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { showFilters, setShowFilters } = useFilter();
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+
+  // Chargement des produits depuis l'API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        // TODO: Remplacer par un appel API réel
+        // Simulation d'appel API - pour l'instant retourne un tableau vide
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProducts([]);
+        setFilteredProducts([]);
+      } catch (error) {
+        console.error('Erreur lors du chargement des promotions:', error);
+        setProducts([]);
+        setFilteredProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Filtrage des produits - SEULEMENT les produits en promotion
   useEffect(() => {
@@ -170,6 +119,14 @@ export default function PromotionsScreen() {
           setSelectedCategory={setSelectedCategory}
         />
 
+        {/* État de chargement */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <ThemedText style={styles.loadingText}>Chargement des promotions...</ThemedText>
+          </View>
+        ) : (
+        <>
         {/* Filtres mobiles */}
         {showFilters && (
           <ThemedView style={styles.filtersContainer}>
@@ -249,7 +206,7 @@ export default function PromotionsScreen() {
         </View>
 
         {/* Message si aucun produit */}
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !isLoading && (
           <View style={styles.emptyState}>
             <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
             <ThemedText style={styles.emptyTitle}>Aucune promotion trouvée</ThemedText>
@@ -260,6 +217,8 @@ export default function PromotionsScreen() {
         )}
         
         <HomeFooter />
+        </>
+        )}
       </ScrollView>
 
       <CurvedBottomNav />
@@ -402,6 +361,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptySubtitle: {
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
     color: '#81C784',
     textAlign: 'center',
