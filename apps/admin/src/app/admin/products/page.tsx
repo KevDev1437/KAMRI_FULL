@@ -76,13 +76,13 @@ export default function ProductsPage() {
       // Charger les catégories
       const categoriesResponse = await apiClient.getCategories()
       if (categoriesResponse.data) {
-        setCategories(categoriesResponse.data)
+        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [])
       }
 
       // Charger les fournisseurs
       const suppliersResponse = await apiClient.getSuppliers()
       if (suppliersResponse.data) {
-        setSuppliers(suppliersResponse.data)
+        setSuppliers(Array.isArray(suppliersResponse.data) ? suppliersResponse.data : [])
       }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
@@ -162,8 +162,8 @@ export default function ProductsPage() {
     return matchesSearch && matchesCategory && matchesSupplier
   })
 
-  const categoryOptions = ['Toutes', ...categories.map(cat => cat.name)]
-  const supplierOptions = ['Tous', ...suppliers.map(sup => sup.name)]
+  const categoryOptions = ['Toutes', ...(categories || []).map(cat => cat.name)]
+  const supplierOptions = ['Tous', ...(suppliers || []).map(sup => sup.name)]
 
   return (
     <div className="space-y-6">

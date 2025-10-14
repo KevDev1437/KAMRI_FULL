@@ -19,6 +19,21 @@ export class ProductsService {
 
   async findAll() {
     return this.prisma.product.findMany({
+      where: {
+        status: 'active' // Seuls les produits validés
+      },
+      include: {
+        category: true,
+        images: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async findAllForAdmin() {
+    return this.prisma.product.findMany({
       include: {
         category: true,
         images: true,
@@ -63,6 +78,33 @@ export class ProductsService {
   async remove(id: string) {
     return this.prisma.product.delete({
       where: { id },
+    });
+  }
+
+  async approve(id: string) {
+    return this.prisma.product.update({
+      where: { id },
+      data: { status: 'active' },
+    });
+  }
+
+  async reject(id: string) {
+    return this.prisma.product.update({
+      where: { id },
+      data: { status: 'rejected' },
+    });
+  }
+
+  async getPendingProducts() {
+    return this.prisma.product.findMany({
+      where: { status: 'pending' },
+      include: {
+        category: true,
+        supplier: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 

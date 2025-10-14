@@ -1,7 +1,7 @@
 'use client';
 
-import { apiClient, Category, Product } from '@/lib/api';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { apiClient, Category, Product } from '../lib/api';
 
 interface AppContextType {
   products: Product[];

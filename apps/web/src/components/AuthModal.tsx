@@ -411,7 +411,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <div className="flex flex-col items-center py-1">
           <div className="w-6 h-6 rounded-full flex items-center justify-center mb-0.5 shadow-lg overflow-hidden">
             <img 
-              src="/logo2.png" 
+              src="/images/logo2.png" 
               alt="KAMRI Logo" 
               className="w-full h-full object-cover"
             />

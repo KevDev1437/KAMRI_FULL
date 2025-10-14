@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
     BarChart3,
+    CheckCircle,
     ChevronLeft,
     ChevronRight,
     FolderOpen,
@@ -28,6 +29,11 @@ const navigation = [
     name: 'Produits',
     href: '/admin/products',
     icon: Package,
+  },
+  {
+    name: 'Validation',
+    href: '/admin/products/validation',
+    icon: CheckCircle,
   },
   {
     name: 'Catégories',

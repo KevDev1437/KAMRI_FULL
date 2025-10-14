@@ -154,6 +154,22 @@ export class ApiClient {
     });
   }
 
+  async getPendingProducts() {
+    return this.fetchWithAuth('/products/admin/pending');
+  }
+
+  async approveProduct(id: string) {
+    return this.fetchWithAuth(`/products/${id}/approve`, {
+      method: 'PATCH',
+    });
+  }
+
+  async rejectProduct(id: string) {
+    return this.fetchWithAuth(`/products/${id}/reject`, {
+      method: 'PATCH',
+    });
+  }
+
   // Fournisseurs
   async getSuppliers() {
     return this.fetchWithAuth('/suppliers');

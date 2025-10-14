@@ -70,7 +70,7 @@ export default function ModernHeader() {
             <div className="flex-shrink-0 order-1 lg:order-1">
               <Link href="/" className="block">
                 <img
-                  src="/logo.png"
+                  src="/images/logo.png"
                   alt="KAMRI Logo"
                   className="h-16 sm:h-20 lg:h-24 w-auto transition-all duration-300 hover:scale-105"
                 />

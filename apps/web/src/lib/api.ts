@@ -110,6 +110,28 @@ export class ApiClient {
   }
 
   // Méthode générique pour les appels API
+  private async fetchPublic(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { data };
+      } else {
+        return { error: data.message || 'Erreur API' };
+      }
+    } catch (error) {
+      return { error: 'Erreur réseau' };
+    }
+  }
+
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -135,7 +157,7 @@ export class ApiClient {
 
   // Produits
   async getProducts(): Promise<ApiResponse<Product[]>> {
-    return this.fetchWithAuth('/products');
+    return this.fetchPublic('/products');
   }
 
   async getProduct(id: string): Promise<ApiResponse<Product>> {

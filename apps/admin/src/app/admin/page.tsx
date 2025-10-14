@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import {
     Activity,
+    AlertCircle,
     ArrowUpRight,
     Package,
     ShoppingCart,
@@ -14,6 +15,7 @@ import {
     Truck,
     Users
 } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 interface DashboardStats {
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [topCategories, setTopCategories] = useState<TopCategory[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null)
+  const [pendingProducts, setPendingProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
   const { isAuthenticated, user } = useAuth()
@@ -73,6 +76,12 @@ export default function DashboardPage() {
       const activityResponse = await apiClient.getDashboardActivity()
       if (activityResponse.data) {
         setRecentActivity(activityResponse.data)
+      }
+
+      // Charger les produits en attente
+      const pendingResponse = await apiClient.getPendingProducts()
+      if (pendingResponse.data) {
+        setPendingProducts(pendingResponse.data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
@@ -195,6 +204,28 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Produits en attente */}
+      {pendingProducts.length > 0 && (
+        <Card className="kamri-card border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="flex items-center text-yellow-800">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              Produits en attente de validation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-yellow-700 mb-4">
+              {pendingProducts.length} produit(s) attendent votre validation
+            </p>
+            <Button asChild className="bg-yellow-600 hover:bg-yellow-700">
+              <Link href="/admin/products/validation">
+                Valider les produits
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

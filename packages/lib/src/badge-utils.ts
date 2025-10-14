@@ -1,6 +1,6 @@
 // Utilitaires pour les étiquettes de produits avec couleurs cohérentes
 
-export type BadgeType = 'promo' | 'top-ventes' | 'tendances' | 'nouveau' | null;
+export type BadgeType = 'promo' | 'top-ventes' | 'tendances' | 'nouveau';
 
 export interface BadgeConfig {
   color: string;
@@ -33,17 +33,19 @@ export const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
     backgroundColor: '#FF9800', // Jaune/Orangé
     text: 'NOUVEAU',
     icon: '🆕'
-  },
-  null: {
-    color: 'transparent',
-    backgroundColor: 'transparent',
-    text: '',
-    icon: ''
   }
 };
 
-export function getBadgeConfig(badge: BadgeType): BadgeConfig {
-  return BADGE_CONFIGS[badge] || BADGE_CONFIGS.null;
+export function getBadgeConfig(badge: BadgeType | null): BadgeConfig {
+  if (!badge) {
+    return {
+      color: 'transparent',
+      backgroundColor: 'transparent',
+      text: '',
+      icon: ''
+    };
+  }
+  return BADGE_CONFIGS[badge];
 }
 
 export function calculateDiscountPercentage(originalPrice: number, currentPrice: number): number {

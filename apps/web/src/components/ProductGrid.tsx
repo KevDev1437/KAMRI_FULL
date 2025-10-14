@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useApp } from '@/contexts/AppContext';
-import { Product } from '@/lib/api';
+import { useApp } from '../contexts/AppContext';
+import { Product } from '../lib/api';
 
 interface ProductCardProps {
   product: Product;
@@ -16,15 +16,15 @@ function ProductCard({ product }: ProductCardProps) {
   const getBadgeColor = (badge?: string) => {
     switch (badge) {
       case 'promo':
-        return 'bg-red-500 text-white';
+        return 'bg-red-500 text-white shadow-lg';
       case 'nouveau':
-        return 'bg-green-500 text-white';
+        return 'bg-green-500 text-white shadow-lg';
       case 'tendances':
-        return 'bg-blue-500 text-white';
+        return 'bg-blue-500 text-white shadow-lg';
       case 'top-ventes':
-        return 'bg-purple-500 text-white';
+        return 'bg-purple-500 text-white shadow-lg';
       default:
-        return 'hidden';
+        return 'bg-gray-500 text-white shadow-lg';
     }
   };
 
@@ -50,6 +50,13 @@ function ProductCard({ product }: ProductCardProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         
+        {/* Badge */}
+        {product.badge && (
+          <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold transition-all duration-300 ease-in-out ${getBadgeColor(product.badge)}`}>
+            {getBadgeText(product.badge)}
+          </div>
+        )}
+        
         {/* Favorite button */}
         <button className="absolute top-4 right-4 p-2 bg-white/95 rounded-full shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 ease-in-out hover:scale-110">
           <svg className="h-5 w-5 text-[#81C784] hover:text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,13 +74,6 @@ function ProductCard({ product }: ProductCardProps) {
             <p className="text-lg text-gray-400 line-through font-['Inter']">{formatPrice(product.originalPrice)}</p>
           )}
         </div>
-        
-        {/* Badge */}
-        {product.badge && (
-          <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold ${getBadgeColor(product.badge)}`}>
-            {getBadgeText(product.badge)}
-          </div>
-        )}
         
         {/* Supplier info */}
         {product.supplier && (

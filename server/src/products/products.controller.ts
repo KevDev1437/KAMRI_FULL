@@ -35,6 +35,34 @@ export class ProductsController {
     return this.productsService.findAll();
   }
 
+  @Get('admin/all')
+  @ApiOperation({ summary: 'Get all products for admin (including pending)' })
+  @ApiResponse({ status: 200, description: 'All products retrieved successfully' })
+  findAllForAdmin() {
+    return this.productsService.findAllForAdmin();
+  }
+
+  @Get('admin/pending')
+  @ApiOperation({ summary: 'Get pending products for validation' })
+  @ApiResponse({ status: 200, description: 'Pending products retrieved successfully' })
+  getPendingProducts() {
+    return this.productsService.getPendingProducts();
+  }
+
+  @Patch(':id/approve')
+  @ApiOperation({ summary: 'Approve a pending product' })
+  @ApiResponse({ status: 200, description: 'Product approved successfully' })
+  approve(@Param('id') id: string) {
+    return this.productsService.approve(id);
+  }
+
+  @Patch(':id/reject')
+  @ApiOperation({ summary: 'Reject a pending product' })
+  @ApiResponse({ status: 200, description: 'Product rejected successfully' })
+  reject(@Param('id') id: string) {
+    return this.productsService.reject(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })
   @ApiResponse({ status: 200, description: 'Product retrieved successfully' })

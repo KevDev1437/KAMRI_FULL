@@ -19,7 +19,7 @@ export default function HomeHeader({ searchQuery, setSearchQuery }: HomeHeaderPr
           <div className="flex-shrink-0">
             <Link href="/">
               <img
-                src="/logo.png"
+                src="/images/logo.png"
                 alt="KAMRI Logo"
                 className="h-16 w-auto transition-all duration-300 hover:scale-105 cursor-pointer"
                 style={{ maxWidth: '240px', height: '64px' }}

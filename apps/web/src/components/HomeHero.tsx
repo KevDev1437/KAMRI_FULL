@@ -24,7 +24,7 @@ export default function HomeHero() {
                 <div className="relative w-full h-[600px] overflow-hidden shadow-lg">
                   {/* Image de modèle */}
                   <img
-                    src="/modelo.png"
+                    src="/images/modelo.png"
                     alt="Modèle KAMRI"
                     className="w-full h-full object-contain"
                   />

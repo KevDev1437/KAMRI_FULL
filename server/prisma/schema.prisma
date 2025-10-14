@@ -50,7 +50,7 @@ model Product {
   image         String?
   categoryId    String
   supplierId    String?
-  status        String   @default("active") // active, inactive
+  status        String   @default("pending") // pending, active, inactive, rejected
   badge         String? // promo, tendances, nouveau, top-ventes
   stock         Int      @default(0)
   sales         Int      @default(0)
