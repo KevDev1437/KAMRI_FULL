@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { AppProvider } from '../contexts/AppContext'
 import { AuthProvider } from '../contexts/AuthContext'
 import './globals.css'
 
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <div className="min-h-screen bg-[#F5F5F5]">
-            <main>{children}</main>
-          </div>
+          <AppProvider>
+            <div className="min-h-screen bg-[#F5F5F5]">
+              <main>{children}</main>
+            </div>
+          </AppProvider>
         </AuthProvider>
       </body>
     </html>

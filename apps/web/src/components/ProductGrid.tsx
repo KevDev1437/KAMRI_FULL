@@ -1,28 +1,47 @@
 
-// Mock data pour les produits - 8 produits optimaux
-const mockProducts = [
-  { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-  { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-  { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-  { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-  { id: '7', name: 'Sac à Dos', price: '39.99€', image: null },
-  { id: '8', name: 'Montre Connectée', price: '199.99€', image: null },
-];
+'use client';
 
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  image: string | null;
-}
+import { useApp } from '@/contexts/AppContext';
+import { Product } from '@/lib/api';
 
 interface ProductCardProps {
   product: Product;
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  const formatPrice = (price: number) => {
+    return `${price.toFixed(2)}€`;
+  };
+
+  const getBadgeColor = (badge?: string) => {
+    switch (badge) {
+      case 'promo':
+        return 'bg-red-500 text-white';
+      case 'nouveau':
+        return 'bg-green-500 text-white';
+      case 'tendances':
+        return 'bg-blue-500 text-white';
+      case 'top-ventes':
+        return 'bg-purple-500 text-white';
+      default:
+        return 'hidden';
+    }
+  };
+
+  const getBadgeText = (badge?: string) => {
+    switch (badge) {
+      case 'promo':
+        return 'PROMO';
+      case 'nouveau':
+        return 'NOUVEAU';
+      case 'tendances':
+        return 'TENDANCES';
+      case 'top-ventes':
+        return 'TOP VENTES';
+      default:
+        return '';
+    }
+  };
   return (
     <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out group border border-[#E8F5E8]">
       {/* Image placeholder */}
@@ -42,7 +61,27 @@ function ProductCard({ product }: ProductCardProps) {
       {/* Product info */}
       <div className="p-6">
         <h3 className="text-lg font-semibold text-[#424242] mb-3 line-clamp-1 font-['Inter']">{product.name}</h3>
-        <p className="text-2xl font-bold text-[#4CAF50] mb-6 font-['Inter']">{product.price}</p>
+        <div className="flex items-center gap-2 mb-6">
+          <p className="text-2xl font-bold text-[#4CAF50] font-['Inter']">{formatPrice(product.price)}</p>
+          {product.originalPrice && (
+            <p className="text-lg text-gray-400 line-through font-['Inter']">{formatPrice(product.originalPrice)}</p>
+          )}
+        </div>
+        
+        {/* Badge */}
+        {product.badge && (
+          <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold ${getBadgeColor(product.badge)}`}>
+            {getBadgeText(product.badge)}
+          </div>
+        )}
+        
+        {/* Supplier info */}
+        {product.supplier && (
+          <p className="text-sm text-gray-500 mb-2">Fournisseur: {product.supplier.name}</p>
+        )}
+        
+        {/* Stock info */}
+        <p className="text-sm text-gray-500 mb-4">Stock: {product.stock} disponibles</p>
         
         <button className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-300 ease-in-out flex items-center justify-center gap-2 border border-[#4CAF50] hover:border-[#2E7D32]">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,6 +95,45 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function ProductGrid() {
+  const { products, isLoading, error } = useApp();
+
+  if (isLoading) {
+    return (
+      <div className="py-20 px-6 bg-[#E8F5E8]/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-bold text-[#424242] mb-4 tracking-tight font-['Inter']">
+              Nos produits
+            </h2>
+            <p className="text-xl text-[#81C784] font-light font-['Inter']">
+              Chargement des produits...
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4CAF50]"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-20 px-6 bg-[#E8F5E8]/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-bold text-[#424242] mb-4 tracking-tight font-['Inter']">
+              Nos produits
+            </h2>
+            <p className="text-xl text-red-500 font-light font-['Inter']">
+              Erreur: {error}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-20 px-6 bg-[#E8F5E8]/30">
       <div className="max-w-7xl mx-auto">
@@ -64,15 +142,21 @@ export default function ProductGrid() {
             Nos produits
           </h2>
           <p className="text-xl text-[#81C784] font-light font-['Inter']">
-            Découvrez notre sélection exclusive
+            Découvrez notre sélection exclusive ({products.length} produits)
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {mockProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {products.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-xl text-gray-500">Aucun produit disponible pour le moment</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
