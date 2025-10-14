@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import {
     CheckCircle,
+    Download,
     Edit,
     Plus,
     TestTube,
@@ -40,6 +41,7 @@ export default function SuppliersPage() {
     apiKey: ''
   })
   const [testingConnection, setTestingConnection] = useState<string | null>(null)
+  const [importingProducts, setImportingProducts] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
@@ -104,6 +106,23 @@ export default function SuppliersPage() {
       } catch (error) {
         console.error('Erreur lors de la suppression:', error)
       }
+    }
+  }
+
+  const handleImportProducts = async (supplierId: string) => {
+    setImportingProducts(supplierId)
+    try {
+      const response = await apiClient.importProducts(supplierId)
+      if (response.data) {
+        alert(`✅ ${response.data.message}\n\n${response.data.products.length} produits importés et en attente de validation.`)
+        // Rediriger vers la page de validation
+        window.location.href = '/admin/products/validation'
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'import:', error)
+      alert('❌ Erreur lors de l\'import des produits')
+    } finally {
+      setImportingProducts(null)
     }
   }
 
@@ -217,6 +236,18 @@ export default function SuppliersPage() {
                   <TestTube className="w-3 h-3 mr-1" />
                   {testingConnection === supplier.id ? 'Test...' : 'Tester'}
                 </Button>
+                {supplier.status === 'connected' && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleImportProducts(supplier.id)}
+                    disabled={importingProducts === supplier.id}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    <Download className="w-3 h-3 mr-1" />
+                    {importingProducts === supplier.id ? 'Import...' : 'Importer'}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

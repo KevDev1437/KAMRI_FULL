@@ -1,12 +1,12 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -68,5 +68,12 @@ export class SuppliersController {
   @ApiResponse({ status: 200, description: 'Test de connexion effectué' })
   testConnection(@Param('id') id: string) {
     return this.suppliersService.testConnection(id);
+  }
+
+  @Post(':id/import')
+  @ApiOperation({ summary: 'Importer des produits depuis un fournisseur' })
+  @ApiResponse({ status: 200, description: 'Import de produits effectué' })
+  importProducts(@Param('id') id: string) {
+    return this.suppliersService.importProducts(id);
   }
 }

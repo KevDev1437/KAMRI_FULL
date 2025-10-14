@@ -91,4 +91,105 @@ export class SuppliersService {
       products,
     };
   }
+
+  async importProducts(supplierId: string) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+    });
+
+    if (!supplier) {
+      throw new Error('Fournisseur non trouvé');
+    }
+
+    try {
+      // Import depuis Fake Store API
+      console.log('🔄 Début de l\'import depuis Fake Store API...');
+      const response = await fetch('https://fakestoreapi.com/products?limit=10');
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération des produits');
+      }
+      
+      const fakeProducts = await response.json();
+      console.log(`📦 ${fakeProducts.length} produits récupérés depuis Fake Store API`);
+      const importedProducts = [];
+      
+      for (const fakeProduct of fakeProducts) {
+        try {
+          console.log(`🔄 Traitement du produit: ${fakeProduct.title} (catégorie: ${fakeProduct.category})`);
+          // Mapper les catégories Fake Store vers nos catégories
+          const categoryId = await this.mapFakeStoreCategory(fakeProduct.category);
+          console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
+          
+          const product = await this.prisma.product.create({
+            data: {
+              name: fakeProduct.title,
+              description: fakeProduct.description,
+              price: fakeProduct.price,
+              originalPrice: fakeProduct.price * 1.2, // Prix original fictif
+              image: fakeProduct.image,
+              categoryId: categoryId,
+              supplierId: supplier.id,
+              status: 'pending', // Produits en attente de validation
+              badge: this.generateBadge(),
+              stock: Math.floor(Math.random() * 50) + 10,
+            },
+            include: {
+              category: true,
+              supplier: true,
+            },
+          });
+          console.log(`✅ Produit créé: ${product.name}`);
+          importedProducts.push(product);
+        } catch (error) {
+          console.error(`❌ Erreur lors de la création du produit ${fakeProduct.title}:`, error);
+        }
+      }
+
+      return {
+        message: `${importedProducts.length} produits importés depuis Fake Store API`,
+        products: importedProducts,
+        supplier: supplier.name,
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async mapFakeStoreCategory(fakeCategory: string): Promise<string> {
+    console.log(`🔍 Mapping catégorie: ${fakeCategory}`);
+    
+    // Récupérer toutes les catégories disponibles
+    const categories = await this.prisma.category.findMany();
+    console.log(`📂 Catégories disponibles: ${categories.map(c => c.name).join(', ')}`);
+    
+    // Mapping simple basé sur les noms
+    const categoryMapping: { [key: string]: string } = {
+      'electronics': 'Technologie',
+      'jewelery': 'Accessoires',
+      "men's clothing": 'Mode',
+      "women's clothing": 'Mode',
+    };
+    
+    const mappedName = categoryMapping[fakeCategory.toLowerCase()];
+    if (mappedName) {
+      const category = categories.find(c => c.name === mappedName);
+      if (category) {
+        console.log(`✅ Catégorie mappée: ${fakeCategory} -> ${category.name} (ID: ${category.id})`);
+        return category.id;
+      }
+    }
+    
+    // Fallback: première catégorie disponible
+    const firstCategory = categories[0];
+    if (!firstCategory) {
+      throw new Error('Aucune catégorie trouvée dans la base de données');
+    }
+    console.log(`🔄 Utilisation de la catégorie par défaut: ${firstCategory.name} (ID: ${firstCategory.id})`);
+    return firstCategory.id;
+  }
+
+  private generateBadge(): string | null {
+    const badges = ['promo', 'nouveau', 'tendances', 'top-ventes', null];
+    return badges[Math.floor(Math.random() * badges.length)];
+  }
 }

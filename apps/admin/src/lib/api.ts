@@ -205,6 +205,12 @@ export class ApiClient {
     });
   }
 
+  async importProducts(supplierId: string) {
+    return this.fetchWithAuth(`/suppliers/${supplierId}/import`, {
+      method: 'POST',
+    });
+  }
+
   async getSupplierStats() {
     return this.fetchWithAuth('/suppliers/stats');
   }
