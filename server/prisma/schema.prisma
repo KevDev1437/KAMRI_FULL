@@ -177,6 +177,7 @@ model Supplier {
   // Relations
   products        Product[]
   categoryMappings CategoryMapping[]
+  unmappedCategories UnmappedExternalCategory[]
 
   @@map("suppliers")
 }
@@ -195,6 +196,20 @@ model CategoryMapping {
 
   @@unique([supplierId, externalCategory])
   @@map("category_mappings")
+}
+
+model UnmappedExternalCategory {
+  id              String   @id @default(cuid())
+  externalCategory String
+  supplierId      String
+  detectedAt      DateTime @default(now())
+  productCount    Int      @default(0)
+
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, externalCategory])
+  @@map("unmapped_external_categories")
 }
 
 model Settings {

@@ -117,7 +117,7 @@ export class SuppliersService {
         try {
           console.log(`🔄 Traitement du produit: ${fakeProduct.title} (catégorie: ${fakeProduct.category})`);
           // Mapper les catégories Fake Store vers nos catégories
-          const categoryId = await this.mapFakeStoreCategory(fakeProduct.category);
+          const categoryId = await this.mapFakeStoreCategory(fakeProduct.category, supplier.id);
           console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
           
           const product = await this.prisma.product.create({
@@ -155,32 +155,66 @@ export class SuppliersService {
     }
   }
 
-  private async mapFakeStoreCategory(fakeCategory: string): Promise<string> {
+  private async mapFakeStoreCategory(fakeCategory: string, supplierId: string): Promise<string> {
     console.log(`🔍 Mapping catégorie: ${fakeCategory}`);
     
-    // Récupérer toutes les catégories disponibles
-    const categories = await this.prisma.category.findMany();
-    console.log(`📂 Catégories disponibles: ${categories.map(c => c.name).join(', ')}`);
-    
-    // Mapping simple basé sur les noms
-    const categoryMapping: { [key: string]: string } = {
-      'electronics': 'Technologie',
-      'jewelery': 'Accessoires',
-      "men's clothing": 'Mode',
-      "women's clothing": 'Mode',
-    };
-    
-    const mappedName = categoryMapping[fakeCategory.toLowerCase()];
-    if (mappedName) {
-      const category = categories.find(c => c.name === mappedName);
-      if (category) {
-        console.log(`✅ Catégorie mappée: ${fakeCategory} -> ${category.name} (ID: ${category.id})`);
-        return category.id;
+    // Vérifier s'il existe déjà un mapping pour cette catégorie externe
+    const existingMapping = await this.prisma.categoryMapping.findFirst({
+      where: {
+        supplierId: supplierId,
+        externalCategory: fakeCategory
+      }
+    });
+
+    if (existingMapping) {
+      // Trouver la catégorie interne correspondante
+      const internalCategory = await this.prisma.category.findFirst({
+        where: { name: existingMapping.internalCategory }
+      });
+      
+      if (internalCategory) {
+        console.log(`✅ Mapping existant trouvé: ${fakeCategory} -> ${internalCategory.name}`);
+        return internalCategory.id;
       }
     }
+
+    // Si pas de mapping, enregistrer comme catégorie non mappée
+    // TODO: Réactiver après résolution du problème Prisma
+    /*
+    await this.prisma.unmappedExternalCategory.upsert({
+      where: {
+        supplierId_externalCategory: {
+          supplierId: supplierId,
+          externalCategory: fakeCategory
+        }
+      },
+      update: {
+        productCount: {
+          increment: 1
+        }
+      },
+      create: {
+        externalCategory: fakeCategory,
+        supplierId: supplierId,
+        productCount: 1
+      }
+    });
+
+    console.log(`📝 Catégorie non mappée enregistrée: ${fakeCategory}`);
+    
+    // Vérifier ce qui a été enregistré
+    const savedCategory = await this.prisma.unmappedExternalCategory.findFirst({
+      where: {
+        supplierId: supplierId,
+        externalCategory: fakeCategory
+      }
+    });
+    console.log(`🔍 Catégorie sauvegardée:`, savedCategory);
+    */
+    console.log(`📝 Catégorie non mappée détectée: ${fakeCategory} (temporairement désactivé)`);
     
     // Fallback: première catégorie disponible
-    const firstCategory = categories[0];
+    const firstCategory = await this.prisma.category.findFirst();
     if (!firstCategory) {
       throw new Error('Aucune catégorie trouvée dans la base de données');
     }

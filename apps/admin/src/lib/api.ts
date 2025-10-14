@@ -252,6 +252,36 @@ export class ApiClient {
       body: JSON.stringify(settingsData),
     });
   }
+
+  // Category Mappings
+  async getCategoryMappings() {
+    return this.fetchWithAuth('/categories/mappings/all');
+  }
+
+  async createCategoryMapping(data: {
+    supplierId: string;
+    externalCategory: string;
+    internalCategory: string;
+  }) {
+    return this.fetchWithAuth('/categories/mappings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCategoryMapping(id: string, data: {
+    internalCategory?: string;
+    status?: string;
+  }) {
+    return this.fetchWithAuth(`/categories/mappings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getUnmappedExternalCategories() {
+    return this.fetchWithAuth('/categories/unmapped-external');
+  }
 }
 
 // Instance globale

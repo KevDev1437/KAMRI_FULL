@@ -11,7 +11,9 @@ import {
     Trash2,
     XCircle
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../../contexts/AuthContext'
+import { apiClient } from '../../../lib/api'
 
 // Mock data
 const categories = [
@@ -96,6 +98,140 @@ const categories = [
 
 export default function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [categories, setCategories] = useState<any[]>([])
+  const [mappings, setMappings] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [unmappedCategories, setUnmappedCategories] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showLogin, setShowLogin] = useState(false)
+  const [showMappingModal, setShowMappingModal] = useState(false)
+  const [selectedCategoryForMapping, setSelectedCategoryForMapping] = useState<any>(null)
+  const [mappingData, setMappingData] = useState({
+    supplierId: '',
+    externalCategory: '',
+    internalCategory: ''
+  })
+  const { isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData()
+    } else {
+      setShowLogin(true)
+    }
+  }, [isAuthenticated])
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Charger les catégories
+      const categoriesResponse = await apiClient.getCategories()
+      console.log('📦 Réponse catégories:', categoriesResponse)
+      
+      if (categoriesResponse.data && categoriesResponse.data.data) {
+        // Le backend retourne { data: [catégories], message: "..." }
+        const categoriesData = Array.isArray(categoriesResponse.data.data) 
+          ? categoriesResponse.data.data 
+          : []
+        console.log('📂 Catégories chargées:', categoriesData)
+        setCategories(categoriesData)
+      } else {
+        console.log('❌ Aucune donnée reçue, utilisation des données de test')
+        // Utiliser les données de test si l'API ne retourne rien
+        setCategories([
+          {
+            id: 1,
+            name: 'Mode',
+            description: 'Vêtements et accessoires de mode',
+            productCount: 234,
+            externalMappings: [
+              { platform: 'Temu', externalName: 'Fashion & Clothing', status: 'mapped' },
+              { platform: 'AliExpress', externalName: 'Women\'s Clothing', status: 'mapped' },
+              { platform: 'Shein', externalName: 'Fashion', status: 'pending' }
+            ]
+          },
+          {
+            id: 2,
+            name: 'Technologie',
+            description: 'Électronique et gadgets technologiques',
+            productCount: 189,
+            externalMappings: [
+              { platform: 'Temu', externalName: 'Electronics', status: 'mapped' },
+              { platform: 'AliExpress', externalName: 'Consumer Electronics', status: 'mapped' },
+              { platform: 'Shein', externalName: 'Tech', status: 'mapped' }
+            ]
+          }
+        ])
+      }
+
+      // Charger les mappings
+      const mappingsResponse = await apiClient.getCategoryMappings()
+      if (mappingsResponse.data) {
+        setMappings(mappingsResponse.data)
+      }
+
+      // Charger les fournisseurs
+      const suppliersResponse = await apiClient.getSuppliers()
+      if (suppliersResponse.data) {
+        setSuppliers(suppliersResponse.data)
+      }
+
+      // Charger les catégories externes non mappées
+      const unmappedResponse = await apiClient.getUnmappedExternalCategories()
+      console.log('📦 Réponse catégories non mappées:', unmappedResponse)
+      
+      if (unmappedResponse.data) {
+        // Vérifier si c'est un objet avec une propriété data ou directement un tableau
+        const categoriesData = unmappedResponse.data.data || unmappedResponse.data
+        console.log('📂 Catégories non mappées chargées:', categoriesData)
+        
+        if (Array.isArray(categoriesData)) {
+          setUnmappedCategories(categoriesData)
+        } else {
+          console.log('❌ Les données ne sont pas un tableau:', categoriesData)
+          setUnmappedCategories([])
+        }
+      } else {
+        console.log('❌ Aucune catégorie non mappée trouvée')
+        setUnmappedCategories([])
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCreateMapping = async () => {
+    try {
+      const response = await apiClient.createCategoryMapping({
+        supplierId: mappingData.supplierId,
+        externalCategory: mappingData.externalCategory,
+        internalCategory: mappingData.internalCategory
+      })
+      
+      if (response.data) {
+        alert('✅ Mapping créé avec succès !')
+        setShowMappingModal(false)
+        setMappingData({ supplierId: '', externalCategory: '', internalCategory: '' })
+        loadData() // Recharger les données
+      }
+    } catch (error) {
+      console.error('Erreur lors de la création du mapping:', error)
+      alert('❌ Erreur lors de la création du mapping')
+    }
+  }
+
+  const openMappingModal = (category: any) => {
+    setSelectedCategoryForMapping(category)
+    setMappingData({
+      supplierId: '',
+      externalCategory: '',
+      internalCategory: category.name
+    })
+    setShowMappingModal(true)
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -119,6 +255,28 @@ export default function CategoriesPage() {
     }
   }
 
+  if (showLogin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Connexion requise</h2>
+          <p className="text-gray-600">Veuillez vous connecter pour accéder à cette page.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des catégories...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,7 +296,7 @@ export default function CategoriesPage() {
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category) => (
+        {categories && Array.isArray(categories) && categories.map((category) => (
           <Card 
             key={category.id} 
             className={`kamri-card cursor-pointer transition-all duration-200 ${
@@ -154,7 +312,7 @@ export default function CategoriesPage() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">{category.name}</CardTitle>
-                    <p className="text-sm text-gray-500">{category.productCount} produits</p>
+                    <p className="text-sm text-gray-500">{category.productCount || 0} produits</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon">
@@ -169,7 +327,8 @@ export default function CategoriesPage() {
               {/* External Mappings */}
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-900">Mappings Externes</h4>
-                {category.externalMappings.map((mapping, index) => (
+                {category.externalMappings && Array.isArray(category.externalMappings) ? (
+                  category.externalMappings.map((mapping, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium">{mapping.platform}</span>
@@ -181,14 +340,25 @@ export default function CategoriesPage() {
                       <span className="capitalize">{mapping.status}</span>
                     </div>
                   </div>
-                ))}
+                  ))
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">Aucun mapping configuré</p>
+                    <p className="text-xs text-gray-400 mt-1">Cliquez sur "Mapper" pour ajouter un mapping</p>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
               {selectedCategory === category.id && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => openMappingModal(category)}
+                    >
                       <Link className="w-3 h-3 mr-1" />
                       Mapper
                     </Button>
@@ -250,6 +420,97 @@ export default function CategoriesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Mapping */}
+      {showMappingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Créer un Mapping</h3>
+            
+            <div className="space-y-4">
+              {/* Fournisseur */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fournisseur
+                </label>
+                <select
+                  value={mappingData.supplierId}
+                  onChange={(e) => setMappingData({...mappingData, supplierId: e.target.value, externalCategory: ''})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Sélectionner un fournisseur</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Catégorie externe */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Catégorie externe détectée
+                </label>
+                <select
+                  value={mappingData.externalCategory}
+                  onChange={(e) => setMappingData({...mappingData, externalCategory: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Sélectionner une catégorie détectée</option>
+                  {unmappedCategories && Array.isArray(unmappedCategories) && unmappedCategories
+                    .filter(cat => cat.supplierId === mappingData.supplierId)
+                    .map((category) => (
+                      <option key={category.id} value={category.externalCategory}>
+                        {category.externalCategory} ({category.productCount} produits)
+                      </option>
+                    ))}
+                </select>
+                {mappingData.supplierId && unmappedCategories && Array.isArray(unmappedCategories) && unmappedCategories.filter(cat => cat.supplierId === mappingData.supplierId).length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Aucune catégorie non mappée pour ce fournisseur
+                  </p>
+                )}
+              </div>
+
+              {/* Catégorie interne */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Catégorie interne
+                </label>
+                <input
+                  type="text"
+                  value={mappingData.internalCategory}
+                  onChange={(e) => setMappingData({...mappingData, internalCategory: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  readOnly
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Catégorie sélectionnée: {selectedCategoryForMapping?.name}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowMappingModal(false)}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleCreateMapping}
+                disabled={!mappingData.supplierId || !mappingData.externalCategory}
+                className="flex-1 kamri-button"
+              >
+                Créer Mapping
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
