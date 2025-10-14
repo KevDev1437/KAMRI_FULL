@@ -24,29 +24,54 @@ interface Product {
 
 export default function ProductValidationPage() {
   const [pendingProducts, setPendingProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadPendingProducts()
+      loadData()
     } else {
       setShowLogin(true)
     }
   }, [isAuthenticated])
 
-  const loadPendingProducts = async () => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadPendingProducts()
+    }
+  }, [selectedCategoryId, isAuthenticated])
+
+  const loadData = async () => {
     try {
       setIsLoading(true)
-      const response = await apiClient.getPendingProducts()
+      
+      // Charger les catégories
+      const categoriesResponse = await apiClient.getCategories()
+      if (categoriesResponse.data) {
+        const categoriesData = categoriesResponse.data.data || categoriesResponse.data
+        setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+      }
+      
+      // Charger les produits
+      await loadPendingProducts()
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadPendingProducts = async () => {
+    try {
+      const response = await apiClient.getProductsReadyForValidation(selectedCategoryId || undefined)
       if (response.data) {
         setPendingProducts(response.data)
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des produits en attente:', error)
-    } finally {
-      setIsLoading(false)
+      console.error('Erreur lors du chargement des produits prêts pour validation:', error)
     }
   }
 
@@ -98,10 +123,44 @@ export default function ProductValidationPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Validation des Produits</h1>
           <p className="text-gray-600 mt-2">
-            {pendingProducts.length} produit(s) en attente de validation
+            {pendingProducts.length} produit(s) catégorisés prêts pour validation
           </p>
         </div>
       </div>
+
+      {/* Filtre par catégorie */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtrer par catégorie</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedCategoryId('')}
+              className={`px-4 py-2 rounded-lg border transition-colors ${
+                selectedCategoryId === ''
+                  ? 'bg-primary-500 text-white border-primary-500'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Toutes ({pendingProducts.length})
+            </button>
+            {categories && Array.isArray(categories) && categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategoryId(category.id)}
+                className={`px-4 py-2 rounded-lg border transition-colors ${
+                  selectedCategoryId === category.id
+                    ? 'bg-primary-500 text-white border-primary-500'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Products Grid */}
       {pendingProducts.length === 0 ? (

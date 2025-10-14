@@ -121,6 +121,39 @@ export default function CategoriesPage() {
     }
   }, [isAuthenticated])
 
+  // Recharger les catégories non mappées quand le fournisseur change
+  useEffect(() => {
+    if (mappingData.supplierId) {
+      loadUnmappedCategories()
+    }
+  }, [mappingData.supplierId])
+
+  const loadUnmappedCategories = async () => {
+    try {
+      console.log('🔄 Rechargement des catégories non mappées...')
+      const unmappedResponse = await apiClient.getUnmappedExternalCategories()
+      console.log('📦 Réponse catégories non mappées:', unmappedResponse)
+      
+      if (unmappedResponse.data) {
+        // Vérifier si c'est un objet avec une propriété data ou directement un tableau
+        const categoriesData = unmappedResponse.data.data || unmappedResponse.data
+        console.log('📂 Catégories non mappées rechargées:', categoriesData)
+        
+        if (Array.isArray(categoriesData)) {
+          setUnmappedCategories(categoriesData)
+        } else {
+          console.log('❌ Les données ne sont pas un tableau:', categoriesData)
+          setUnmappedCategories([])
+        }
+      } else {
+        console.log('❌ Aucune catégorie non mappée trouvée')
+        setUnmappedCategories([])
+      }
+    } catch (error) {
+      console.error('Erreur lors du rechargement des catégories non mappées:', error)
+    }
+  }
+
   const loadData = async () => {
     try {
       setIsLoading(true)
@@ -168,7 +201,8 @@ export default function CategoriesPage() {
       // Charger les mappings
       const mappingsResponse = await apiClient.getCategoryMappings()
       if (mappingsResponse.data) {
-        setMappings(mappingsResponse.data)
+        const mappingsData = mappingsResponse.data.data || mappingsResponse.data
+        setMappings(Array.isArray(mappingsData) ? mappingsData : [])
       }
 
       // Charger les fournisseurs
@@ -178,24 +212,7 @@ export default function CategoriesPage() {
       }
 
       // Charger les catégories externes non mappées
-      const unmappedResponse = await apiClient.getUnmappedExternalCategories()
-      console.log('📦 Réponse catégories non mappées:', unmappedResponse)
-      
-      if (unmappedResponse.data) {
-        // Vérifier si c'est un objet avec une propriété data ou directement un tableau
-        const categoriesData = unmappedResponse.data.data || unmappedResponse.data
-        console.log('📂 Catégories non mappées chargées:', categoriesData)
-        
-        if (Array.isArray(categoriesData)) {
-          setUnmappedCategories(categoriesData)
-        } else {
-          console.log('❌ Les données ne sont pas un tableau:', categoriesData)
-          setUnmappedCategories([])
-        }
-      } else {
-        console.log('❌ Aucune catégorie non mappée trouvée')
-        setUnmappedCategories([])
-      }
+      await loadUnmappedCategories()
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
     } finally {
@@ -435,7 +452,10 @@ export default function CategoriesPage() {
                 </label>
                 <select
                   value={mappingData.supplierId}
-                  onChange={(e) => setMappingData({...mappingData, supplierId: e.target.value, externalCategory: ''})}
+                  onChange={(e) => {
+                    console.log('🔄 Fournisseur changé:', e.target.value)
+                    setMappingData({...mappingData, supplierId: e.target.value, externalCategory: ''})
+                  }}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Sélectionner un fournisseur</option>
@@ -458,13 +478,34 @@ export default function CategoriesPage() {
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Sélectionner une catégorie détectée</option>
-                  {unmappedCategories && Array.isArray(unmappedCategories) && unmappedCategories
-                    .filter(cat => cat.supplierId === mappingData.supplierId)
-                    .map((category) => (
-                      <option key={category.id} value={category.externalCategory}>
-                        {category.externalCategory} ({category.productCount} produits)
-                      </option>
-                    ))}
+                  {(() => {
+                    const filteredCategories = unmappedCategories && Array.isArray(unmappedCategories) 
+                      ? unmappedCategories.filter(cat => cat.supplierId === mappingData.supplierId)
+                      : []
+                    console.log('🔍 Catégories filtrées pour le fournisseur', mappingData.supplierId, ':', filteredCategories)
+                    return filteredCategories.map((category) => {
+                      // Vérifier si cette catégorie a déjà un mapping
+                      const hasMapping = mappings && Array.isArray(mappings) && mappings.some(mapping => 
+                        mapping.supplierId === mappingData.supplierId && 
+                        mapping.externalCategory === category.externalCategory
+                      )
+                      
+                      return (
+                        <option 
+                          key={category.id} 
+                          value={category.externalCategory}
+                          disabled={hasMapping}
+                          style={{ 
+                            color: hasMapping ? '#999' : 'inherit',
+                            backgroundColor: hasMapping ? '#f5f5f5' : 'inherit'
+                          }}
+                        >
+                          {hasMapping ? '🔒 ' : ''}{category.externalCategory} ({category.productCount} produits)
+                          {hasMapping ? ' - Déjà mappé' : ''}
+                        </option>
+                      )
+                    })
+                  })()}
                 </select>
                 {mappingData.supplierId && unmappedCategories && Array.isArray(unmappedCategories) && unmappedCategories.filter(cat => cat.supplierId === mappingData.supplierId).length === 0 && (
                   <p className="text-xs text-gray-500 mt-1">

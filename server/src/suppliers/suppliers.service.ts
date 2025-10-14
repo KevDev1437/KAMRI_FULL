@@ -93,72 +93,105 @@ export class SuppliersService {
   }
 
   async importProducts(supplierId: string) {
+    console.log('🚀 === DÉBUT IMPORT PRODUITS ===');
+    console.log('🔍 Supplier ID:', supplierId);
+    
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: supplierId },
     });
 
     if (!supplier) {
+      console.log('❌ Fournisseur non trouvé pour ID:', supplierId);
       throw new Error('Fournisseur non trouvé');
     }
+
+    console.log('✅ Fournisseur trouvé:', supplier.name);
 
     try {
       // Import depuis Fake Store API
       console.log('🔄 Début de l\'import depuis Fake Store API...');
-      const response = await fetch('https://fakestoreapi.com/products?limit=10');
+      const response = await fetch('https://fakestoreapi.com/products');
       if (!response.ok) {
+        console.log('❌ Erreur HTTP:', response.status, response.statusText);
         throw new Error('Erreur lors de la récupération des produits');
       }
       
       const fakeProducts = await response.json();
       console.log(`📦 ${fakeProducts.length} produits récupérés depuis Fake Store API`);
+      console.log('📋 Premiers produits:', fakeProducts.slice(0, 3).map(p => ({ title: p.title, category: p.category })));
+      
       const importedProducts = [];
       
       for (const fakeProduct of fakeProducts) {
         try {
-          console.log(`🔄 Traitement du produit: ${fakeProduct.title} (catégorie: ${fakeProduct.category})`);
+          console.log(`\n🔄 === TRAITEMENT PRODUIT ===`);
+          console.log(`📝 Titre: ${fakeProduct.title}`);
+          console.log(`🏷️ Catégorie externe: "${fakeProduct.category}"`);
+          console.log(`💰 Prix: ${fakeProduct.price}`);
+          
           // Mapper les catégories Fake Store vers nos catégories
           const categoryId = await this.mapFakeStoreCategory(fakeProduct.category, supplier.id);
           console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
           
+          // TOUS les produits importés sont en attente de catégorisation et validation
+          const productData: any = {
+            name: fakeProduct.title,
+            description: fakeProduct.description,
+            price: fakeProduct.price,
+            originalPrice: fakeProduct.price * 1.2, // Prix original fictif
+            image: fakeProduct.image,
+            supplierId: supplier.id,
+            externalCategory: fakeProduct.category, // Sauvegarder la catégorie externe
+            status: 'pending', // TOUS les produits en attente de catégorisation
+            badge: this.generateBadge(),
+            stock: Math.floor(Math.random() * 50) + 10,
+          };
+
+          // Ajouter categoryId seulement si une catégorie est assignée
+          if (categoryId) {
+            productData.categoryId = categoryId;
+          }
+
           const product = await this.prisma.product.create({
-            data: {
-              name: fakeProduct.title,
-              description: fakeProduct.description,
-              price: fakeProduct.price,
-              originalPrice: fakeProduct.price * 1.2, // Prix original fictif
-              image: fakeProduct.image,
-              categoryId: categoryId,
-              supplierId: supplier.id,
-              status: 'pending', // Produits en attente de validation
-              badge: this.generateBadge(),
-              stock: Math.floor(Math.random() * 50) + 10,
-            },
+            data: productData,
             include: {
               category: true,
               supplier: true,
             },
           });
-          console.log(`✅ Produit créé: ${product.name}`);
+          console.log(`✅ Produit créé: ${product.name} (statut: pending - en attente de catégorisation)`);
+          console.log(`📊 ID produit: ${product.id}`);
           importedProducts.push(product);
         } catch (error) {
           console.error(`❌ Erreur lors de la création du produit ${fakeProduct.title}:`, error);
         }
       }
 
+      console.log(`\n🎉 === IMPORT TERMINÉ ===`);
+      console.log(`📊 Total produits importés: ${importedProducts.length}`);
+      console.log(`🏢 Fournisseur: ${supplier.name}`);
+      console.log(`📋 Produits:`, importedProducts.map(p => ({ name: p.name, category: p.category?.name, status: p.status })));
+
       return {
-        message: `${importedProducts.length} produits importés depuis Fake Store API`,
+        message: `${importedProducts.length} produits importés depuis Fake Store API - Tous en attente de catégorisation`,
         products: importedProducts,
         supplier: supplier.name,
+        workflow: 'Import → Catégorisation → Validation → Active'
       };
     } catch (error) {
+      console.log('❌ === ERREUR IMPORT ===');
+      console.log('💥 Erreur:', error);
       throw new Error(`Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   private async mapFakeStoreCategory(fakeCategory: string, supplierId: string): Promise<string> {
-    console.log(`🔍 Mapping catégorie: ${fakeCategory}`);
+    console.log(`\n🔍 === MAPPING CATÉGORIE ===`);
+    console.log(`🏷️ Catégorie externe: "${fakeCategory}"`);
+    console.log(`🏢 Supplier ID: ${supplierId}`);
     
     // Vérifier s'il existe déjà un mapping pour cette catégorie externe
+    console.log(`🔎 Recherche mapping existant...`);
     const existingMapping = await this.prisma.categoryMapping.findFirst({
       where: {
         supplierId: supplierId,
@@ -167,40 +200,45 @@ export class SuppliersService {
     });
 
     if (existingMapping) {
+      console.log(`✅ Mapping existant trouvé:`, existingMapping);
       // Trouver la catégorie interne correspondante
       const internalCategory = await this.prisma.category.findFirst({
         where: { name: existingMapping.internalCategory }
       });
       
       if (internalCategory) {
-        console.log(`✅ Mapping existant trouvé: ${fakeCategory} -> ${internalCategory.name}`);
+        console.log(`✅ Catégorie interne trouvée: ${internalCategory.name} (ID: ${internalCategory.id})`);
         return internalCategory.id;
       }
+    } else {
+      console.log(`❌ Aucun mapping existant pour "${fakeCategory}"`);
     }
 
     // Si pas de mapping, enregistrer comme catégorie non mappée
-    // TODO: Réactiver après résolution du problème Prisma
-    /*
-    await this.prisma.unmappedExternalCategory.upsert({
-      where: {
-        supplierId_externalCategory: {
+    console.log(`📝 Enregistrement catégorie non mappée...`);
+    try {
+      await this.prisma.unmappedExternalCategory.upsert({
+        where: {
+          supplierId_externalCategory: {
+            supplierId: supplierId,
+            externalCategory: fakeCategory
+          }
+        },
+        update: {
+          productCount: {
+            increment: 1
+          }
+        },
+        create: {
+          externalCategory: fakeCategory,
           supplierId: supplierId,
-          externalCategory: fakeCategory
+          productCount: 1
         }
-      },
-      update: {
-        productCount: {
-          increment: 1
-        }
-      },
-      create: {
-        externalCategory: fakeCategory,
-        supplierId: supplierId,
-        productCount: 1
-      }
-    });
-
-    console.log(`📝 Catégorie non mappée enregistrée: ${fakeCategory}`);
+      });
+      console.log(`✅ Catégorie non mappée enregistrée: ${fakeCategory}`);
+    } catch (error) {
+      console.log(`❌ Erreur enregistrement catégorie non mappée:`, error);
+    }
     
     // Vérifier ce qui a été enregistré
     const savedCategory = await this.prisma.unmappedExternalCategory.findFirst({
@@ -210,16 +248,13 @@ export class SuppliersService {
       }
     });
     console.log(`🔍 Catégorie sauvegardée:`, savedCategory);
-    */
-    console.log(`📝 Catégorie non mappée détectée: ${fakeCategory} (temporairement désactivé)`);
     
-    // Fallback: première catégorie disponible
-    const firstCategory = await this.prisma.category.findFirst();
-    if (!firstCategory) {
-      throw new Error('Aucune catégorie trouvée dans la base de données');
-    }
-    console.log(`🔄 Utilisation de la catégorie par défaut: ${firstCategory.name} (ID: ${firstCategory.id})`);
-    return firstCategory.id;
+    // Pas de fallback - laisser en attente de catégorisation manuelle
+    console.log(`⏳ Produit laissé en attente de catégorisation manuelle`);
+    console.log(`📝 Catégorie externe "${fakeCategory}" doit être mappée manuellement`);
+    
+    // Retourner null pour indiquer qu'aucune catégorie n'est assignée
+    return null;
   }
 
   private generateBadge(): string | null {

@@ -108,6 +108,59 @@ export class ProductsService {
     });
   }
 
+  async getProductsReadyForValidation(categoryId?: string) {
+    // Récupérer tous les produits pending
+    const products = await this.prisma.product.findMany({
+      where: { 
+        status: 'pending'
+      },
+      include: {
+        category: true,
+        supplier: {
+          include: {
+            categoryMappings: true
+          }
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Récupérer tous les mappings de catégories
+    const categoryMappings = await this.prisma.categoryMapping.findMany();
+    
+    // Filtrer pour ne garder que ceux qui ont un mapping pour leur catégorie externe
+    let filteredProducts = products.filter(product => {
+      if (!product.supplier || !product.externalCategory) return false;
+      
+      // Vérifier si ce produit a un mapping pour sa catégorie externe
+      const hasMapping = categoryMappings.some(mapping => 
+        mapping.supplierId === product.supplierId && 
+        mapping.externalCategory === product.externalCategory
+      );
+      
+      return hasMapping;
+    });
+
+    // Si une catégorie spécifique est demandée, filtrer par cette catégorie
+    if (categoryId) {
+      filteredProducts = filteredProducts.filter(product => {
+        if (!product.supplier || !product.externalCategory) return false;
+        
+        // Trouver le mapping pour ce produit
+        const mapping = categoryMappings.find(mapping => 
+          mapping.supplierId === product.supplierId && 
+          mapping.externalCategory === product.externalCategory
+        );
+        
+        return mapping && mapping.internalCategory === categoryId;
+      });
+    }
+
+    return filteredProducts;
+  }
+
   async findByCategory(categoryId: string) {
     return this.prisma.product.findMany({
       where: { categoryId },

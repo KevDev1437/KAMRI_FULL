@@ -83,5 +83,12 @@ export class ProductsController {
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
+
+  @Get('admin/ready-for-validation')
+  @ApiOperation({ summary: 'Get products ready for validation (with category mapping)' })
+  @ApiResponse({ status: 200, description: 'Products ready for validation retrieved successfully' })
+  getProductsReadyForValidation(@Query('categoryId') categoryId?: string) {
+    return this.productsService.getProductsReadyForValidation(categoryId);
+  }
 }
 

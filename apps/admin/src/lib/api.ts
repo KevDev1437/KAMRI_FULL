@@ -282,6 +282,14 @@ export class ApiClient {
   async getUnmappedExternalCategories() {
     return this.fetchWithAuth('/categories/unmapped-external');
   }
+
+  async getProductsReadyForValidation(categoryId?: string) {
+    const url = categoryId 
+      ? `/products/admin/ready-for-validation?categoryId=${categoryId}`
+      : '/products/admin/ready-for-validation';
+    
+    return this.fetchWithAuth(url);
+  }
 }
 
 // Instance globale

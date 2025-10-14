@@ -18,21 +18,23 @@ export class CategoriesController {
     };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Récupérer une catégorie par ID' })
-  @ApiResponse({ status: 200, description: 'Catégorie récupérée avec succès' })
-  @ApiResponse({ status: 404, description: 'Catégorie non trouvée' })
-  async findOne(@Param('id') id: string) {
-    const category = await this.categoriesService.findOne(id);
-    if (!category) {
+  @Get('unmapped-external')
+  @ApiOperation({ summary: 'Récupérer les catégories externes non mappées' })
+  @ApiResponse({ status: 200, description: 'Catégories externes non mappées récupérées avec succès' })
+  async getUnmappedExternalCategories() {
+    try {
+      const categories = await this.categoriesService.getUnmappedExternalCategories();
       return {
-        error: 'Catégorie non trouvée'
+        data: categories,
+        message: 'Catégories externes non mappées récupérées avec succès'
+      };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des catégories non mappées:', error);
+      return {
+        error: 'Erreur lors de la récupération des catégories non mappées',
+        details: error instanceof Error ? error.message : String(error)
       };
     }
-    return {
-      data: category,
-      message: 'Catégorie récupérée avec succès'
-    };
   }
 
   @Get('mappings/all')
@@ -78,22 +80,20 @@ export class CategoriesController {
     };
   }
 
-  @Get('unmapped-external')
-  @ApiOperation({ summary: 'Récupérer les catégories externes non mappées' })
-  @ApiResponse({ status: 200, description: 'Catégories externes non mappées récupérées avec succès' })
-  async getUnmappedExternalCategories() {
-    try {
-      const categories = await this.categoriesService.getUnmappedExternalCategories();
+  @Get(':id')
+  @ApiOperation({ summary: 'Récupérer une catégorie par ID' })
+  @ApiResponse({ status: 200, description: 'Catégorie récupérée avec succès' })
+  @ApiResponse({ status: 404, description: 'Catégorie non trouvée' })
+  async findOne(@Param('id') id: string) {
+    const category = await this.categoriesService.findOne(id);
+    if (!category) {
       return {
-        data: categories,
-        message: 'Catégories externes non mappées récupérées avec succès'
-      };
-    } catch (error) {
-      console.error('Erreur lors de la récupération des catégories non mappées:', error);
-      return {
-        error: 'Erreur lors de la récupération des catégories non mappées',
-        details: error instanceof Error ? error.message : String(error)
+        error: 'Catégorie non trouvée'
       };
     }
+    return {
+      data: category,
+      message: 'Catégorie récupérée avec succès'
+    };
   }
 }

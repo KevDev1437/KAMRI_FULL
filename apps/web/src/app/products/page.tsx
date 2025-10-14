@@ -6,154 +6,7 @@ import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
-
-// Mock data pour les produits avec les 7 catégories fixes
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'tendances',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '2', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '4', 
-    name: 'Veste Denim', 
-    price: 79.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.3,
-    reviews: 67,
-    badge: null,
-    brand: 'KAMRI'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '6', 
-    name: 'Sac à Main', 
-    price: 49.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.1,
-    reviews: 45,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99, 
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '8', 
-    name: 'Chaise Design', 
-    price: 199.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'maison',
-    rating: 4.4,
-    reviews: 78,
-    badge: 'tendances',
-    brand: 'HomeStyle'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '10', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  },
-  { 
-    id: '11', 
-    name: 'Jouet Éducatif', 
-    price: 29.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'enfants',
-    rating: 4.5,
-    reviews: 67,
-    badge: 'nouveau',
-    brand: 'KidsBrand'
-  },
-  { 
-    id: '12', 
-    name: 'Crème Hydratante', 
-    price: 24.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'beaute',
-    rating: 4.2,
-    reviews: 134,
-    badge: 'top-ventes',
-    brand: 'BeautyBrand'
-  },
-];
+import { apiClient } from '../../lib/api';
 
 interface Product {
   id: string;
@@ -161,21 +14,60 @@ interface Product {
   price: number;
   originalPrice: number | null;
   image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
+  category: {
+    id: string;
+    name: string;
+  } | null;
   badge: string | null;
-  brand: string;
+  stock: number;
+  supplier: {
+    name: string;
+  };
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Charger les données depuis l'API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Charger les catégories
+        const categoriesResponse = await apiClient.getCategories();
+        if (categoriesResponse.data) {
+          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
+          setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        }
+
+        // Charger les produits
+        const productsResponse = await apiClient.getProducts();
+        if (productsResponse.data) {
+          setProducts(productsResponse.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Filtrage des produits
   useEffect(() => {
@@ -183,14 +75,16 @@ export default function ProductsPage() {
 
     // Filtre par catégorie
     if (selectedCategory !== 'tous') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => 
+        product.category?.id === selectedCategory
+      );
     }
 
     // Filtre par recherche
     if (searchQuery) {
       filtered = filtered.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        product.supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -210,11 +104,8 @@ export default function ProductsPage() {
       case 'nouveautes':
         filtered.sort((a, b) => b.id.localeCompare(a.id));
         break;
-      case 'note':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
       default: // populaire
-        filtered.sort((a, b) => b.reviews - a.reviews);
+        filtered.sort((a, b) => b.stock - a.stock);
     }
 
     setFilteredProducts(filtered);
@@ -244,13 +135,14 @@ export default function ProductsPage() {
             <CategoryTabs
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
+              categories={categories}
             />
 
             {/* Résultats */}
             <div className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-[#424242]">
-                  {filteredProducts.length} produits trouvés
+                  {loading ? 'Chargement...' : `${filteredProducts.length} produits trouvés`}
                 </h2>
                 <button 
                   className="lg:hidden bg-[#4CAF50] text-white px-4 py-2 rounded-lg"
@@ -260,24 +152,39 @@ export default function ProductsPage() {
                 </button>
               </div>
 
-              {/* Grille de produits */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-
-              {/* Message si aucun produit */}
-              {filteredProducts.length === 0 && (
+              {/* État de chargement */}
+              {loading ? (
                 <div className="text-center py-16">
-                  <div className="text-6xl mb-4">🔍</div>
+                  <div className="text-6xl mb-4">⏳</div>
                   <h3 className="text-xl font-semibold text-[#424242] mb-2">
-                    Aucun produit trouvé
+                    Chargement des produits...
                   </h3>
                   <p className="text-[#81C784]">
-                    Essayez de modifier vos critères de recherche
+                    Veuillez patienter
                   </p>
                 </div>
+              ) : (
+                <>
+                  {/* Grille de produits */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+
+                  {/* Message si aucun produit */}
+                  {filteredProducts.length === 0 && (
+                    <div className="text-center py-16">
+                      <div className="text-6xl mb-4">🔍</div>
+                      <h3 className="text-xl font-semibold text-[#424242] mb-2">
+                        Aucun produit trouvé
+                      </h3>
+                      <p className="text-[#81C784]">
+                        Essayez de modifier vos critères de recherche
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

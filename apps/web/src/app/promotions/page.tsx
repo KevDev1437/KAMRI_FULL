@@ -6,6 +6,7 @@ import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import ProductCard from '../../components/ProductCard';
 import ProductFilters from '../../components/ProductFilters';
+import { apiClient } from '../../lib/api';
 
 // Mock data pour les produits en promotion uniquement
 const mockProducts = [
@@ -89,36 +90,79 @@ interface Product {
   price: number;
   originalPrice: number | null;
   image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
+  category: {
+    id: string;
+    name: string;
+  } | null;
   badge: string | null;
-  brand: string;
+  stock: number;
+  supplier: {
+    name: string;
+  };
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function PromotionsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Charger les données depuis l'API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Charger les catégories
+        const categoriesResponse = await apiClient.getCategories();
+        if (categoriesResponse.data) {
+          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
+          setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        }
+
+        // Charger les produits
+        const productsResponse = await apiClient.getProducts();
+        if (productsResponse.data) {
+          setProducts(productsResponse.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Filtrage des produits - SEULEMENT les produits en promotion
   useEffect(() => {
-    let filtered = products.filter(product => product.badge === 'promo');
+    let filtered = products.filter(product => 
+      product.badge === 'promo' || product.originalPrice && product.originalPrice > product.price
+    );
 
     // Filtre par catégorie
     if (selectedCategory !== 'tous') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => 
+        product.category?.id === selectedCategory
+      );
     }
 
     // Filtre par recherche
     if (searchQuery) {
       filtered = filtered.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        product.supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -138,11 +182,8 @@ export default function PromotionsPage() {
       case 'nouveautes':
         filtered.sort((a, b) => b.id.localeCompare(a.id));
         break;
-      case 'note':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
       default: // populaire
-        filtered.sort((a, b) => b.reviews - a.reviews);
+        filtered.sort((a, b) => b.stock - a.stock);
     }
 
     setFilteredProducts(filtered);
@@ -174,13 +215,14 @@ export default function PromotionsPage() {
             <CategoryTabs
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
+              categories={categories}
             />
 
             {/* Résultats */}
             <div className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-[#424242]">
-                  {filteredProducts.length} produits en promotion trouvés
+                  {loading ? 'Chargement...' : `${filteredProducts.length} produits en promotion trouvés`}
                 </h2>
                 <button 
                   className="lg:hidden bg-[#4CAF50] text-white px-4 py-2 rounded-lg"
@@ -190,24 +232,39 @@ export default function PromotionsPage() {
                 </button>
               </div>
 
-              {/* Grille de produits */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-
-              {/* Message si aucun produit */}
-              {filteredProducts.length === 0 && (
-                <div className="text-center py-20">
-                  <div className="text-6xl mb-4">🔍</div>
-                  <h2 className="text-2xl font-bold text-[#424242] mb-2">
-                    Aucune promotion trouvée
-                  </h2>
-                  <p className="text-lg text-[#81C784]">
-                    Essayez de modifier vos critères de recherche
+              {/* État de chargement */}
+              {loading ? (
+                <div className="text-center py-16">
+                  <div className="text-6xl mb-4">⏳</div>
+                  <h3 className="text-xl font-semibold text-[#424242] mb-2">
+                    Chargement des promotions...
+                  </h3>
+                  <p className="text-[#81C784]">
+                    Veuillez patienter
                   </p>
                 </div>
+              ) : (
+                <>
+                  {/* Grille de produits */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+
+                  {/* Message si aucun produit */}
+                  {filteredProducts.length === 0 && (
+                    <div className="text-center py-20">
+                      <div className="text-6xl mb-4">🔍</div>
+                      <h2 className="text-2xl font-bold text-[#424242] mb-2">
+                        Aucune promotion trouvée
+                      </h2>
+                      <p className="text-lg text-[#81C784]">
+                        Essayez de modifier vos critères de recherche
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

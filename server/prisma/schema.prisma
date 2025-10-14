@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./prisma/dev.db"
 }
 
 model User {
@@ -42,23 +42,24 @@ model Category {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  price         Float
-  originalPrice Float?
-  image         String?
-  categoryId    String
-  supplierId    String?
-  status        String   @default("pending") // pending, active, inactive, rejected
-  badge         String? // promo, tendances, nouveau, top-ventes
-  stock         Int      @default(0)
-  sales         Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  price            Float
+  originalPrice    Float?
+  image            String?
+  categoryId       String?
+  supplierId       String?
+  externalCategory String?  // Catégorie externe du fournisseur
+  status           String   @default("pending") // pending, active, inactive, rejected
+  badge            String? // promo, tendances, nouveau, top-ventes
+  stock            Int      @default(0)
+  sales            Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
-  category      Category      @relation(fields: [categoryId], references: [id])
+  category      Category?     @relation(fields: [categoryId], references: [id])
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])
   images        Image[]
   cartItems     CartItem[]

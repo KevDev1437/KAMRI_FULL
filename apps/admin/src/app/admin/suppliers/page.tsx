@@ -114,9 +114,8 @@ export default function SuppliersPage() {
     try {
       const response = await apiClient.importProducts(supplierId)
       if (response.data) {
-        alert(`✅ ${response.data.message}\n\n${response.data.products.length} produits importés et en attente de validation.`)
-        // Rediriger vers la page de validation
-        window.location.href = '/admin/products/validation'
+        alert(`✅ ${response.data.message}\n\n${response.data.products.length} produits importés et en attente de catégorisation.\n\nRegardez la console du backend pour voir les logs détaillés.`)
+        // Pas de redirection - rester sur la page pour voir les logs
       }
     } catch (error) {
       console.error('Erreur lors de l\'import:', error)
