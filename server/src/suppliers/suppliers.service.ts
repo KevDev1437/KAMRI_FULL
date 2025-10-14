@@ -108,16 +108,25 @@ export class SuppliersService {
     console.log('✅ Fournisseur trouvé:', supplier.name);
 
     try {
-      // Import depuis Fake Store API
-      console.log('🔄 Début de l\'import depuis Fake Store API...');
-      const response = await fetch('https://fakestoreapi.com/products');
+      // Utiliser les données stockées dans la base de données
+      const apiUrl = supplier.apiUrl;
+      const apiName = supplier.name; // Ou un champ apiName si tu en ajoutes un
+      
+      console.log(`🔄 Début de l'import depuis ${apiName}...`);
+      console.log(`🌐 URL: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         console.log('❌ Erreur HTTP:', response.status, response.statusText);
         throw new Error('Erreur lors de la récupération des produits');
       }
       
-      const fakeProducts = await response.json();
-      console.log(`📦 ${fakeProducts.length} produits récupérés depuis Fake Store API`);
+      const apiResponse = await response.json();
+      
+      // DummyJSON retourne { products: [...] } alors que Fake Store retourne directement [...]
+      const fakeProducts = apiResponse.products || apiResponse;
+      
+      console.log(`📦 ${fakeProducts.length} produits récupérés depuis ${apiName}`);
       console.log('📋 Premiers produits:', fakeProducts.slice(0, 3).map(p => ({ title: p.title, category: p.category })));
       
       const importedProducts = [];
@@ -129,8 +138,8 @@ export class SuppliersService {
           console.log(`🏷️ Catégorie externe: "${fakeProduct.category}"`);
           console.log(`💰 Prix: ${fakeProduct.price}`);
           
-          // Mapper les catégories Fake Store vers nos catégories
-          const categoryId = await this.mapFakeStoreCategory(fakeProduct.category, supplier.id);
+          // Mapper les catégories externes vers nos catégories
+          const categoryId = await this.mapExternalCategory(fakeProduct.category, supplier.id);
           console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
           
           // TOUS les produits importés sont en attente de catégorisation et validation
@@ -173,7 +182,7 @@ export class SuppliersService {
       console.log(`📋 Produits:`, importedProducts.map(p => ({ name: p.name, category: p.category?.name, status: p.status })));
 
       return {
-        message: `${importedProducts.length} produits importés depuis Fake Store API - Tous en attente de catégorisation`,
+        message: `${importedProducts.length} produits importés depuis ${apiName} - Tous en attente de catégorisation`,
         products: importedProducts,
         supplier: supplier.name,
         workflow: 'Import → Catégorisation → Validation → Active'
@@ -185,7 +194,7 @@ export class SuppliersService {
     }
   }
 
-  private async mapFakeStoreCategory(fakeCategory: string, supplierId: string): Promise<string> {
+  private async mapExternalCategory(fakeCategory: string, supplierId: string): Promise<string> {
     console.log(`\n🔍 === MAPPING CATÉGORIE ===`);
     console.log(`🏷️ Catégorie externe: "${fakeCategory}"`);
     console.log(`🏢 Supplier ID: ${supplierId}`);

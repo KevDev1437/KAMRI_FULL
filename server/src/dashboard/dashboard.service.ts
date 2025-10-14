@@ -16,9 +16,14 @@ export class DashboardService {
       totalRevenue,
       monthlyRevenue,
     ] = await Promise.all([
-      this.prisma.product.count(),
       this.prisma.product.count({
-        where: { badge: 'promo' },
+        where: { status: 'active' },
+      }),
+      this.prisma.product.count({
+        where: { 
+          badge: 'promo',
+          status: 'active'
+        },
       }),
       this.prisma.order.count(),
       this.prisma.supplier.count({
@@ -124,7 +129,11 @@ export class DashboardService {
     const categories = await this.prisma.category.findMany({
       include: {
         _count: {
-          select: { products: true },
+          select: { 
+            products: {
+              where: { status: 'active' }
+            }
+          },
         },
       },
       orderBy: {

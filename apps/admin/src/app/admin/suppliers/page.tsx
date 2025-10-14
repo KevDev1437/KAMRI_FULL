@@ -34,6 +34,7 @@ export default function SuppliersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [newSupplier, setNewSupplier] = useState({
     name: '',
     description: '',
@@ -68,14 +69,26 @@ export default function SuppliersPage() {
 
   const handleAddSupplier = async () => {
     try {
-      const response = await apiClient.createSupplier(newSupplier)
-      if (response.data) {
-        setSuppliers([...suppliers, response.data])
-        setShowAddModal(false)
-        setNewSupplier({ name: '', description: '', apiUrl: '', apiKey: '' })
+      if (editingSupplier) {
+        // Mode édition
+        const response = await apiClient.updateSupplier(editingSupplier.id, newSupplier)
+        if (response.data) {
+          setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? response.data : s))
+          setShowAddModal(false)
+          setEditingSupplier(null)
+          setNewSupplier({ name: '', description: '', apiUrl: '', apiKey: '' })
+        }
+      } else {
+        // Mode ajout
+        const response = await apiClient.createSupplier(newSupplier)
+        if (response.data) {
+          setSuppliers([...suppliers, response.data])
+          setShowAddModal(false)
+          setNewSupplier({ name: '', description: '', apiUrl: '', apiKey: '' })
+        }
       }
     } catch (error) {
-      console.error('Erreur lors de l\'ajout du fournisseur:', error)
+      console.error('Erreur lors de l\'ajout/modification du fournisseur:', error)
     }
   }
 
@@ -96,6 +109,17 @@ export default function SuppliersPage() {
     } finally {
       setTestingConnection(null)
     }
+  }
+
+  const handleEditSupplier = (supplier: Supplier) => {
+    setNewSupplier({
+      name: supplier.name,
+      description: supplier.description || '',
+      apiUrl: supplier.apiUrl,
+      apiKey: supplier.apiKey || ''
+    })
+    setEditingSupplier(supplier)
+    setShowAddModal(true)
   }
 
   const handleDeleteSupplier = async (supplierId: string) => {
@@ -250,7 +274,7 @@ export default function SuppliersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => alert('Modification - Fonctionnalité à venir')}
+                  onClick={() => handleEditSupplier(supplier)}
                 >
                   <Edit className="w-3 h-3" />
                 </Button>
@@ -273,7 +297,7 @@ export default function SuppliersPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Ajouter un fournisseur</CardTitle>
+              <CardTitle>{editingSupplier ? 'Modifier le fournisseur' : 'Ajouter un fournisseur'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -315,7 +339,11 @@ export default function SuppliersPage() {
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false)
+                    setEditingSupplier(null)
+                    setNewSupplier({ name: '', description: '', apiUrl: '', apiKey: '' })
+                  }}
                   className="flex-1"
                 >
                   Annuler
@@ -324,7 +352,7 @@ export default function SuppliersPage() {
                   onClick={handleAddSupplier}
                   className="flex-1"
                 >
-                  Ajouter
+                  {editingSupplier ? 'Modifier' : 'Ajouter'}
                 </Button>
               </div>
             </CardContent>
