@@ -1,8 +1,11 @@
 'use client'
 
+import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiClient } from '@/lib/api'
 import {
     DollarSign,
     Globe,
@@ -13,10 +16,27 @@ import {
     Settings,
     Sun
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+interface Settings {
+  id?: string
+  theme: string
+  currency: string
+  language: string
+  accentColor: string
+  companyName: string
+  companyEmail?: string
+  companyPhone?: string
+  companyAddress?: string
+  apiRateLimit: number
+  autoSync: boolean
+  notifications: boolean
+  emailNotifications: boolean
+  smsNotifications: boolean
+}
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<Settings>({
     theme: 'light',
     currency: 'EUR',
     language: 'fr',
@@ -32,10 +52,46 @@ export default function SettingsPage() {
     smsNotifications: false
   })
 
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
+  const { isAuthenticated } = useAuth()
 
-  const handleSave = () => {
-    alert('Paramètres sauvegardés avec succès !')
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadSettings()
+    } else {
+      setShowLogin(true)
+    }
+  }, [isAuthenticated])
+
+  const loadSettings = async () => {
+    try {
+      setIsLoading(true)
+      const response = await apiClient.getSettings()
+      if (response.data) {
+        setSettings(response.data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des paramètres:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      const response = await apiClient.updateSettings(settings)
+      if (response.data) {
+        alert('Paramètres sauvegardés avec succès !')
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error)
+      alert('Erreur lors de la sauvegarde des paramètres')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleReset = () => {
@@ -55,9 +111,42 @@ export default function SettingsPage() {
         emailNotifications: true,
         smsNotifications: false
       })
-      setIsDarkMode(false)
       alert('Paramètres réinitialisés !')
     }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Connexion Requise</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-gray-600 mb-4">
+                Veuillez vous connecter pour accéder aux paramètres
+              </p>
+              <Button onClick={() => setShowLogin(true)}>
+                Se connecter
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      </>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des paramètres...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -96,18 +185,18 @@ export default function SettingsPage() {
               </label>
               <div className="flex space-x-4">
                 <button
-                  onClick={() => setIsDarkMode(false)}
+                  onClick={() => setSettings({...settings, theme: 'light'})}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                    !isDarkMode ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                    settings.theme === 'light' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
                   }`}
                 >
                   <Sun className="w-4 h-4" />
                   <span>Clair</span>
                 </button>
                 <button
-                  onClick={() => setIsDarkMode(true)}
+                  onClick={() => setSettings({...settings, theme: 'dark'})}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                    isDarkMode ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                    settings.theme === 'dark' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
                   }`}
                 >
                   <Moon className="w-4 h-4" />
@@ -326,7 +415,7 @@ export default function SettingsPage() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">Thème</h4>
               <p className="text-sm text-gray-600">
-                {isDarkMode ? 'Mode sombre' : 'Mode clair'} avec couleur d'accent {settings.accentColor}
+                {settings.theme === 'dark' ? 'Mode sombre' : 'Mode clair'} avec couleur d'accent {settings.accentColor}
               </p>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">

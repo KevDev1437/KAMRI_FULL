@@ -1,11 +1,13 @@
 'use client'
 
+import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiClient } from '@/lib/api'
 import {
     Edit,
-    Filter,
     Mail,
     Plus,
     Search,
@@ -16,94 +18,140 @@ import {
     Users,
     UserX
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-// Mock data
-const users = [
-  {
-    id: 1,
-    name: 'Admin KAMRI',
-    email: 'admin@kamri.com',
-    role: 'admin',
-    status: 'active',
-    lastLogin: 'Il y a 2 heures',
-    createdAt: '2024-01-01',
-    avatar: null
-  },
-  {
-    id: 2,
-    name: 'Jean Dupont',
-    email: 'jean.dupont@email.com',
-    role: 'user',
-    status: 'active',
-    lastLogin: 'Il y a 1 jour',
-    createdAt: '2024-01-10',
-    avatar: null
-  },
-  {
-    id: 3,
-    name: 'Marie Martin',
-    email: 'marie.martin@email.com',
-    role: 'user',
-    status: 'suspended',
-    lastLogin: 'Il y a 3 jours',
-    createdAt: '2024-01-08',
-    avatar: null
-  },
-  {
-    id: 4,
-    name: 'Pierre Durand',
-    email: 'pierre.durand@email.com',
-    role: 'user',
-    status: 'active',
-    lastLogin: 'Il y a 2 heures',
-    createdAt: '2024-01-12',
-    avatar: null
-  },
-  {
-    id: 5,
-    name: 'Sophie Bernard',
-    email: 'sophie.bernard@email.com',
-    role: 'user',
-    status: 'inactive',
-    lastLogin: 'Il y a 1 semaine',
-    createdAt: '2024-01-05',
-    avatar: null
-  }
-]
-
-const roles = ['Tous', 'admin', 'user']
-const statuses = ['Tous', 'active', 'suspended', 'inactive']
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  createdAt: string
+}
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showLogin, setShowLogin] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedRole, setSelectedRole] = useState('Tous')
-  const [selectedStatus, setSelectedStatus] = useState('Tous')
-  const [showFilters, setShowFilters] = useState(false)
+  const [roleFilter, setRoleFilter] = useState('Tous')
+  const [statusFilter, setStatusFilter] = useState('Tous')
+  const { isAuthenticated } = useAuth()
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <UserCheck className="w-4 h-4 text-green-500" />
-      case 'suspended':
-        return <UserX className="w-4 h-4 text-yellow-500" />
-      case 'inactive':
-        return <User className="w-4 h-4 text-gray-400" />
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUsers()
+    } else {
+      setShowLogin(true)
+    }
+  }, [isAuthenticated])
+
+  const loadUsers = async () => {
+    try {
+      setIsLoading(true)
+      const response = await apiClient.getUsers()
+      if (response.data) {
+        setUsers(response.data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des utilisateurs:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleToggleStatus = async (userId: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
+      const response = await apiClient.updateUser(userId, { status: newStatus })
+      
+      if (response.data) {
+        setUsers(users.map(user => 
+          user.id === userId ? { ...user, status: newStatus } : user
+        ))
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Connexion Requise</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-gray-600 mb-4">
+                Veuillez vous connecter pour accéder aux utilisateurs
+              </p>
+              <Button onClick={() => setShowLogin(true)}>
+                Se connecter
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      </>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des utilisateurs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return <Shield className="w-4 h-4 text-purple-500" />
+      case 'user':
+        return <User className="w-4 h-4 text-blue-500" />
       default:
-        return <User className="w-4 h-4 text-gray-400" />
+        return <User className="w-4 h-4 text-gray-500" />
+    }
+  }
+
+  const getRoleText = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrateur'
+      case 'user':
+        return 'Utilisateur'
+      default:
+        return role
+    }
+  }
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-purple-100 text-purple-800'
+      case 'user':
+        return 'bg-blue-100 text-blue-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'text-green-600 bg-green-50'
+        return 'bg-green-100 text-green-800'
       case 'suspended':
-        return 'text-yellow-600 bg-yellow-50'
+        return 'bg-red-100 text-red-800'
       case 'inactive':
-        return 'text-gray-600 bg-gray-50'
+        return 'bg-gray-100 text-gray-800'
       default:
-        return 'text-gray-600 bg-gray-50'
+        return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -120,39 +168,14 @@ export default function UsersPage() {
     }
   }
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <Shield className="w-4 h-4 text-blue-500" />
-      case 'user':
-        return <User className="w-4 h-4 text-gray-500" />
-      default:
-        return <User className="w-4 h-4 text-gray-400" />
-    }
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'text-blue-600 bg-blue-50'
-      case 'user':
-        return 'text-gray-600 bg-gray-50'
-      default:
-        return 'text-gray-600 bg-gray-50'
-    }
-  }
-
-  const toggleUserStatus = (userId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
-    alert(`Utilisateur ${userId} ${newStatus === 'active' ? 'activé' : 'suspendu'}`)
-  }
-
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = selectedRole === 'Tous' || user.role === selectedRole
-    const matchesStatus = selectedStatus === 'Tous' || user.status === selectedStatus
+    
+    const matchesRole = roleFilter === 'Tous' || user.role === roleFilter
+    const matchesStatus = statusFilter === 'Tous' || user.status === statusFilter
+    
     return matchesSearch && matchesRole && matchesStatus
   })
 
@@ -162,14 +185,14 @@ export default function UsersPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Utilisateurs</h1>
-          <p className="text-gray-600 mt-2">Gérez les utilisateurs et administrateurs</p>
+          <p className="text-gray-600 mt-2">Gérez les comptes utilisateurs</p>
         </div>
         <Button 
           className="kamri-button"
-          onClick={() => alert('Ajouter un utilisateur - Fonctionnalité à venir')}
+          onClick={() => alert('Ajout d\'utilisateur - Fonctionnalité à venir')}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Ajouter Utilisateur
+          Ajouter un utilisateur
         </Button>
       </div>
 
@@ -192,104 +215,74 @@ export default function UsersPage() {
 
             {/* Role Filter */}
             <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              {roles.map(role => (
-                <option key={role} value={role}>
-                  {role === 'Tous' ? 'Tous les rôles' : role === 'admin' ? 'Administrateurs' : 'Utilisateurs'}
-                </option>
-              ))}
+              <option value="Tous">Tous les rôles</option>
+              <option value="admin">Administrateur</option>
+              <option value="user">Utilisateur</option>
             </select>
 
             {/* Status Filter */}
             <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              {statuses.map(status => (
-                <option key={status} value={status}>
-                  {status === 'Tous' ? 'Tous les statuts' : getStatusText(status)}
-                </option>
-              ))}
+              <option value="Tous">Tous les statuts</option>
+              <option value="active">Actif</option>
+              <option value="suspended">Suspendu</option>
+              <option value="inactive">Inactif</option>
             </select>
-
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="lg:hidden"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filtres
-            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Users List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-4">
         {filteredUsers.map((user) => (
           <Card key={user.id} className="kamri-card">
             <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                {/* Avatar */}
-                <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                  {user.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full" />
-                  ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
                     <User className="w-6 h-6 text-primary-600" />
-                  )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{user.name}</h3>
+                    <p className="text-sm text-gray-500 flex items-center">
+                      <Mail className="w-3 h-3 mr-1" />
+                      {user.email}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Créé le {new Date(user.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">{user.name}</h3>
+                
+                <div className="flex items-center space-x-4">
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.role)}`}>
                     <div className="flex items-center space-x-1">
                       {getRoleIcon(user.role)}
-                      <span className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user.role)}`}>
-                        {user.role === 'admin' ? 'Admin' : 'User'}
-                      </span>
+                      <span>{getRoleText(user.role)}</span>
                     </div>
                   </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600 truncate">{user.email}</span>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">Dernière connexion:</span>
-                      <span className="text-sm text-gray-900">{user.lastLogin}</span>
-                    </div>
+                  
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(user.status)}`}>
+                    {getStatusText(user.status)}
                   </div>
-
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs ${getStatusColor(user.status)}`}>
-                      {getStatusIcon(user.status)}
-                      <span>{getStatusText(user.status)}</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Créé le {user.createdAt}</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => alert(`Modifier l'utilisateur ${user.name}`)}
-                    >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Modifier
-                    </Button>
-                    <Button 
-                      variant="outline" 
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
                       size="sm"
-                      onClick={() => toggleUserStatus(user.id, user.status)}
-                      className={user.status === 'active' ? 'text-yellow-600 hover:text-yellow-700' : 'text-green-600 hover:text-green-700'}
+                      onClick={() => handleToggleStatus(user.id, user.status)}
+                      className={
+                        user.status === 'active' 
+                          ? 'text-red-600 hover:text-red-700' 
+                          : 'text-green-600 hover:text-green-700'
+                      }
                     >
                       {user.status === 'active' ? (
                         <>
@@ -303,11 +296,17 @@ export default function UsersPage() {
                         </>
                       )}
                     </Button>
+                    
+                    <Button variant="outline" size="sm">
+                      <Edit className="w-3 h-3 mr-1" />
+                      Modifier
+                    </Button>
+                    
                     <Button 
                       variant="outline" 
-                      size="sm" 
+                      size="sm"
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => alert(`Supprimer l'utilisateur ${user.name}`)}
+                      onClick={() => alert('Suppression - Fonctionnalité à venir')}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -325,69 +324,22 @@ export default function UsersPage() {
           <CardContent className="text-center py-12">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun utilisateur trouvé</h3>
-            <p className="text-gray-500">Essayez de modifier vos critères de recherche</p>
+            <p className="text-gray-500 mb-4">
+              {searchQuery || roleFilter !== 'Tous' || statusFilter !== 'Tous'
+                ? 'Essayez de modifier vos critères de recherche'
+                : 'Les utilisateurs apparaîtront ici'
+              }
+            </p>
+            <Button 
+              className="kamri-button"
+              onClick={() => alert('Ajout d\'utilisateur - Fonctionnalité à venir')}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter un utilisateur
+            </Button>
           </CardContent>
         </Card>
       )}
-
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="kamri-card">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <UserCheck className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Utilisateurs actifs</p>
-                <p className="text-lg font-semibold text-gray-900">3</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kamri-card">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <UserX className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Suspendus</p>
-                <p className="text-lg font-semibold text-gray-900">1</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kamri-card">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Administrateurs</p>
-                <p className="text-lg font-semibold text-gray-900">1</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kamri-card">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <User className="w-5 h-5 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total</p>
-                <p className="text-lg font-semibold text-gray-900">5</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

@@ -1,8 +1,11 @@
 'use client'
 
+import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiClient } from '@/lib/api'
 import {
     Edit,
     Eye,
@@ -14,85 +17,113 @@ import {
     Search,
     Trash2
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-// Mock data
-const products = [
-  {
-    id: 1,
-    name: 'iPhone 15 Pro',
-    price: 999.99,
-    originalPrice: 1199.99,
-    supplier: 'Temu',
-    category: 'Technologie',
-    status: 'active',
-    badge: 'promo',
-    image: null,
-    stock: 45,
-    sales: 128
-  },
-  {
-    id: 2,
-    name: 'Jean Slim Fit',
-    price: 59.99,
-    originalPrice: null,
-    supplier: 'AliExpress',
-    category: 'Mode',
-    status: 'active',
-    badge: 'nouveau',
-    image: null,
-    stock: 23,
-    sales: 89
-  },
-  {
-    id: 3,
-    name: 'Sac à Main Cuir',
-    price: 89.99,
-    originalPrice: 129.99,
-    supplier: 'Shein',
-    category: 'Accessoires',
-    status: 'inactive',
-    badge: 'tendances',
-    image: null,
-    stock: 12,
-    sales: 67
-  },
-  {
-    id: 4,
-    name: 'Laptop Gaming',
-    price: 1299.99,
-    originalPrice: null,
-    supplier: 'Temu',
-    category: 'Technologie',
-    status: 'active',
-    badge: null,
-    image: null,
-    stock: 8,
-    sales: 45
-  },
-  {
-    id: 5,
-    name: 'Parfum Élégant',
-    price: 79.99,
-    originalPrice: 99.99,
-    supplier: 'AliExpress',
-    category: 'Beauté',
-    status: 'active',
-    badge: 'top-ventes',
-    image: null,
-    stock: 34,
-    sales: 203
-  },
-]
+interface Product {
+  id: string
+  name: string
+  price: number
+  originalPrice?: number
+  supplier?: { name: string }
+  category?: { name: string }
+  status: string
+  badge?: string
+  image?: string
+  stock: number
+  sales: number
+}
 
-const categories = ['Toutes', 'Mode', 'Technologie', 'Maison', 'Beauté', 'Accessoires', 'Sport', 'Enfants']
-const suppliers = ['Tous', 'Temu', 'AliExpress', 'Shein', 'Amazon']
+interface Category {
+  id: string
+  name: string
+}
+
+interface Supplier {
+  id: string
+  name: string
+}
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('Toutes')
   const [selectedSupplier, setSelectedSupplier] = useState('Tous')
   const [showFilters, setShowFilters] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showLogin, setShowLogin] = useState(false)
+  const { isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData()
+    } else {
+      setShowLogin(true)
+    }
+  }, [isAuthenticated])
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Charger les produits
+      const productsResponse = await apiClient.getProducts()
+      if (productsResponse.data) {
+        setProducts(productsResponse.data)
+      }
+
+      // Charger les catégories
+      const categoriesResponse = await apiClient.getCategories()
+      if (categoriesResponse.data) {
+        setCategories(categoriesResponse.data)
+      }
+
+      // Charger les fournisseurs
+      const suppliersResponse = await apiClient.getSuppliers()
+      if (suppliersResponse.data) {
+        setSuppliers(suppliersResponse.data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Connexion Requise</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-gray-600 mb-4">
+                Veuillez vous connecter pour accéder aux produits
+              </p>
+              <Button onClick={() => setShowLogin(true)}>
+                Se connecter
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      </>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des produits...</p>
+        </div>
+      </div>
+    )
+  }
 
   const getBadgeStyle = (badge: string | null) => {
     switch (badge) {
@@ -126,10 +157,13 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'Toutes' || product.category === selectedCategory
-    const matchesSupplier = selectedSupplier === 'Tous' || product.supplier === selectedSupplier
+    const matchesCategory = selectedCategory === 'Toutes' || product.category?.name === selectedCategory
+    const matchesSupplier = selectedSupplier === 'Tous' || product.supplier?.name === selectedSupplier
     return matchesSearch && matchesCategory && matchesSupplier
   })
+
+  const categoryOptions = ['Toutes', ...categories.map(cat => cat.name)]
+  const supplierOptions = ['Tous', ...suppliers.map(sup => sup.name)]
 
   return (
     <div className="space-y-6">
@@ -171,7 +205,7 @@ export default function ProductsPage() {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              {categories.map(category => (
+              {categoryOptions.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
@@ -182,7 +216,7 @@ export default function ProductsPage() {
               onChange={(e) => setSelectedSupplier(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              {suppliers.map(supplier => (
+              {supplierOptions.map(supplier => (
                 <option key={supplier} value={supplier}>{supplier}</option>
               ))}
             </select>
@@ -242,7 +276,7 @@ export default function ProductsPage() {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Fournisseur:</span>
-                    <span className="text-sm font-medium">{product.supplier}</span>
+                    <span className="text-sm font-medium">{product.supplier?.name || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Stock:</span>

@@ -5,46 +5,60 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Create categories - 7 catégories fixes
+  // Create categories - 7 catégories fixes (avec upsert)
   const categories = await Promise.all([
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Mode' },
+      update: {},
+      create: {
         name: 'Mode',
         description: 'Vêtements et accessoires de mode',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Technologie' },
+      update: {},
+      create: {
         name: 'Technologie',
         description: 'Électronique et gadgets technologiques',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Maison' },
+      update: {},
+      create: {
         name: 'Maison',
         description: 'Décoration et équipement de la maison',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Beauté' },
+      update: {},
+      create: {
         name: 'Beauté',
         description: 'Produits de beauté et soins',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Accessoires' },
+      update: {},
+      create: {
         name: 'Accessoires',
         description: 'Accessoires et petits objets',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Sport' },
+      update: {},
+      create: {
         name: 'Sport',
         description: 'Équipement et vêtements de sport',
       },
     }),
-    prisma.category.create({
-      data: {
+    prisma.category.upsert({
+      where: { name: 'Enfants' },
+      update: {},
+      create: {
         name: 'Enfants',
         description: 'Produits pour enfants et bébés',
       },
@@ -53,10 +67,12 @@ async function main() {
 
   console.log('✅ Categories created');
 
-  // Create suppliers
+  // Create suppliers (avec upsert)
   const suppliers = await Promise.all([
-    prisma.supplier.create({
-      data: {
+    prisma.supplier.upsert({
+      where: { name: 'Temu' },
+      update: {},
+      create: {
         name: 'Temu',
         description: 'Plateforme de dropshipping chinoise',
         apiUrl: 'https://api.temu.com',
@@ -65,8 +81,10 @@ async function main() {
         lastSync: new Date(),
       },
     }),
-    prisma.supplier.create({
-      data: {
+    prisma.supplier.upsert({
+      where: { name: 'AliExpress' },
+      update: {},
+      create: {
         name: 'AliExpress',
         description: 'Marketplace international d\'AliExpress',
         apiUrl: 'https://api.aliexpress.com',
@@ -75,8 +93,10 @@ async function main() {
         lastSync: new Date(),
       },
     }),
-    prisma.supplier.create({
-      data: {
+    prisma.supplier.upsert({
+      where: { name: 'Shein' },
+      update: {},
+      create: {
         name: 'Shein',
         description: 'Plateforme de mode rapide',
         apiUrl: 'https://api.shein.com',
@@ -151,18 +171,22 @@ async function main() {
 
   console.log('✅ Products created');
 
-  // Create users
+  // Create users (avec upsert)
   const users = await Promise.all([
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: 'admin@kamri.com' },
+      update: {},
+      create: {
         email: 'admin@kamri.com',
         name: 'Admin KAMRI',
         role: 'admin',
         status: 'active',
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: 'user@example.com' },
+      update: {},
+      create: {
         email: 'user@example.com',
         name: 'Utilisateur Test',
         role: 'user',
@@ -213,18 +237,32 @@ async function main() {
 
   console.log('✅ Orders created');
 
-  // Create category mappings
+  // Create category mappings (avec upsert)
   await Promise.all([
-    prisma.categoryMapping.create({
-      data: {
+    prisma.categoryMapping.upsert({
+      where: {
+        supplierId_externalCategory: {
+          supplierId: suppliers[0].id,
+          externalCategory: 'Electronics'
+        }
+      },
+      update: {},
+      create: {
         supplierId: suppliers[0].id,
         externalCategory: 'Electronics',
         internalCategory: 'Technologie',
         status: 'mapped',
       },
     }),
-    prisma.categoryMapping.create({
-      data: {
+    prisma.categoryMapping.upsert({
+      where: {
+        supplierId_externalCategory: {
+          supplierId: suppliers[1].id,
+          externalCategory: 'Women\'s Clothing'
+        }
+      },
+      update: {},
+      create: {
         supplierId: suppliers[1].id,
         externalCategory: 'Women\'s Clothing',
         internalCategory: 'Mode',

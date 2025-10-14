@@ -1,7 +1,10 @@
 'use client'
 
+import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiClient } from '@/lib/api'
 import {
     Activity,
     ArrowUpRight,
@@ -11,82 +14,170 @@ import {
     Truck,
     Users
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
-// Mock data
-const stats = [
-  {
-    title: 'Produits Totaux',
-    value: '1,247',
-    change: '+12%',
-    changeType: 'positive' as const,
-    icon: Package,
-  },
-  {
-    title: 'Produits en Promotion',
-    value: '89',
-    change: '+5%',
-    changeType: 'positive' as const,
-    icon: TrendingUp,
-  },
-  {
-    title: 'Commandes',
-    value: '2,341',
-    change: '+23%',
-    changeType: 'positive' as const,
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Fournisseurs Connectés',
-    value: '12',
-    change: '+2',
-    changeType: 'positive' as const,
-    icon: Truck,
-  },
-]
+interface DashboardStats {
+  totalProducts: number
+  promoProducts: number
+  totalOrders: number
+  connectedSuppliers: number
+  totalUsers: number
+  activeUsers: number
+  totalRevenue: number
+  monthlyRevenue: number
+}
 
-const recentActivity = [
-  {
-    id: 1,
-    action: 'Nouveau produit ajouté',
-    description: 'iPhone 15 Pro importé depuis Temu',
-    time: 'Il y a 2 minutes',
-    type: 'product'
-  },
-  {
-    id: 2,
-    action: 'Commande reçue',
-    description: 'Commande #1234 - 3 produits',
-    time: 'Il y a 15 minutes',
-    type: 'order'
-  },
-  {
-    id: 3,
-    action: 'Fournisseur connecté',
-    description: 'AliExpress API configurée',
-    time: 'Il y a 1 heure',
-    type: 'supplier'
-  },
-  {
-    id: 4,
-    action: 'Catégorie mise à jour',
-    description: 'Mode → Vêtements Femme',
-    time: 'Il y a 2 heures',
-    type: 'category'
-  },
-]
+interface TopCategory {
+  name: string
+  productCount: number
+}
+
+interface RecentActivity {
+  recentOrders: any[]
+  recentProducts: any[]
+}
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [topCategories, setTopCategories] = useState<TopCategory[]>([])
+  const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showLogin, setShowLogin] = useState(false)
+  const { isAuthenticated, user } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDashboardData()
+    } else {
+      setShowLogin(true)
+    }
+  }, [isAuthenticated])
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Charger les statistiques
+      const statsResponse = await apiClient.getDashboardStats()
+      if (statsResponse.data) {
+        setStats(statsResponse.data)
+      }
+
+      // Charger les top catégories
+      const categoriesResponse = await apiClient.getTopCategories()
+      if (categoriesResponse.data) {
+        setTopCategories(categoriesResponse.data)
+      }
+
+      // Charger l'activité récente
+      const activityResponse = await apiClient.getDashboardActivity()
+      if (activityResponse.data) {
+        setRecentActivity(activityResponse.data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Connexion Requise</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-gray-600 mb-4">
+                Veuillez vous connecter pour accéder au dashboard
+              </p>
+              <Button onClick={() => setShowLogin(true)}>
+                Se connecter
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      </>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement du dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Données formatées pour l'affichage
+  const displayStats = [
+    {
+      title: 'Produits Totaux',
+      value: stats?.totalProducts?.toString() || '0',
+      change: '+12%',
+      changeType: 'positive' as const,
+      icon: Package,
+    },
+    {
+      title: 'Produits en Promotion',
+      value: stats?.promoProducts?.toString() || '0',
+      change: '+5%',
+      changeType: 'positive' as const,
+      icon: TrendingUp,
+    },
+    {
+      title: 'Commandes',
+      value: stats?.totalOrders?.toString() || '0',
+      change: '+23%',
+      changeType: 'positive' as const,
+      icon: ShoppingCart,
+    },
+    {
+      title: 'Fournisseurs Connectés',
+      value: stats?.connectedSuppliers?.toString() || '0',
+      change: '+2',
+      changeType: 'positive' as const,
+      icon: Truck,
+    },
+  ]
+
+  // Formatage de l'activité récente
+  const displayActivity = [
+    ...(recentActivity?.recentProducts?.slice(0, 2).map((product, index) => ({
+      id: `product-${index}`,
+      action: 'Nouveau produit ajouté',
+      description: `${product.name} - ${product.supplier?.name || 'Import'}`,
+      time: new Date(product.createdAt).toLocaleDateString(),
+      type: 'product'
+    })) || []),
+    ...(recentActivity?.recentOrders?.slice(0, 2).map((order, index) => ({
+      id: `order-${index}`,
+      action: 'Commande reçue',
+      description: `Commande #${order.id} - ${order.items?.length || 0} produits`,
+      time: new Date(order.createdAt).toLocaleDateString(),
+      type: 'order'
+    })) || [])
+  ]
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600 mt-2">Vue d'ensemble de votre plateforme KAMRI</p>
+        {user && (
+          <p className="text-sm text-gray-500">Connecté en tant que {user.name}</p>
+        )}
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
+        {displayStats.map((stat) => (
           <Card key={stat.title} className="kamri-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -130,7 +221,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity) => (
+              {displayActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
                   <div className={`w-2 h-2 rounded-full mt-2 ${
                     activity.type === 'product' ? 'bg-primary-500' :
