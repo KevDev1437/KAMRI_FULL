@@ -24,10 +24,32 @@ async function bootstrap() {
 
   // Swagger Documentation
   const config = new DocumentBuilder()
-    .setTitle('KAMRI API')
-    .setDescription('E-commerce API with Stripe integration')
-    .setVersion('1.0')
+    .setTitle('KAMRI API - Dropshipping Platform')
+    .setDescription(`
+      API complète pour la plateforme e-commerce KAMRI avec support dropshipping.
+      
+      ## Fonctionnalités principales :
+      - 🛍️ **Gestion produits** : CRUD complet avec badges et fournisseurs
+      - 🏪 **Fournisseurs** : Intégration Temu, AliExpress, Shein
+      - 🗂️ **Mapping catégories** : Synchronisation automatique
+      - 📊 **Dashboard** : Statistiques et analytics
+      - 👥 **Utilisateurs** : Authentification JWT avec rôles
+      - ⚙️ **Paramètres** : Configuration globale
+      - 💳 **Paiements** : Intégration Stripe
+      
+      ## Authentification :
+      Utilisez le token JWT dans l'en-tête Authorization : \`Bearer <token>\`
+    `)
+    .setVersion('2.0')
     .addBearerAuth()
+    .addTag('auth', 'Authentification et autorisation')
+    .addTag('products', 'Gestion des produits')
+    .addTag('suppliers', 'Gestion des fournisseurs')
+    .addTag('categories', 'Gestion des catégories')
+    .addTag('orders', 'Gestion des commandes')
+    .addTag('users', 'Gestion des utilisateurs')
+    .addTag('settings', 'Paramètres globaux')
+    .addTag('dashboard', 'Statistiques et analytics')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

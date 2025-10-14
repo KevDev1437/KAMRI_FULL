@@ -14,6 +14,8 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  role      String   @default("user") // user, admin
+  status    String   @default("active") // active, suspended, inactive
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -40,21 +42,28 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  image       String?
-  categoryId  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  originalPrice Float?
+  image         String?
+  categoryId    String
+  supplierId    String?
+  status        String   @default("active") // active, inactive
+  badge         String? // promo, tendances, nouveau, top-ventes
+  stock         Int      @default(0)
+  sales         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  category    Category    @relation(fields: [categoryId], references: [id])
-  images      Image[]
-  cartItems   CartItem[]
-  orderItems  OrderItem[]
-  reviews     Review[]
+  category      Category      @relation(fields: [categoryId], references: [id])
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  images        Image[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  reviews       Review[]
 
   @@map("products")
 }
@@ -151,6 +160,62 @@ model Review {
 
   @@unique([userId, productId])
   @@map("reviews")
+}
+
+// Nouveaux modèles pour le dropshipping
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  apiUrl      String
+  apiKey      String
+  status      String   @default("disconnected") // connected, disconnected, pending
+  lastSync    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products        Product[]
+  categoryMappings CategoryMapping[]
+
+  @@map("suppliers")
+}
+
+model CategoryMapping {
+  id               String   @id @default(cuid())
+  supplierId       String
+  externalCategory String
+  internalCategory String
+  status           String   @default("mapped") // mapped, pending, failed
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, externalCategory])
+  @@map("category_mappings")
+}
+
+model Settings {
+  id                String   @id @default(cuid())
+  theme             String   @default("light") // light, dark
+  currency          String   @default("EUR") // EUR, USD, GBP
+  language          String   @default("fr") // fr, en, es, de
+  accentColor       String   @default("#4CAF50")
+  companyName       String   @default("KAMRI")
+  companyEmail      String?
+  companyPhone      String?
+  companyAddress    String?
+  apiRateLimit      Int      @default(1000)
+  autoSync          Boolean  @default(true)
+  notifications     Boolean  @default(true)
+  emailNotifications Boolean @default(true)
+  smsNotifications  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("settings")
 }
 
 
