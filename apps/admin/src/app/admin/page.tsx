@@ -78,8 +78,8 @@ export default function DashboardPage() {
         setRecentActivity(activityResponse.data)
       }
 
-      // Charger les produits en attente
-      const pendingResponse = await apiClient.getPendingProducts()
+      // Charger les produits en attente de validation (catégorisés)
+      const pendingResponse = await apiClient.getProductsReadyForValidation()
       if (pendingResponse.data) {
         setPendingProducts(pendingResponse.data)
       }
