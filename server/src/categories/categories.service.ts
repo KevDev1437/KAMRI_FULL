@@ -10,14 +10,17 @@ export class CategoriesService {
       include: {
         products: {
           where: {
-            status: 'active'
+            status: {
+              in: ['active', 'pending'] // Inclure les produits en attente ET actifs
+            }
           },
           select: {
             id: true,
             name: true,
             price: true,
             image: true,
-            badge: true
+            badge: true,
+            status: true // Ajouter le statut pour distinguer
           }
         }
       }

@@ -1,27 +1,35 @@
 'use client';
 
+import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import Link from 'next/link';
-import { getBadgeConfig, calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
 
 interface Product {
   id: string;
   name: string;
   price: number;
-  originalPrice: number | null;
-  image: string;
-  images: string[];
-  category: string;
-  type: 'mode' | 'tech';
-  rating: number;
-  reviews: number;
-  badge: string | null;
-  brand: string;
-  description: string;
-  sizes: string[] | null;
-  colors: string[];
-  specifications: Record<string, string> | null;
-  inStock: boolean;
-  stockCount: number;
+  originalPrice?: number;
+  image?: string;
+  images?: string[];
+  category?: {
+    id: string;
+    name: string;
+  };
+  type?: 'mode' | 'tech';
+  rating?: number;
+  reviews?: number;
+  badge?: string;
+  brand?: string;
+  supplier?: {
+    name: string;
+  };
+  description?: string;
+  sizes?: string[] | null;
+  colors?: string[];
+  specifications?: Record<string, string> | null;
+  inStock?: boolean;
+  stockCount?: number;
+  stock: number;
+  status: string;
 }
 
 interface SimilarProductsProps {
@@ -45,7 +53,7 @@ export default function SimilarProducts({ products }: SimilarProductsProps) {
                 {/* Image */}
                 <div className="h-48 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
                   <img
-                    src={product.image}
+                    src={product.image || '/images/modelo.png'}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -67,39 +75,42 @@ export default function SimilarProducts({ products }: SimilarProductsProps) {
                   )}
                 </div>
               
-              {/* Product info */}
-              <div className="p-4">
-                <p className="text-sm text-[#81C784] font-medium mb-1">{product.brand}</p>
-                <h3 className="text-lg font-semibold text-[#424242] mb-2 line-clamp-2">{product.name}</h3>
-                
-                {/* Rating */}
-                <div className="flex items-center gap-1 mb-3">
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <svg
-                        key={i}
-                        className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <span className="text-xs text-[#81C784]">({product.reviews})</span>
-                </div>
-                
-                {/* Price */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}€</span>
-                  {product.originalPrice && (
-                    <span className="text-sm text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</span>
+                {/* Product info */}
+                <div className="p-4">
+                  <p className="text-sm text-[#81C784] font-medium mb-1">{product.brand || product.supplier?.name || 'KAMRI'}</p>
+                  <h3 className="text-lg font-semibold text-[#424242] mb-2 line-clamp-2">{product.name}</h3>
+                  
+                  {/* Rating */}
+                  {product.rating && product.reviews && (
+                    <div className="flex items-center gap-1 mb-3">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`h-4 w-4 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-xs text-[#81C784]">({product.reviews})</span>
+                    </div>
                   )}
+                  
+                  {/* Price */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}€</span>
+                    {product.originalPrice && (
+                      <span className="text-sm text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
