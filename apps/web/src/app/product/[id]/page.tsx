@@ -16,7 +16,7 @@ interface Product {
   price: number;
   originalPrice?: number;
   image?: string;
-  images?: string[];
+  images?: Array<{ url: string; alt?: string }>; // ✅ Structure correcte pour les images
   category?: {
     id: string;
     name: string;
@@ -134,7 +134,7 @@ export default function ProductDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Galerie d'images */}
           <ProductImageGallery 
-            images={product.images || [product.image || '/images/modelo.png']}
+            images={product.images?.map((img: any) => img.url) || [product.image || '/images/modelo.png']}
             mainImage={product.image || '/images/modelo.png'}
             productName={product.name}
           />

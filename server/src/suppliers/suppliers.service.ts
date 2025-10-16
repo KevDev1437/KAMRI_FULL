@@ -178,8 +178,25 @@ export class SuppliersService {
               supplier: true,
             },
           });
+          
+          // Sauvegarder toutes les images du produit
+          const allImages = this.extractAllImages(fakeProduct);
+          if (allImages.length > 0) {
+            console.log(`🖼️ Sauvegarde de ${allImages.length} images pour le produit`);
+            for (const imageUrl of allImages) {
+              await this.prisma.image.create({
+                data: {
+                  url: imageUrl,
+                  alt: fakeProduct.title,
+                  productId: product.id,
+                },
+              });
+            }
+          }
+          
           console.log(`✅ Produit créé: ${product.name} (statut: pending - en attente de catégorisation)`);
           console.log(`📊 ID produit: ${product.id}`);
+          console.log(`🖼️ Images sauvegardées: ${allImages.length}`);
           importedProducts.push(product);
         } catch (error) {
           console.error(`❌ Erreur lors de la création du produit ${fakeProduct.title}:`, error);
@@ -310,5 +327,38 @@ export class SuppliersService {
     
     // Aucune image trouvée
     return null;
+  }
+
+  /**
+   * Fonction pour extraire TOUTES les images d'un produit
+   * Utilisée pour créer la galerie d'images
+   */
+  private extractAllImages(product: any): string[] {
+    const images: string[] = [];
+    
+    // Priorité 1: images[] (DummyJSON, Shopify, WooCommerce, AliExpress, etc.)
+    if (product.images && Array.isArray(product.images)) {
+      images.push(...product.images.filter((img: any) => typeof img === 'string'));
+    }
+    
+    // Priorité 2: image (Fake Store, WooCommerce, etc.) - si pas déjà dans images[]
+    if (product.image && typeof product.image === 'string' && !images.includes(product.image)) {
+      images.push(product.image);
+    }
+    
+    // Priorité 3: thumbnail (DummyJSON, etc.) - si pas déjà dans images[]
+    if (product.thumbnail && typeof product.thumbnail === 'string' && !images.includes(product.thumbnail)) {
+      images.push(product.thumbnail);
+    }
+    
+    // Priorité 4: Autres champs possibles
+    const otherImageFields = ['photo', 'picture', 'img', 'photoUrl', 'imageUrl'];
+    for (const field of otherImageFields) {
+      if (product[field] && typeof product[field] === 'string' && !images.includes(product[field])) {
+        images.push(product[field]);
+      }
+    }
+    
+    return images;
   }
 }
