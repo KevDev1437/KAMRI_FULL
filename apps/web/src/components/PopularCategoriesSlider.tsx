@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 interface Category {
@@ -21,6 +22,7 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
 
   const scrollToIndex = (index: number) => {
     if (scrollRef.current) {
@@ -72,6 +74,18 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
 
   const handleMouseLeave = () => {
     setIsAutoScrolling(true);
+  };
+
+  // Fonctions de navigation
+  const handleCategoryClick = (category: Category) => {
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/categories/${slug}`);
+  };
+
+  const handleExploreClick = (e: React.MouseEvent, category: Category) => {
+    e.stopPropagation(); // Empêcher le clic sur la carte parent
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/categories/${slug}/products`);
   };
 
   return (
@@ -137,7 +151,10 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="flex-shrink-0 w-80"
             >
-              <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group cursor-pointer">
+              <div 
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group cursor-pointer"
+                onClick={() => handleCategoryClick(category)}
+              >
                 {/* Image de la catégorie */}
                 <div className="relative h-40 overflow-hidden">
                   <div 
@@ -169,6 +186,7 @@ export default function PopularCategoriesSlider({ categories }: PopularCategorie
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      onClick={(e) => handleExploreClick(e, category)}
                       className="bg-[#4CAF50] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#45a049] transition-colors duration-300"
                     >
                       Explorer
