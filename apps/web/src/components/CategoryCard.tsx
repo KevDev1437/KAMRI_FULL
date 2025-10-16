@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 interface Category {
@@ -18,6 +19,18 @@ interface CategoryCardProps {
 
 export default function CategoryCard({ category }: CategoryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
+
+  const handleCategoryClick = () => {
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/categories/${slug}`);
+  };
+
+  const handleViewAllClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/categories/${slug}/products`);
+  };
 
   return (
     <motion.div
@@ -25,6 +38,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
       whileTap={{ scale: 0.98 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
+      onClick={handleCategoryClick}
       className="group cursor-pointer"
     >
       <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
@@ -69,6 +83,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={handleViewAllClick}
               className="bg-[#4CAF50] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#45a049] transition-colors duration-300"
             >
               Voir tout

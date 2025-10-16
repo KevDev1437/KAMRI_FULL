@@ -1,75 +1,111 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import CategoryCard from '../../components/CategoryCard';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
 import PopularCategoriesSlider from '../../components/PopularCategoriesSlider';
 import TrendingSection from '../../components/TrendingSection';
+import { apiClient } from '../../lib/api';
 
-// Données mock pour les 7 catégories fixes
-const categories = [
-  {
-    id: 1,
-    name: 'Mode',
-    image: '/api/placeholder/300/200',
-    count: 156,
-    color: '#FF6B6B',
-    icon: '👕'
-  },
-  {
-    id: 2,
-    name: 'Technologie',
-    image: '/api/placeholder/300/200',
-    count: 89,
-    color: '#4ECDC4',
-    icon: '💻'
-  },
-  {
-    id: 3,
-    name: 'Maison',
-    image: '/api/placeholder/300/200',
-    count: 234,
-    color: '#45B7D1',
-    icon: '🏠'
-  },
-  {
-    id: 4,
-    name: 'Beauté',
-    image: '/api/placeholder/300/200',
-    count: 123,
-    color: '#FECA57',
-    icon: '💄'
-  },
-  {
-    id: 5,
-    name: 'Accessoires',
-    image: '/api/placeholder/300/200',
-    count: 67,
-    color: '#96CEB4',
-    icon: '🎒'
-  },
-  {
-    id: 6,
-    name: 'Sport',
-    image: '/api/placeholder/300/200',
-    count: 45,
-    color: '#A8E6CF',
-    icon: '⚽'
-  },
-  {
-    id: 7,
-    name: 'Enfants',
-    image: '/api/placeholder/300/200',
-    count: 78,
-    color: '#FFB6C1',
-    icon: '🧸'
-  }
-];
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  category: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+// Mapping des icônes et couleurs pour les catégories
+const getCategoryConfig = (categoryName: string) => {
+  const configs: { [key: string]: { icon: string; color: string } } = {
+    'Mode': { icon: '👕', color: '#FF6B6B' },
+    'Technologie': { icon: '💻', color: '#4ECDC4' },
+    'Maison': { icon: '🏠', color: '#45B7D1' },
+    'Beauté': { icon: '💄', color: '#FECA57' },
+    'Accessoires': { icon: '🎒', color: '#96CEB4' },
+    'Sport': { icon: '⚽', color: '#A8E6CF' },
+    'Enfants': { icon: '🧸', color: '#FFB6C1' },
+  };
+  return configs[categoryName] || { icon: '🛍️', color: '#4CAF50' };
+};
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoading(true);
+        
+        // Charger les catégories depuis l'API
+        const categoriesResponse = await apiClient.getCategories();
+        if (categoriesResponse.data) {
+          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
+          const categoriesList = Array.isArray(categoriesData) ? categoriesData : [];
+          
+          // Charger les produits pour compter par catégorie
+          const productsResponse = await apiClient.getProducts();
+          if (productsResponse.data) {
+            const products = productsResponse.data;
+            
+            // Enrichir les catégories avec le nombre de produits et la configuration
+            const enrichedCategories = categoriesList.map(category => {
+              const productCount = products.filter((product: Product) => 
+                product.category?.id === category.id
+              ).length;
+              
+              const config = getCategoryConfig(category.name);
+              
+              return {
+                id: category.id,
+                name: category.name,
+                image: '/api/placeholder/300/200',
+                count: productCount, // Afficher 0 si pas de produits
+                color: config.color,
+                icon: config.icon
+              };
+            });
+            
+            setCategories(enrichedCategories);
+          } else {
+            // Si pas de produits, afficher quand même les catégories avec 0 produits
+            const enrichedCategories = categoriesList.map(category => {
+              const config = getCategoryConfig(category.name);
+              
+              return {
+                id: category.id,
+                name: category.name,
+                image: '/api/placeholder/300/200',
+                count: 0,
+                color: config.color,
+                icon: config.icon
+              };
+            });
+            
+            setCategories(enrichedCategories);
+          }
+        } else {
+          // Si pas de catégories, afficher un message
+          setCategories([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const filteredCategories = categories.filter(category =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -171,18 +207,40 @@ export default function CategoriesPage() {
             Toutes les catégories
           </h2>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCategories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <CategoryCard category={category} />
-              </motion.div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">⏳</div>
+              <h3 className="text-xl font-semibold text-[#424242] mb-2">
+                Chargement des catégories...
+              </h3>
+              <p className="text-[#81C784]">
+                Veuillez patienter
+              </p>
+            </div>
+          ) : filteredCategories.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredCategories.map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <CategoryCard category={category} />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">📂</div>
+              <h3 className="text-xl font-semibold text-[#424242] mb-2">
+                Aucune catégorie trouvée
+              </h3>
+              <p className="text-[#81C784]">
+                Les catégories seront disponibles bientôt
+              </p>
+            </div>
+          )}
         </motion.section>
 
         {/* Catégories populaires - Slider */}
