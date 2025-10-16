@@ -188,7 +188,7 @@ export class ApiClient {
 
   async updateSupplier(id: string, supplierData: any) {
     return this.fetchWithAuth(`/suppliers/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(supplierData),
     });
   }
