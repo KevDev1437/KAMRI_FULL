@@ -1,5 +1,7 @@
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import Link from 'next/link';
+import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 
 interface Product {
   id: string;
@@ -19,6 +21,9 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { addToCart } = useCart();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  
   // Utilisation des couleurs d'étiquettes cohérentes
   const badgeConfig = getBadgeConfig(product.badge as any);
   
@@ -26,6 +31,30 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountPercentage = product.originalPrice 
     ? calculateDiscountPercentage(product.originalPrice, product.price)
     : 0;
+    
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await addToCart(product.id, 1);
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout au panier:', error);
+    }
+  };
+  
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      if (isInWishlist(product.id)) {
+        await removeFromWishlist(product.id);
+      } else {
+        await addToWishlist(product.id);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la gestion des favoris:', error);
+    }
+  };
 
   return (
     <Link href={`/product/${product.id}`}>
@@ -67,8 +96,15 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {/* Favorite button */}
-        <button className="absolute top-4 right-4 p-2 bg-white/90 rounded-full shadow-md hover:bg-white hover:shadow-lg transition-all duration-200">
-          <svg className="h-5 w-5 text-[#81C784] hover:text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button 
+          onClick={handleToggleWishlist}
+          className={`absolute top-4 right-4 p-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 ${
+            isInWishlist(product.id) 
+              ? 'bg-[#FF7043] text-white hover:bg-[#E64A19]' 
+              : 'bg-white/90 text-[#81C784] hover:bg-white hover:text-[#4CAF50]'
+          }`}
+        >
+          <svg className="h-5 w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
@@ -107,7 +143,10 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
         
-        <button className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
+        <button 
+          onClick={handleAddToCart}
+          className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2"
+        >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>

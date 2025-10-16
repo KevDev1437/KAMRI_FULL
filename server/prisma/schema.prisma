@@ -24,6 +24,7 @@ model User {
   orders    Order[]
   addresses Address[]
   reviews   Review[]
+  wishlist  Wishlist[]
 
   @@map("users")
 }
@@ -67,6 +68,7 @@ model Product {
   cartItems     CartItem[]
   orderItems    OrderItem[]
   reviews       Review[]
+  wishlist      Wishlist[]
 
   @@map("products")
 }
@@ -213,6 +215,20 @@ model UnmappedExternalCategory {
 
   @@unique([supplierId, externalCategory])
   @@map("unmapped_external_categories")
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlist")
 }
 
 model Settings {

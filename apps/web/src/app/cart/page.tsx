@@ -5,81 +5,52 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
+import { useCart } from '../../contexts/CartContext';
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      quantity: 1,
-      size: '256GB',
-      color: 'Titanium Naturel',
-      inStock: true,
-      savings: 100
-    },
-    {
-      id: '2',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      quantity: 2,
-      size: 'Standard',
-      color: 'Blanc',
-      inStock: true,
-      savings: 60
-    },
-    {
-      id: '3',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      quantity: 1,
-      size: '13"',
-      color: 'Gris sidéral',
-      inStock: false,
-      savings: 0
-    }
-  ]);
+  const { cartItems, cartCount, loading, removeFromCart, updateQuantity, clearCart } = useCart();
 
   const [promoCode, setPromoCode] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
-  const [selectedItems, setSelectedItems] = useState(new Set(['1', '2', '3']));
+  const [selectedItems, setSelectedItems] = useState(new Set());
 
   // Calculs
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const totalSavings = cartItems.reduce((sum, item) => sum + (item.savings * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const totalSavings = cartItems.reduce((sum, item) => {
+    const originalPrice = item.product.originalPrice || item.product.price;
+    return sum + ((originalPrice - item.product.price) * item.quantity);
+  }, 0);
   const shipping = subtotal > 100 ? 0 : 9.99;
   const promoDiscount = promoCode === 'WELCOME10' ? subtotal * 0.1 : 0;
   const total = subtotal + shipping - promoDiscount;
   
   // Calcul du pourcentage moyen de réduction
-  const itemsWithDiscount = cartItems.filter(item => item.originalPrice > item.price);
+  const itemsWithDiscount = cartItems.filter(item => item.product.originalPrice && item.product.originalPrice > item.product.price);
   const averageDiscountPercentage = itemsWithDiscount.length > 0 
-    ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
+    ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.product.originalPrice!, item.product.price), 0) / itemsWithDiscount.length
     : 0;
 
-  const updateQuantity = (id: string, newQuantity: number) => {
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
-    setCartItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
+    try {
+      await updateQuantity(itemId, newQuantity);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la quantité:', error);
+    }
   };
 
-  const removeItem = (id: string) => {
+  const handleRemoveItem = async (itemId: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet article de votre panier ?')) {
-      setCartItems(items => items.filter(item => item.id !== id));
-      setSelectedItems(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
+      try {
+        await removeFromCart(itemId);
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(itemId);
+          return newSet;
+        });
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+      }
     }
   };
 
@@ -220,8 +191,8 @@ export default function CartPage() {
 
                     {/* Image du produit */}
                     <img 
-                      src={item.image} 
-                      alt={item.name}
+                      src={item.product.image || '/images/placeholder-product.png'} 
+                      alt={item.product.name}
                       className="w-24 h-24 object-cover rounded-lg"
                     />
                     
@@ -229,11 +200,13 @@ export default function CartPage() {
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <h3 className="text-lg font-semibold text-[#424242] mb-1">{item.name}</h3>
-                          <p className="text-sm text-gray-500">{item.size} • {item.color}</p>
+                          <h3 className="text-lg font-semibold text-[#424242] mb-1">{item.product.name}</h3>
+                          <p className="text-sm text-gray-500">
+                            {item.product.category?.name || 'Non catégorisé'} • {item.product.supplier?.name || 'N/A'}
+                          </p>
                         </div>
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => handleRemoveItem(item.id)}
                           className="text-red-500 hover:text-red-600 transition-colors duration-300 p-2"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,21 +218,21 @@ export default function CartPage() {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#4CAF50]">{item.price}€</span>
-                            {item.originalPrice > item.price && (
-                              <span className="text-sm text-gray-500 line-through">{item.originalPrice}€</span>
+                            <span className="text-xl font-bold text-[#4CAF50]">{item.product.price}€</span>
+                            {item.product.originalPrice && item.product.originalPrice > item.product.price && (
+                              <span className="text-sm text-gray-500 line-through">{item.product.originalPrice}€</span>
                             )}
                           </div>
-                          {item.originalPrice > item.price && (
+                          {item.product.originalPrice && item.product.originalPrice > item.product.price && (
                             <span className="bg-[#E8F5E8] text-[#4CAF50] px-2 py-1 rounded-full text-sm font-medium">
-                              {formatDiscountPercentage(calculateDiscountPercentage(item.originalPrice, item.price))}
+                              {formatDiscountPercentage(calculateDiscountPercentage(item.product.originalPrice, item.product.price))}
                             </span>
                           )}
                         </div>
                         
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                             className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors duration-300"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,7 +241,7 @@ export default function CartPage() {
                           </button>
                           <span className="w-8 text-center font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                             className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors duration-300"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -189,23 +189,54 @@ export class ApiClient {
     });
   }
 
-  // Panier (pour plus tard)
-  async getCart(): Promise<ApiResponse<CartItem[]>> {
-    return this.fetchWithAuth('/cart');
+  // Cart methods
+  async getCart(userId: string): Promise<ApiResponse<any[]>> {
+    return this.fetchWithAuth(`/cart/${userId}`);
   }
 
-  async addToCart(productId: string, quantity: number = 1): Promise<ApiResponse> {
+  async addToCart(userId: string, productId: string, quantity: number = 1): Promise<ApiResponse<any>> {
     return this.fetchWithAuth('/cart', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
+      body: JSON.stringify({ userId, productId, quantity }),
     });
   }
 
-  async removeFromCart(productId: string): Promise<ApiResponse> {
-    return this.fetchWithAuth(`/cart/${productId}`, {
+  async removeFromCart(userId: string, itemId: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/cart/${userId}/${itemId}`, {
       method: 'DELETE',
     });
   }
+
+  async clearCart(userId: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/cart/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Wishlist methods
+  async getWishlist(userId: string): Promise<ApiResponse<any[]>> {
+    return this.fetchWithAuth(`/wishlist/${userId}`);
+  }
+
+  async addToWishlist(userId: string, productId: string): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/wishlist', {
+      method: 'POST',
+      body: JSON.stringify({ userId, productId }),
+    });
+  }
+
+  async removeFromWishlist(userId: string, productId: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/wishlist/${userId}/${productId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearWishlist(userId: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/wishlist/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
 
   // Commandes
   async getOrders(): Promise<ApiResponse<any[]>> {
