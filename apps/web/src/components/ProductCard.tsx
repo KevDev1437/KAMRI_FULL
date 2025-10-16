@@ -43,72 +43,78 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
   
   const handleToggleWishlist = async (e: React.MouseEvent) => {
+    console.log('🔥 CŒUR CLIQUÉ !', { productId: product.id, productName: product.name });
     e.preventDefault();
     e.stopPropagation();
+    
     try {
       if (isInWishlist(product.id)) {
+        console.log('📤 Suppression des favoris...', product.id);
         await removeFromWishlist(product.id);
+        console.log('✅ Supprimé des favoris');
       } else {
+        console.log('📥 Ajout aux favoris...', product.id);
         await addToWishlist(product.id);
+        console.log('✅ Ajouté aux favoris');
       }
     } catch (error) {
-      console.error('Erreur lors de la gestion des favoris:', error);
+      console.error('❌ Erreur lors de la gestion des favoris:', error);
     }
   };
 
   return (
-    <Link href={`/product/${product.id}`}>
-      <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group cursor-pointer">
-      {/* Image du produit */}
-      <div className="h-56 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative overflow-hidden">
-        {product.image ? (
-          <img 
-            src={product.image} 
-            alt={product.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback si l'image ne charge pas
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling.style.display = 'flex';
-            }}
-          />
-        ) : null}
-        <div className={`${product.image ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
-          <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        </div>
-        
-        {/* Badge */}
-        {product.badge && (
-          <div 
-            className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold"
-            style={{ 
-              backgroundColor: badgeConfig.backgroundColor, 
-              color: badgeConfig.color 
-            }}
-          >
-            {product.badge === 'promo' && discountPercentage > 0 
-              ? formatDiscountPercentage(discountPercentage)
-              : `${badgeConfig.icon} ${badgeConfig.text}`
-            }
-          </div>
-        )}
+    <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group cursor-pointer relative">
+      {/* Favorite button - EN DEHORS du Link */}
+      <button 
+        onClick={handleToggleWishlist}
+        className={`absolute top-4 right-4 p-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 z-10 ${
+          isInWishlist(product.id) 
+            ? 'bg-[#FF7043] text-white hover:bg-[#E64A19]' 
+            : 'bg-white/90 text-[#81C784] hover:bg-white hover:text-[#4CAF50]'
+        }`}
+      >
+        <svg className="h-5 w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      </button>
 
-        {/* Favorite button */}
-        <button 
-          onClick={handleToggleWishlist}
-          className={`absolute top-4 right-4 p-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 ${
-            isInWishlist(product.id) 
-              ? 'bg-[#FF7043] text-white hover:bg-[#E64A19]' 
-              : 'bg-white/90 text-[#81C784] hover:bg-white hover:text-[#4CAF50]'
-          }`}
-        >
-          <svg className="h-5 w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-      </div>
+      <Link href={`/product/${product.id}`}>
+        {/* Image du produit */}
+        <div className="h-56 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative overflow-hidden">
+          {product.image ? (
+            <img 
+              src={product.image} 
+              alt={product.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback si l'image ne charge pas
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling.style.display = 'flex';
+              }}
+            />
+          ) : null}
+          <div className={`${product.image ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
+            <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          
+          {/* Badge */}
+          {product.badge && (
+            <div 
+              className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold"
+              style={{ 
+                backgroundColor: badgeConfig.backgroundColor, 
+                color: badgeConfig.color 
+              }}
+            >
+              {product.badge === 'promo' && discountPercentage > 0 
+                ? formatDiscountPercentage(discountPercentage)
+                : `${badgeConfig.icon} ${badgeConfig.text}`
+              }
+            </div>
+          )}
+        </div>
       
       {/* Product info */}
       <div className="p-6">
@@ -153,7 +159,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           Ajouter au panier
         </button>
       </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

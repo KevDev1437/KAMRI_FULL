@@ -50,24 +50,31 @@ interface WishlistProviderProps {
 }
 
 export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, userId }) => {
+  console.log('🚀 [WishlistProvider] Initialisation avec userId:', userId);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const wishlistCount = wishlistItems.length;
+  console.log('📈 [WishlistContext] wishlistCount mis à jour:', wishlistCount, 'items:', wishlistItems.length);
 
   const refreshWishlist = async () => {
     if (!userId) return;
     
     try {
       setLoading(true);
+      console.log('🔄 [refreshWishlist] Appel API getWishlist...');
       const response = await apiClient.getWishlist(userId);
+      console.log('📡 [refreshWishlist] Réponse API:', response);
       if (response.data) {
-        setWishlistItems(Array.isArray(response.data) ? response.data : []);
+        const items = Array.isArray(response.data) ? response.data : [];
+        console.log('📦 [refreshWishlist] Items récupérés:', items.length, items);
+        setWishlistItems(items);
       } else {
+        console.log('❌ [refreshWishlist] Pas de données dans la réponse');
         setWishlistItems([]);
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des favoris:', error);
+      console.error('❌ [refreshWishlist] Erreur lors du chargement des favoris:', error);
       setWishlistItems([]);
     } finally {
       setLoading(false);
@@ -75,13 +82,22 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
   };
 
   const addToWishlist = async (productId: string) => {
-    if (!userId) return;
+    console.log('🎯 [WishlistContext] addToWishlist appelé', { userId, productId });
+    if (!userId) {
+      console.log('❌ [WishlistContext] Pas d\'userId');
+      return;
+    }
     
     try {
+      console.log('📡 [WishlistContext] Appel API...');
       await apiClient.addToWishlist(userId, productId);
+      console.log('⏳ [WishlistContext] Attente 500ms avant refresh...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🔄 [WishlistContext] Refresh wishlist...');
       await refreshWishlist();
+      console.log('✅ [WishlistContext] Ajout réussi');
     } catch (error) {
-      console.error('Erreur lors de l\'ajout aux favoris:', error);
+      console.error('❌ [WishlistContext] Erreur lors de l\'ajout aux favoris:', error);
       throw error;
     }
   };
@@ -116,7 +132,11 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
 
   useEffect(() => {
     if (userId) {
+      console.log('🚀 [WishlistProvider] Initialisation avec userId:', userId);
       refreshWishlist();
+    } else {
+      console.log('ℹ️ [WishlistProvider] Aucun userId, wishlist vide');
+      setWishlistItems([]);
     }
   }, [userId]);
 

@@ -10,24 +10,31 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string) {
+  async validateUser(email: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (user && user.status === 'active') {
-      // Pour la simulation, on accepte n'importe quel mot de passe
-      // En production, il faudrait vérifier le hash du mot de passe
       return user;
     }
 
     return null;
   }
 
-  async login(email: string, password: string) {
-    const user = await this.validateUser(email, password);
+  async login(email: string) {
+    console.log('🔑 [AuthService] Tentative de connexion pour:', email);
+    
+    // Vérifier si l'utilisateur existe
+    let user = await this.validateUser(email);
+    
+    // Si l'utilisateur n'existe pas, le créer automatiquement
     if (!user) {
-      throw new UnauthorizedException('Identifiants invalides');
+      console.log('👤 [AuthService] Utilisateur non trouvé, création automatique...');
+      user = await this.createUser(email, email.split('@')[0], 'auto-generated');
+      console.log('✅ [AuthService] Utilisateur créé:', user.id);
+    } else {
+      console.log('✅ [AuthService] Utilisateur trouvé:', user.id);
     }
 
     const payload = { 
@@ -36,8 +43,11 @@ export class AuthService {
       role: user.role 
     };
 
+    const token = this.jwtService.sign(payload);
+    console.log('🎫 [AuthService] Token JWT généré');
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: token,
       user: {
         id: user.id,
         email: user.email,
@@ -47,7 +57,7 @@ export class AuthService {
     };
   }
 
-  async register(email: string, name: string, password: string, role: string = 'user') {
+  async register(email: string, name: string, password: string = 'auto-generated', role: string = 'user') {
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -62,6 +72,7 @@ export class AuthService {
       data: {
         email,
         name,
+        password: hashedPassword,
         role,
         status: 'active',
       },
@@ -84,15 +95,60 @@ export class AuthService {
     };
   }
 
-  async createUser(email: string, name: string) {
+  async createUser(email: string, name: string, password: string) {
+    const hashedPassword = await bcrypt.hash(password, 10);
     return this.prisma.user.create({
       data: {
         email,
         name,
+        password: hashedPassword,
         role: 'user',
         status: 'active',
       },
     });
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur non trouvé');
+    }
+
+    return user;
+  }
+
+  async updateProfile(userId: string, data: { name?: string; email?: string }) {
+    console.log('👤 [AuthService] Mise à jour du profil pour:', userId, data);
+    
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.email && { email: data.email }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    console.log('✅ [AuthService] Profil mis à jour:', user.id);
+    return user;
   }
 }
 

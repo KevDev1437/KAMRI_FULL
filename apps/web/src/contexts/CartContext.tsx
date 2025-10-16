@@ -132,7 +132,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children, userId }) 
 
   useEffect(() => {
     if (userId) {
+      console.log('🚀 [CartProvider] Initialisation avec userId:', userId);
       refreshCart();
+    } else {
+      console.log('ℹ️ [CartProvider] Aucun userId, panier vide');
+      setCartItems([]);
     }
   }, [userId]);
 

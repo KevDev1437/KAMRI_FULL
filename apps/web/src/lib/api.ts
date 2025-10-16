@@ -133,6 +133,8 @@ export class ApiClient {
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
+    console.log('🔑 [API] fetchWithAuth appelé', { endpoint, hasToken: !!this.token });
+    
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
@@ -144,13 +146,16 @@ export class ApiClient {
       });
 
       const data = await response.json();
+      console.log('📡 [API] Réponse reçue', { status: response.status, data });
 
       if (response.ok) {
         return { data };
       } else {
+        console.log('❌ [API] Erreur API', { status: response.status, error: data.message });
         return { error: data.message || 'Erreur API' };
       }
     } catch (error) {
+      console.log('❌ [API] Erreur réseau', error);
       return { error: 'Erreur réseau' };
     }
   }

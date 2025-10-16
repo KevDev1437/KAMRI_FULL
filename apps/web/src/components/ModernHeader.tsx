@@ -18,6 +18,9 @@ export default function ModernHeader() {
   const { wishlistCount } = useWishlist();
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Log pour debug
+  console.log('📊 [Header] wishlistCount:', wishlistCount, 'cartCount:', cartCount);
+
   // Fermer le menu quand on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

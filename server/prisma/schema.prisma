@@ -14,6 +14,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  password  String   // Mot de passe hashé
   role      String   @default("user") // user, admin
   status    String   @default("active") // active, suspended, inactive
   createdAt DateTime @default(now())
