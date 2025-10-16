@@ -141,6 +141,13 @@ export class SuppliersService {
           console.log(`🏷️ Catégorie externe: "${fakeProduct.category}"`);
           console.log(`💰 Prix: ${fakeProduct.price}`);
           
+          // Debug des images
+          const extractedImage = this.extractImageUrl(fakeProduct);
+          console.log(`🖼️ Image extraite: ${extractedImage || 'Aucune image trouvée'}`);
+          if (fakeProduct.images) console.log(`📸 Images disponibles: ${fakeProduct.images.length}`);
+          if (fakeProduct.image) console.log(`🖼️ Image directe: ${fakeProduct.image}`);
+          if (fakeProduct.thumbnail) console.log(`🔍 Thumbnail: ${fakeProduct.thumbnail}`);
+          
           // Mapper les catégories externes vers nos catégories
           const categoryId = await this.mapExternalCategory(fakeProduct.category, supplier.id);
           console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
@@ -151,7 +158,7 @@ export class SuppliersService {
             description: fakeProduct.description,
             price: fakeProduct.price,
             originalPrice: fakeProduct.price * 1.2, // Prix original fictif
-            image: fakeProduct.image,
+            image: this.extractImageUrl(fakeProduct), // ✅ Fonction générique pour tous les fournisseurs
             supplierId: supplier.id,
             externalCategory: fakeProduct.category, // Sauvegarder la catégorie externe
             status: 'pending', // TOUS les produits en attente de catégorisation
@@ -272,5 +279,36 @@ export class SuppliersService {
   private generateBadge(): string | null {
     const badges = ['promo', 'nouveau', 'tendances', 'top-ventes', null];
     return badges[Math.floor(Math.random() * badges.length)];
+  }
+
+  /**
+   * Fonction générique pour extraire l'URL d'image de n'importe quel fournisseur
+   * Compatible avec DummyJSON, Fake Store, WooCommerce, Shopify, AliExpress, etc.
+   */
+  private extractImageUrl(product: any): string | null {
+    // Priorité 1: images[0] (DummyJSON, Shopify, WooCommerce, AliExpress, etc.)
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+      return product.images[0];
+    }
+    
+    // Priorité 2: image (Fake Store, WooCommerce, etc.)
+    if (product.image && typeof product.image === 'string') {
+      return product.image;
+    }
+    
+    // Priorité 3: thumbnail (DummyJSON, etc.)
+    if (product.thumbnail && typeof product.thumbnail === 'string') {
+      return product.thumbnail;
+    }
+    
+    // Priorité 4: Autres champs possibles selon les fournisseurs
+    if (product.photo && typeof product.photo === 'string') return product.photo;
+    if (product.picture && typeof product.picture === 'string') return product.picture;
+    if (product.img && typeof product.img === 'string') return product.img;
+    if (product.photoUrl && typeof product.photoUrl === 'string') return product.photoUrl;
+    if (product.imageUrl && typeof product.imageUrl === 'string') return product.imageUrl;
+    
+    // Aucune image trouvée
+    return null;
   }
 }

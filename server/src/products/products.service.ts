@@ -24,6 +24,7 @@ export class ProductsService {
       },
       include: {
         category: true,
+        supplier: true, // ✅ Ajouter la relation supplier
         images: true,
       },
       orderBy: {
@@ -36,6 +37,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       include: {
         category: true,
+        supplier: true, // ✅ Ajouter la relation supplier
         images: true,
       },
       orderBy: {
@@ -49,6 +51,7 @@ export class ProductsService {
       where: { id },
       include: {
         category: true,
+        supplier: true, // ✅ Ajouter la relation supplier
         images: true,
         reviews: {
           include: {
