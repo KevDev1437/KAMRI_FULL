@@ -47,10 +47,19 @@ export default function CategoryPage() {
           const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
           const categories = Array.isArray(categoriesData) ? categoriesData : [];
           
+          // Debug: Afficher les catégories et le slug
+          console.log('🔍 Slug recherché:', slug);
+          console.log('📂 Catégories disponibles:', categories.map(cat => ({
+            name: cat.name,
+            slug: cat.name.toLowerCase().replace(/\s+/g, '-')
+          })));
+          
           // Trouver la catégorie par slug (nom en minuscules)
           const foundCategory = categories.find(cat => 
             cat.name.toLowerCase().replace(/\s+/g, '-') === slug
           );
+          
+          console.log('✅ Catégorie trouvée:', foundCategory);
           
           if (foundCategory) {
             setCategory(foundCategory);
@@ -121,9 +130,9 @@ export default function CategoryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <nav className="flex items-center space-x-2 text-sm">
             <Link href="/" className="text-[#4CAF50] hover:text-[#45a049]">Accueil</Link>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-400">→</span>
             <Link href="/categories" className="text-[#4CAF50] hover:text-[#45a049]">Catégories</Link>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-400">→</span>
             <span className="text-gray-600">{category.name}</span>
           </nav>
         </div>
@@ -132,12 +141,12 @@ export default function CategoryPage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-[#EAF3EE] to-[#FFFFFF] py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center"
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
             <h1 className="text-4xl md:text-5xl font-bold text-[#1A3C2E] mb-4">
               {category.name}
             </h1>
@@ -209,7 +218,7 @@ export default function CategoryPage() {
                       {product.name}
                     </h3>
                     <p className="text-sm text-gray-500 mb-3">
-                      {product.supplier.name}
+                      {product.supplier?.name || 'Fournisseur inconnu'}
                     </p>
                     
                     <div className="flex items-center justify-between">
@@ -238,11 +247,11 @@ export default function CategoryPage() {
       {/* CTA Section */}
       <section className="bg-[#4CAF50] py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
             <h2 className="text-3xl font-bold text-white mb-4">
               Prêt à explorer {category.name} ?
             </h2>

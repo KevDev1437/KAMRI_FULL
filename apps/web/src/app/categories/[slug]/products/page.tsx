@@ -59,10 +59,19 @@ export default function CategoryProductsPage() {
           const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
           const categories = Array.isArray(categoriesData) ? categoriesData : [];
           
+          // Debug: Afficher les catégories et le slug
+          console.log('🔍 [PRODUCTS] Slug recherché:', slug);
+          console.log('📂 [PRODUCTS] Catégories disponibles:', categories.map(cat => ({
+            name: cat.name,
+            slug: cat.name.toLowerCase().replace(/\s+/g, '-')
+          })));
+          
           // Trouver la catégorie par slug
           const foundCategory = categories.find(cat => 
             cat.name.toLowerCase().replace(/\s+/g, '-') === slug
           );
+          
+          console.log('✅ [PRODUCTS] Catégorie trouvée:', foundCategory);
           
           if (foundCategory) {
             setCategory(foundCategory);
@@ -96,7 +105,7 @@ export default function CategoryProductsPage() {
     if (searchQuery) {
       filtered = filtered.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.supplier?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 

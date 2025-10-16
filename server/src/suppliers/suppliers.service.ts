@@ -9,7 +9,10 @@ export class SuppliersService {
 
   async create(createSupplierDto: CreateSupplierDto) {
     return this.prisma.supplier.create({
-      data: createSupplierDto,
+      data: {
+        ...createSupplierDto,
+        apiKey: createSupplierDto.apiKey || '', // Valeur par défaut si pas fournie
+      },
     });
   }
 

@@ -80,7 +80,11 @@ export default function SuppliersPage() {
         }
       } else {
         // Mode ajout
-        const response = await apiClient.createSupplier(newSupplier)
+        const supplierData = {
+          ...newSupplier,
+          apiKey: newSupplier.apiKey || '', // S'assurer que apiKey n'est pas undefined
+        }
+        const response = await apiClient.createSupplier(supplierData)
         if (response.data) {
           setSuppliers([...suppliers, response.data])
           setShowAddModal(false)
@@ -136,14 +140,22 @@ export default function SuppliersPage() {
   const handleImportProducts = async (supplierId: string) => {
     setImportingProducts(supplierId)
     try {
+      console.log('🔄 Début de l\'import pour le fournisseur:', supplierId)
       const response = await apiClient.importProducts(supplierId)
+      console.log('📦 Réponse de l\'import:', response)
+      
       if (response.data) {
         alert(`✅ ${response.data.message}\n\n${response.data.products.length} produits importés et en attente de catégorisation.\n\nRegardez la console du backend pour voir les logs détaillés.`)
-        // Pas de redirection - rester sur la page pour voir les logs
+        // Recharger la liste des fournisseurs
+        loadSuppliers()
+      } else if (response.error) {
+        alert(`❌ Erreur: ${response.error}`)
+      } else {
+        alert('❌ Réponse inattendue du serveur')
       }
     } catch (error) {
       console.error('Erreur lors de l\'import:', error)
-      alert('❌ Erreur lors de l\'import des produits')
+      alert(`❌ Erreur lors de l'import des produits: ${error}`)
     } finally {
       setImportingProducts(null)
     }
@@ -259,18 +271,16 @@ export default function SuppliersPage() {
                   <TestTube className="w-3 h-3 mr-1" />
                   {testingConnection === supplier.id ? 'Test...' : 'Tester'}
                 </Button>
-                {supplier.status === 'connected' && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleImportProducts(supplier.id)}
-                    disabled={importingProducts === supplier.id}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    <Download className="w-3 h-3 mr-1" />
-                    {importingProducts === supplier.id ? 'Import...' : 'Importer'}
-                  </Button>
-                )}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => handleImportProducts(supplier.id)}
+                  disabled={importingProducts === supplier.id}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  {importingProducts === supplier.id ? 'Import...' : 'Importer'}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

@@ -1,3 +1,4 @@
+import AuthGuard from '@/components/AuthGuard'
 import { AuthProvider } from '@/contexts/AuthContext'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="fr">
       <body className={inter.className}>
         <AuthProvider>
-          <div className="min-h-screen bg-gray-50">
-            {children}
-          </div>
+          <AuthGuard>
+            <div className="min-h-screen bg-gray-50">
+              {children}
+            </div>
+          </AuthGuard>
         </AuthProvider>
       </body>
     </html>

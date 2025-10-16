@@ -15,7 +15,8 @@ export class CreateSupplierDto {
   @IsUrl()
   apiUrl: string;
 
-  @ApiProperty({ description: 'Clé API du fournisseur' })
+  @ApiProperty({ description: 'Clé API du fournisseur', required: false })
+  @IsOptional()
   @IsString()
-  apiKey: string;
+  apiKey?: string;
 }
