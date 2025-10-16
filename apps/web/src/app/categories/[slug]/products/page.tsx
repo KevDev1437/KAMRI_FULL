@@ -53,6 +53,9 @@ export default function CategoryProductsPage() {
       try {
         setLoading(true);
         
+        // Décoder le slug pour gérer les caractères spéciaux
+        const decodedSlug = decodeURIComponent(slug);
+        
         // Charger toutes les catégories pour trouver celle correspondant au slug
         const categoriesResponse = await apiClient.getCategories();
         if (categoriesResponse.data) {
@@ -60,7 +63,8 @@ export default function CategoryProductsPage() {
           const categories = Array.isArray(categoriesData) ? categoriesData : [];
           
           // Debug: Afficher les catégories et le slug
-          console.log('🔍 [PRODUCTS] Slug recherché:', slug);
+          console.log('🔍 [PRODUCTS] Slug recherché (encodé):', slug);
+          console.log('🔍 [PRODUCTS] Slug recherché (décodé):', decodedSlug);
           console.log('📂 [PRODUCTS] Catégories disponibles:', categories.map(cat => ({
             name: cat.name,
             slug: cat.name.toLowerCase().replace(/\s+/g, '-')
@@ -68,7 +72,7 @@ export default function CategoryProductsPage() {
           
           // Trouver la catégorie par slug
           const foundCategory = categories.find(cat => 
-            cat.name.toLowerCase().replace(/\s+/g, '-') === slug
+            cat.name.toLowerCase().replace(/\s+/g, '-') === decodedSlug
           );
           
           console.log('✅ [PRODUCTS] Catégorie trouvée:', foundCategory);

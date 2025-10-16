@@ -12,6 +12,8 @@ import { apiClient } from '../../lib/api';
 interface Category {
   id: string;
   name: string;
+  icon?: string;
+  color?: string;
 }
 
 interface Product {
@@ -22,18 +24,12 @@ interface Product {
   } | null;
 }
 
-// Mapping des icônes et couleurs pour les catégories
-const getCategoryConfig = (categoryName: string) => {
-  const configs: { [key: string]: { icon: string; color: string } } = {
-    'Mode': { icon: '👕', color: '#FF6B6B' },
-    'Technologie': { icon: '💻', color: '#4ECDC4' },
-    'Maison': { icon: '🏠', color: '#45B7D1' },
-    'Beauté': { icon: '💄', color: '#FECA57' },
-    'Accessoires': { icon: '🎒', color: '#96CEB4' },
-    'Sport': { icon: '⚽', color: '#A8E6CF' },
-    'Enfants': { icon: '🧸', color: '#FFB6C1' },
+// Utiliser les icônes et couleurs du backend
+const getCategoryConfig = (category: any) => {
+  return {
+    icon: category.icon || '🛍️',
+    color: category.color || '#4CAF50'
   };
-  return configs[categoryName] || { icon: '🛍️', color: '#4CAF50' };
 };
 
 export default function CategoriesPage() {
@@ -63,7 +59,7 @@ export default function CategoriesPage() {
                 product.category?.id === category.id
               ).length;
               
-              const config = getCategoryConfig(category.name);
+              const config = getCategoryConfig(category);
               
               return {
                 id: category.id,
@@ -79,7 +75,7 @@ export default function CategoriesPage() {
           } else {
             // Si pas de produits, afficher quand même les catégories avec 0 produits
             const enrichedCategories = categoriesList.map(category => {
-              const config = getCategoryConfig(category.name);
+              const config = getCategoryConfig(category);
               
               return {
                 id: category.id,

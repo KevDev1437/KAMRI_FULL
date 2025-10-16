@@ -13,6 +13,8 @@ interface Category {
   id: string;
   name: string;
   description?: string;
+  icon?: string;
+  color?: string;
 }
 
 interface Product {
@@ -41,6 +43,9 @@ export default function CategoryPage() {
       try {
         setLoading(true);
         
+        // Décoder le slug pour gérer les caractères spéciaux
+        const decodedSlug = decodeURIComponent(slug);
+        
         // Charger toutes les catégories pour trouver celle correspondant au slug
         const categoriesResponse = await apiClient.getCategories();
         if (categoriesResponse.data) {
@@ -48,7 +53,8 @@ export default function CategoryPage() {
           const categories = Array.isArray(categoriesData) ? categoriesData : [];
           
           // Debug: Afficher les catégories et le slug
-          console.log('🔍 Slug recherché:', slug);
+          console.log('🔍 Slug recherché (encodé):', slug);
+          console.log('🔍 Slug recherché (décodé):', decodedSlug);
           console.log('📂 Catégories disponibles:', categories.map(cat => ({
             name: cat.name,
             slug: cat.name.toLowerCase().replace(/\s+/g, '-')
@@ -56,7 +62,7 @@ export default function CategoryPage() {
           
           // Trouver la catégorie par slug (nom en minuscules)
           const foundCategory = categories.find(cat => 
-            cat.name.toLowerCase().replace(/\s+/g, '-') === slug
+            cat.name.toLowerCase().replace(/\s+/g, '-') === decodedSlug
           );
           
           console.log('✅ Catégorie trouvée:', foundCategory);
