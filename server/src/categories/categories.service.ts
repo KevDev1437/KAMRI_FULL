@@ -40,6 +40,39 @@ export class CategoriesService {
     });
   }
 
+  async create(data: { name: string; description?: string; icon?: string; color?: string }) {
+    return this.prisma.category.create({
+      data: {
+        name: data.name,
+        description: data.description || '',
+        icon: data.icon || '🛍️',
+        color: data.color || '#4CAF50'
+      }
+    });
+  }
+
+  async update(id: string, data: { name?: string; description?: string; icon?: string; color?: string }) {
+    return this.prisma.category.update({
+      where: { id },
+      data
+    });
+  }
+
+  async remove(id: string) {
+    // Vérifier s'il y a des produits dans cette catégorie
+    const productsCount = await this.prisma.product.count({
+      where: { categoryId: id }
+    });
+
+    if (productsCount > 0) {
+      throw new Error(`Impossible de supprimer la catégorie car elle contient ${productsCount} produit(s)`);
+    }
+
+    return this.prisma.category.delete({
+      where: { id }
+    });
+  }
+
   async getCategoryMappings() {
     return this.prisma.categoryMapping.findMany({
       include: {

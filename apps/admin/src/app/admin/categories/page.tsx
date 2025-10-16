@@ -105,11 +105,20 @@ export default function CategoriesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
   const [showMappingModal, setShowMappingModal] = useState(false)
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false)
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false)
   const [selectedCategoryForMapping, setSelectedCategoryForMapping] = useState<any>(null)
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<any>(null)
   const [mappingData, setMappingData] = useState({
     supplierId: '',
     externalCategory: '',
     internalCategory: ''
+  })
+  const [categoryData, setCategoryData] = useState({
+    name: '',
+    description: '',
+    icon: '🛍️',
+    color: '#4CAF50'
   })
   const { isAuthenticated } = useAuth()
 
@@ -250,6 +259,59 @@ export default function CategoriesPage() {
     setShowMappingModal(true)
   }
 
+  const openEditModal = (category: any) => {
+    setSelectedCategoryForEdit(category)
+    setCategoryData({
+      name: category.name,
+      description: category.description || '',
+      icon: category.icon || '🛍️',
+      color: category.color || '#4CAF50'
+    })
+    setShowEditCategoryModal(true)
+  }
+
+  const handleCreateCategory = async () => {
+    try {
+      const response = await apiClient.createCategory(categoryData)
+      if (response.data) {
+        alert('✅ Catégorie créée avec succès !')
+        setShowAddCategoryModal(false)
+        setCategoryData({ name: '', description: '', icon: '🛍️', color: '#4CAF50' })
+        loadData()
+      }
+    } catch (error) {
+      console.error('Erreur lors de la création de la catégorie:', error)
+      alert('❌ Erreur lors de la création de la catégorie')
+    }
+  }
+
+  const handleUpdateCategory = async () => {
+    try {
+      const response = await apiClient.updateCategory(selectedCategoryForEdit.id, categoryData)
+      if (response.data) {
+        alert('✅ Catégorie modifiée avec succès !')
+        setShowEditCategoryModal(false)
+        loadData()
+      }
+    } catch (error) {
+      console.error('Erreur lors de la modification de la catégorie:', error)
+      alert('❌ Erreur lors de la modification de la catégorie')
+    }
+  }
+
+  const handleDeleteCategory = async (category: any) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${category.name}" ?`)) {
+      try {
+        await apiClient.deleteCategory(category.id)
+        alert('✅ Catégorie supprimée avec succès !')
+        loadData()
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la catégorie:', error)
+        alert('❌ Erreur lors de la suppression de la catégorie')
+      }
+    }
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'mapped':
@@ -304,7 +366,7 @@ export default function CategoriesPage() {
         </div>
         <Button 
           className="kamri-button"
-          onClick={() => alert('Ajouter une catégorie - Fonctionnalité à venir')}
+          onClick={() => setShowAddCategoryModal(true)}
         >
           <Plus className="w-4 h-4 mr-2" />
           Ajouter Catégorie
@@ -379,11 +441,21 @@ export default function CategoriesPage() {
                       <Link className="w-3 h-3 mr-1" />
                       Mapper
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => openEditModal(category)}
+                    >
                       <Edit className="w-3 h-3 mr-1" />
                       Modifier
                     </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteCategory(category)}
+                    >
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
@@ -547,6 +619,165 @@ export default function CategoriesPage() {
                 className="flex-1 kamri-button"
               >
                 Créer Mapping
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'ajout de catégorie */}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Ajouter une Catégorie</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de la catégorie
+                </label>
+                <input
+                  type="text"
+                  value={categoryData.name}
+                  onChange={(e) => setCategoryData({...categoryData, name: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Ex: Électronique"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={categoryData.description}
+                  onChange={(e) => setCategoryData({...categoryData, description: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  rows={3}
+                  placeholder="Description de la catégorie"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Icône
+                  </label>
+                  <input
+                    type="text"
+                    value={categoryData.icon}
+                    onChange={(e) => setCategoryData({...categoryData, icon: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="🛍️"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Couleur
+                  </label>
+                  <input
+                    type="color"
+                    value={categoryData.color}
+                    onChange={(e) => setCategoryData({...categoryData, color: e.target.value})}
+                    className="w-full h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowAddCategoryModal(false)}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleCreateCategory}
+                disabled={!categoryData.name}
+                className="flex-1 kamri-button"
+              >
+                Créer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de modification de catégorie */}
+      {showEditCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Modifier la Catégorie</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de la catégorie
+                </label>
+                <input
+                  type="text"
+                  value={categoryData.name}
+                  onChange={(e) => setCategoryData({...categoryData, name: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={categoryData.description}
+                  onChange={(e) => setCategoryData({...categoryData, description: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Icône
+                  </label>
+                  <input
+                    type="text"
+                    value={categoryData.icon}
+                    onChange={(e) => setCategoryData({...categoryData, icon: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Couleur
+                  </label>
+                  <input
+                    type="color"
+                    value={categoryData.color}
+                    onChange={(e) => setCategoryData({...categoryData, color: e.target.value})}
+                    className="w-full h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditCategoryModal(false)}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleUpdateCategory}
+                disabled={!categoryData.name}
+                className="flex-1 kamri-button"
+              >
+                Modifier
               </Button>
             </div>
           </div>

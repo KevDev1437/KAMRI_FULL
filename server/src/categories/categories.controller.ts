@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 
@@ -15,6 +15,17 @@ export class CategoriesController {
     return {
       data: categories,
       message: 'Catégories récupérées avec succès'
+    };
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Créer une nouvelle catégorie' })
+  @ApiResponse({ status: 201, description: 'Catégorie créée avec succès' })
+  async create(@Body() data: { name: string; description?: string; icon?: string; color?: string }) {
+    const category = await this.categoriesService.create(data);
+    return {
+      data: category,
+      message: 'Catégorie créée avec succès'
     };
   }
 
@@ -94,6 +105,39 @@ export class CategoriesController {
     return {
       data: category,
       message: 'Catégorie récupérée avec succès'
+    };
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Modifier une catégorie' })
+  @ApiResponse({ status: 200, description: 'Catégorie modifiée avec succès' })
+  @ApiResponse({ status: 404, description: 'Catégorie non trouvée' })
+  async update(@Param('id') id: string, @Body() data: { name?: string; description?: string; icon?: string; color?: string }) {
+    const category = await this.categoriesService.update(id, data);
+    if (!category) {
+      return {
+        error: 'Catégorie non trouvée'
+      };
+    }
+    return {
+      data: category,
+      message: 'Catégorie modifiée avec succès'
+    };
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Supprimer une catégorie' })
+  @ApiResponse({ status: 200, description: 'Catégorie supprimée avec succès' })
+  @ApiResponse({ status: 404, description: 'Catégorie non trouvée' })
+  async remove(@Param('id') id: string) {
+    const result = await this.categoriesService.remove(id);
+    if (!result) {
+      return {
+        error: 'Catégorie non trouvée'
+      };
+    }
+    return {
+      message: 'Catégorie supprimée avec succès'
     };
   }
 }

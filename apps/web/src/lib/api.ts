@@ -169,6 +169,26 @@ export class ApiClient {
     return this.fetchWithAuth('/categories');
   }
 
+  async createCategory(categoryData: { name: string; description?: string; icon?: string; color?: string }): Promise<ApiResponse<Category>> {
+    return this.fetchWithAuth('/categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async updateCategory(id: string, categoryData: { name?: string; description?: string; icon?: string; color?: string }): Promise<ApiResponse<Category>> {
+    return this.fetchWithAuth(`/categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async deleteCategory(id: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/categories/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Panier (pour plus tard)
   async getCart(): Promise<ApiResponse<CartItem[]>> {
     return this.fetchWithAuth('/cart');

@@ -220,6 +220,26 @@ export class ApiClient {
     return this.fetchWithAuth('/categories');
   }
 
+  async createCategory(categoryData: { name: string; description?: string; icon?: string; color?: string }) {
+    return this.fetchWithAuth('/categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async updateCategory(id: string, categoryData: { name?: string; description?: string; icon?: string; color?: string }) {
+    return this.fetchWithAuth(`/categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  async deleteCategory(id: string) {
+    return this.fetchWithAuth(`/categories/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Commandes
   async getOrders() {
     return this.fetchWithAuth('/orders');
