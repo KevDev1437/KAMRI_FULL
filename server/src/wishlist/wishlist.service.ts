@@ -6,6 +6,8 @@ export class WishlistService {
   constructor(private prisma: PrismaService) {}
 
   async getWishlist(userId: string) {
+    console.log('🔍 [Backend] getWishlist appelé pour userId:', userId);
+    
     const wishlist = await this.prisma.wishlist.findMany({
       where: { userId },
       include: {
@@ -19,6 +21,9 @@ export class WishlistService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    console.log('📦 [Backend] Wishlist trouvée:', wishlist.length, 'items');
+    console.log('📋 [Backend] Détails wishlist:', wishlist);
 
     return {
       data: wishlist,

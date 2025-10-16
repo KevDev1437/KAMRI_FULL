@@ -1,39 +1,61 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { apiClient } from '../lib/api';
+
+interface Address {
+  id: string;
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function AddressSection() {
   const [showModal, setShowModal] = useState(false);
-  const [editingAddress, setEditingAddress] = useState(null);
-  const [addresses, setAddresses] = useState([
-    {
-      id: 1,
-      name: 'Domicile',
-      fullName: 'Jean Dupont',
-      address: '123 Rue de la Paix',
-      city: '75001 Paris',
-      phone: '+33 6 12 34 56 78',
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: 'Bureau',
-      fullName: 'Jean Dupont',
-      address: '456 Avenue des Champs-Élysées',
-      city: '75008 Paris',
-      phone: '+33 6 12 34 56 78',
-      isDefault: false
-    }
-  ]);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: '',
-    fullName: '',
-    address: '',
+    street: '',
     city: '',
-    phone: ''
+    state: '',
+    zipCode: '',
+    country: 'FR',
+    isDefault: false
   });
+
+  // Charger les adresses au montage du composant
+  useEffect(() => {
+    loadAddresses();
+  }, []);
+
+  const loadAddresses = async () => {
+    try {
+      setLoading(true);
+      console.log('🏠 [AddressSection] Chargement des adresses...');
+      const response = await apiClient.getAddresses();
+      
+      if (response.data) {
+        console.log('✅ [AddressSection] Adresses chargées:', response.data);
+        setAddresses(response.data);
+      } else {
+        console.log('❌ [AddressSection] Erreur:', response.error);
+        setAddresses([]);
+      }
+    } catch (error) {
+      console.error('❌ [AddressSection] Erreur lors du chargement:', error);
+      setAddresses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddAddress = () => {
     setEditingAddress(null);

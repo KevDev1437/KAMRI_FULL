@@ -21,11 +21,12 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  cart      CartItem[]
-  orders    Order[]
-  addresses Address[]
-  reviews   Review[]
-  wishlist  Wishlist[]
+  cart         CartItem[]
+  orders       Order[]
+  addresses    Address[]
+  reviews      Review[]
+  wishlist     Wishlist[]
+  userSettings UserSettings? // ✅ Added user settings relation
 
   @@map("users")
 }
@@ -251,6 +252,27 @@ model Settings {
   updatedAt         DateTime @updatedAt
 
   @@map("settings")
+}
+
+model UserSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Paramètres de notification (stockés comme String JSON)
+  notifications String @default("{\"email\": true, \"sms\": false, \"push\": true, \"marketing\": false}")
+
+  // Paramètres de confidentialité (stockés comme String JSON)
+  privacy String @default("{\"profileVisible\": true, \"orderHistory\": false, \"dataSharing\": false}")
+
+  // Préférences utilisateur (stockés comme String JSON)
+  preferences String @default("{\"theme\": \"light\", \"language\": \"fr\", \"currency\": \"EUR\"}")
+
+  @@map("user_settings")
 }
 
 

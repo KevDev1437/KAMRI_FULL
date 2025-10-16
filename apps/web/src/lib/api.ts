@@ -242,6 +242,86 @@ export class ApiClient {
     });
   }
 
+  // Address methods
+  async getAddresses(): Promise<ApiResponse<any[]>> {
+    return this.fetchWithAuth('/addresses');
+  }
+
+  async createAddress(addressData: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country?: string;
+    isDefault?: boolean;
+  }): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/addresses', {
+      method: 'POST',
+      body: JSON.stringify(addressData),
+    });
+  }
+
+  async updateAddress(id: string, addressData: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    isDefault?: boolean;
+  }): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth(`/addresses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(addressData),
+    });
+  }
+
+  async deleteAddress(id: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/addresses/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setDefaultAddress(id: string): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth(`/addresses/${id}/default`, {
+      method: 'POST',
+    });
+  }
+
+  // User Settings methods
+  async getUserSettings(): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/user-settings');
+  }
+
+  async updateUserSettings(settingsData: {
+    notifications?: {
+      email?: boolean;
+      sms?: boolean;
+      push?: boolean;
+      marketing?: boolean;
+    };
+    privacy?: {
+      profileVisible?: boolean;
+      orderHistory?: boolean;
+      dataSharing?: boolean;
+    };
+    preferences?: {
+      theme?: string;
+      language?: string;
+      currency?: string;
+    };
+  }): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/user-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData),
+    });
+  }
+
+  async deleteUserAccount(): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth('/user-settings/account', {
+      method: 'DELETE',
+    });
+  }
+
 
   // Commandes
   async getOrders(): Promise<ApiResponse<any[]>> {

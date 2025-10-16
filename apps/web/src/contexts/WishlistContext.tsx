@@ -56,6 +56,7 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
 
   const wishlistCount = wishlistItems.length;
   console.log('📈 [WishlistContext] wishlistCount mis à jour:', wishlistCount, 'items:', wishlistItems.length);
+  console.log('📋 [WishlistContext] wishlistItems:', wishlistItems);
 
   const refreshWishlist = async () => {
     if (!userId) return;
@@ -69,9 +70,11 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
         const items = Array.isArray(response.data) ? response.data : [];
         console.log('📦 [refreshWishlist] Items récupérés:', items.length, items);
         setWishlistItems(items);
+        console.log('✅ [refreshWishlist] wishlistItems mis à jour avec:', items.length, 'items');
       } else {
         console.log('❌ [refreshWishlist] Pas de données dans la réponse');
         setWishlistItems([]);
+        console.log('🔄 [refreshWishlist] wishlistItems vidé');
       }
     } catch (error) {
       console.error('❌ [refreshWishlist] Erreur lors du chargement des favoris:', error);
@@ -90,12 +93,23 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
     
     try {
       console.log('📡 [WishlistContext] Appel API...');
-      await apiClient.addToWishlist(userId, productId);
-      console.log('⏳ [WishlistContext] Attente 500ms avant refresh...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('🔄 [WishlistContext] Refresh wishlist...');
-      await refreshWishlist();
-      console.log('✅ [WishlistContext] Ajout réussi');
+      const response = await apiClient.addToWishlist(userId, productId);
+      console.log('📡 [WishlistContext] Réponse API:', response);
+      
+      if (response.data) {
+        console.log('✅ [WishlistContext] Ajout réussi, refresh immédiat...');
+        // Refresh immédiat puis après un délai pour s'assurer
+        await refreshWishlist();
+        setTimeout(async () => {
+          console.log('🔄 [WishlistContext] Refresh après délai...');
+          await refreshWishlist();
+        }, 500);
+      } else if (response.message === 'Produit déjà dans les favoris') {
+        console.log('ℹ️ [WishlistContext] Produit déjà dans les favoris, refresh...');
+        await refreshWishlist();
+      } else {
+        console.log('❌ [WishlistContext] Erreur d\'ajout:', response.error || response.message);
+      }
     } catch (error) {
       console.error('❌ [WishlistContext] Erreur lors de l\'ajout aux favoris:', error);
       throw error;

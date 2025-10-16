@@ -1,5 +1,6 @@
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 
@@ -42,10 +43,19 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   };
   
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+
   const handleToggleWishlist = async (e: React.MouseEvent) => {
+    if (isWishlistLoading) {
+      console.log('⏳ Clic ignoré - action en cours...');
+      return;
+    }
+
     console.log('🔥 CŒUR CLIQUÉ !', { productId: product.id, productName: product.name });
     e.preventDefault();
     e.stopPropagation();
+    
+    setIsWishlistLoading(true);
     
     try {
       if (isInWishlist(product.id)) {
@@ -59,6 +69,8 @@ export default function ProductCard({ product }: ProductCardProps) {
       }
     } catch (error) {
       console.error('❌ Erreur lors de la gestion des favoris:', error);
+    } finally {
+      setIsWishlistLoading(false);
     }
   };
 
@@ -67,11 +79,12 @@ export default function ProductCard({ product }: ProductCardProps) {
       {/* Favorite button - EN DEHORS du Link */}
       <button 
         onClick={handleToggleWishlist}
+        disabled={isWishlistLoading}
         className={`absolute top-4 right-4 p-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 z-10 ${
-          isInWishlist(product.id) 
-            ? 'bg-[#FF7043] text-white hover:bg-[#E64A19]' 
+          isInWishlist(product.id)
+            ? 'bg-[#FF7043] text-white hover:bg-[#E64A19]'
             : 'bg-white/90 text-[#81C784] hover:bg-white hover:text-[#4CAF50]'
-        }`}
+        } ${isWishlistLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <svg className="h-5 w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />

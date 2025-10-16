@@ -61,6 +61,36 @@ export class OrdersService {
     });
   }
 
+  async getUserOrders(userId: string) {
+    console.log('📦 [OrdersService] Récupération des commandes pour userId:', userId);
+    
+    const orders = await this.prisma.order.findMany({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                images: true,
+                category: true,
+                supplier: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    console.log('📦 [OrdersService] Commandes trouvées:', orders.length);
+    return {
+      data: orders,
+      message: 'Commandes récupérées avec succès',
+    };
+  }
+
   async getOrder(id: string) {
     return this.prisma.order.findUnique({
       where: { id },

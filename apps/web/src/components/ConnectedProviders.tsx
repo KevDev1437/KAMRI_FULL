@@ -10,10 +10,25 @@ interface ConnectedProvidersProps {
 }
 
 export default function ConnectedProviders({ children }: ConnectedProvidersProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const userId = user?.id || null;
 
+  console.log('🔗 [ConnectedProviders] user:', user);
+  console.log('🔗 [ConnectedProviders] isAuthenticated:', isAuthenticated);
+  console.log('🔗 [ConnectedProviders] isLoading:', isLoading);
   console.log('🔗 [ConnectedProviders] userId:', userId);
+
+  // Attendre que l'auth soit initialisée
+  if (isLoading) {
+    console.log('⏳ [ConnectedProviders] Auth en cours de chargement...');
+    return (
+      <CartProvider userId={null}>
+        <WishlistProvider userId={null}>
+          {children}
+        </WishlistProvider>
+      </CartProvider>
+    );
+  }
 
   return (
     <CartProvider userId={userId}>

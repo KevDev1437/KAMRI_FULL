@@ -3,11 +3,11 @@
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import AccountSettings from '../../components/AccountSettings';
-import AddressSection from '../../components/AddressSection';
+import AccountSettingsNew from '../../components/AccountSettingsNew';
+import AddressSectionNew from '../../components/AddressSectionNew';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
-import OrdersHistory from '../../components/OrdersHistory';
+import OrdersHistoryNew from '../../components/OrdersHistoryNew';
 import PersonalInfo from '../../components/PersonalInfo';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -94,9 +94,9 @@ export default function ProfilePage() {
           transition={{ duration: 0.5 }}
         >
           {activeTab === 'personal' && <PersonalInfo />}
-          {activeTab === 'addresses' && <AddressSection />}
-          {activeTab === 'orders' && <OrdersHistory />}
-          {activeTab === 'settings' && <AccountSettings />}
+          {activeTab === 'addresses' && <AddressSectionNew />}
+          {activeTab === 'orders' && <OrdersHistoryNew />}
+          {activeTab === 'settings' && <AccountSettingsNew />}
         </motion.div>
       </main>
       
