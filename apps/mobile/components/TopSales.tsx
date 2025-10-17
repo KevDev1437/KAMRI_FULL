@@ -1,29 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { getBadgeConfig } from '@kamri/lib';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { apiClient, Product } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les top ventes - 6 produits optimaux
-const topSales = [
-  { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-  { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-  { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-  { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
 const cardWidth = isTablet ? (width - 60) / 4 : (width - 60) / 2;
 
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  image: string | null;
-}
 
 interface ProductCardProps {
   product: Product;
@@ -33,13 +19,25 @@ function ProductCard({ product }: ProductCardProps) {
   // Utilisation des couleurs d'étiquettes cohérentes pour "top-ventes"
   const badgeConfig = getBadgeConfig('top-ventes');
   
+  const formatPrice = (price: number) => {
+    return `${price.toFixed(2)}€`;
+  };
+  
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
-      {/* Image placeholder */}
+      {/* Image */}
       <View style={styles.imageContainer}>
-        <ThemedView style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={32} color="#81C784" />
-        </ThemedView>
+        {product.image ? (
+          <Image 
+            source={{ uri: product.image }} 
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <ThemedView style={styles.imagePlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#81C784" />
+          </ThemedView>
+        )}
         
         {/* Badge Top Vente */}
         <View style={[styles.badge, { backgroundColor: badgeConfig.backgroundColor }]}>
@@ -55,7 +53,7 @@ function ProductCard({ product }: ProductCardProps) {
           {product.name}
         </ThemedText>
         
-        <ThemedText style={styles.productPrice}>{product.price}</ThemedText>
+        <ThemedText style={styles.productPrice}>{formatPrice(product.price)}</ThemedText>
         
         <TouchableOpacity style={styles.addButton}>
           <Ionicons name="add" size={16} color="#FFFFFF" />
@@ -67,6 +65,67 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function TopSales() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTopSales = async () => {
+      try {
+        console.log('🏆 [TOPSALES] Début du chargement des top ventes');
+        setLoading(true);
+        const response = await apiClient.getProducts();
+        console.log('🏆 [TOPSALES] Réponse API:', response);
+        
+        if (response.data) {
+          console.log('🏆 [TOPSALES] Produits reçus:', response.data.length);
+          // Prendre les 6 premiers produits comme "top ventes"
+          // TODO: Implémenter un vrai système de tri par popularité
+          const topProducts = response.data.slice(0, 6);
+          console.log('🏆 [TOPSALES] Top produits:', topProducts.length);
+          setProducts(topProducts);
+        } else {
+          console.log('🏆 [TOPSALES] Pas de données dans la réponse');
+        }
+      } catch (error) {
+        console.error('❌ [TOPSALES] Erreur lors du chargement des top ventes:', error);
+      } finally {
+        setLoading(false);
+        console.log('🏆 [TOPSALES] Chargement terminé');
+      }
+    };
+
+    loadTopSales();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.titleContainer}>
+          <ThemedText style={styles.sectionTitle}>Top Ventes</ThemedText>
+          <ThemedText style={styles.sectionSubtitle}>
+            Chargement...
+          </ThemedText>
+        </View>
+        <View style={styles.grid}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} style={[styles.productCard, { width: cardWidth }]}>
+              <View style={styles.imageContainer}>
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={32} color="#E5E7EB" />
+                </View>
+              </View>
+              <View style={styles.productInfo}>
+                <View style={[styles.productName, { backgroundColor: '#E5E7EB', height: 20, marginBottom: 8 }]} />
+                <View style={[styles.productPrice, { backgroundColor: '#E5E7EB', height: 18, marginBottom: 16 }]} />
+                <View style={[styles.addButton, { backgroundColor: '#E5E7EB' }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -77,7 +136,7 @@ export default function TopSales() {
       </View>
       
       <View style={styles.grid}>
-        {topSales.map((product) => (
+        {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </View>
@@ -134,6 +193,10 @@ const styles = StyleSheet.create({
     height: 160,
     backgroundColor: '#E8F5E8',
     position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     flex: 1,

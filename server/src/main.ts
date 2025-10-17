@@ -15,6 +15,8 @@ async function bootstrap() {
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3002', // Dashboard admin
       'http://localhost:3000', // Web app
+      'http://192.168.129.10:3000', // Mobile app (même IP que le PC)
+      'http://192.168.129.10:3001', // Mobile app direct
     ],
     credentials: true,
   }));

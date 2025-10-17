@@ -1,43 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { apiClient, Product } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les produits - 8 produits optimaux
-const mockProducts = [
-  { id: '1', name: 'T-Shirt Premium', price: '29.99€', image: null },
-  { id: '2', name: 'Jean Slim Fit', price: '59.99€', image: null },
-  { id: '3', name: 'Sneakers Sport', price: '89.99€', image: null },
-  { id: '4', name: 'Veste Denim', price: '79.99€', image: null },
-  { id: '5', name: 'Pull Cachemire', price: '129.99€', image: null },
-  { id: '6', name: 'Chaussures Cuir', price: '149.99€', image: null },
-  { id: '7', name: 'Sac à Dos', price: '39.99€', image: null },
-  { id: '8', name: 'Montre Connectée', price: '199.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
 const cardWidth = isTablet ? (width - 60) / 4 : (width - 60) / 2;
-
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  image: string | null;
-}
 
 interface ProductCardProps {
   product: Product;
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  const formatPrice = (price: number) => {
+    return `${price.toFixed(2)}€`;
+  };
+
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
-      {/* Image placeholder */}
+      {/* Image */}
       <View style={styles.imageContainer}>
-        <ThemedView style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={32} color="#9CA3AF" />
-        </ThemedView>
+        {product.image ? (
+          <Image 
+            source={{ uri: product.image }} 
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <ThemedView style={styles.imagePlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#9CA3AF" />
+          </ThemedView>
+        )}
         <TouchableOpacity style={styles.favoriteButton}>
           <Ionicons name="heart-outline" size={20} color="#9CA3AF" />
         </TouchableOpacity>
@@ -48,7 +43,7 @@ function ProductCard({ product }: ProductCardProps) {
         <ThemedText style={styles.productName} numberOfLines={1}>
           {product.name}
         </ThemedText>
-        <ThemedText style={styles.productPrice}>{product.price}</ThemedText>
+        <ThemedText style={styles.productPrice}>{formatPrice(product.price)}</ThemedText>
         
         <TouchableOpacity style={styles.addButton}>
           <Ionicons name="add" size={16} color="#FFFFFF" />
@@ -60,6 +55,74 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function ProductGrid() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        console.log('🛍️ [PRODUCTGRID] Début du chargement des produits');
+        setLoading(true);
+        const response = await apiClient.getProducts();
+        console.log('🛍️ [PRODUCTGRID] Réponse API:', response);
+        
+        if (response.data) {
+          console.log('🛍️ [PRODUCTGRID] Produits reçus:', response.data.length);
+          
+          // Debug: Afficher les détails des images
+          console.log('🛍️ [PRODUCTGRID] Détails des images:', response.data.slice(0, 3).map(p => ({
+            name: p.name,
+            image: p.image,
+            hasImage: !!p.image
+          })));
+          
+          // Limiter à 8 produits pour la page d'accueil
+          const limitedProducts = response.data.slice(0, 8);
+          console.log('🛍️ [PRODUCTGRID] Produits limités:', limitedProducts.length);
+          setProducts(limitedProducts);
+        } else {
+          console.log('🛍️ [PRODUCTGRID] Pas de données dans la réponse');
+        }
+      } catch (error) {
+        console.error('❌ [PRODUCTGRID] Erreur lors du chargement des produits:', error);
+      } finally {
+        setLoading(false);
+        console.log('🛍️ [PRODUCTGRID] Chargement terminé');
+      }
+    };
+
+    loadProducts();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.titleContainer}>
+          <ThemedText style={styles.sectionTitle}>Nos produits</ThemedText>
+          <ThemedText style={styles.sectionSubtitle}>
+            Chargement...
+          </ThemedText>
+        </View>
+        <View style={styles.grid}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={[styles.productCard, { width: cardWidth }]}>
+              <View style={styles.imageContainer}>
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={32} color="#E5E7EB" />
+                </View>
+              </View>
+              <View style={styles.productInfo}>
+                <View style={[styles.productName, { backgroundColor: '#E5E7EB', height: 20, marginBottom: 8 }]} />
+                <View style={[styles.productPrice, { backgroundColor: '#E5E7EB', height: 18, marginBottom: 16 }]} />
+                <View style={[styles.addButton, { backgroundColor: '#E5E7EB' }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -70,7 +133,7 @@ export default function ProductGrid() {
       </View>
       
       <View style={styles.grid}>
-        {mockProducts.map((product) => (
+        {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </View>
@@ -127,6 +190,10 @@ const styles = StyleSheet.create({
     height: 160,
     backgroundColor: '#E8F5E8',
     position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     flex: 1,

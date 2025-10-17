@@ -1,30 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
+import { useEffect, useState } from 'react';
+import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { apiClient, Product } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-// Mock data pour les meilleures offres - 6 produits optimaux
-const bestOffers = [
-  { id: '1', name: 'Pull Cachemire', price: '99.99€', originalPrice: '149.99€', image: null },
-  { id: '2', name: 'Chaussures Cuir', price: '119.99€', originalPrice: '179.99€', image: null },
-  { id: '3', name: 'Sac à Main', price: '49.99€', originalPrice: '79.99€', image: null },
-  { id: '4', name: 'Montre Élégante', price: '89.99€', originalPrice: '129.99€', image: null },
-  { id: '5', name: 'Veste Cuir', price: '199.99€', originalPrice: '299.99€', image: null },
-  { id: '6', name: 'Smartphone Pro', price: '599.99€', originalPrice: '799.99€', image: null },
-];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
 const cardWidth = isTablet ? (width - 60) / 4 : (width - 60) / 2;
 
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  originalPrice: string;
-  image: string | null;
-}
 
 interface ProductCardProps {
   product: Product;
@@ -34,20 +19,28 @@ function ProductCard({ product }: ProductCardProps) {
   // Utilisation des couleurs d'étiquettes cohérentes pour "promo"
   const badgeConfig = getBadgeConfig('promo');
   
-  // Calcul du pourcentage de réduction
-  const originalPrice = parseFloat(product.originalPrice?.replace('€', '') || '0');
-  const currentPrice = parseFloat(product.price.replace('€', ''));
-  const discountPercentage = originalPrice > 0 
-    ? calculateDiscountPercentage(originalPrice, currentPrice)
-    : 0;
+  const formatPrice = (price: number) => {
+    return `${price.toFixed(2)}€`;
+  };
+  
+  // Calcul du pourcentage de réduction basé sur le discount
+  const discountPercentage = product.discount || 0;
   
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
-      {/* Image placeholder */}
+      {/* Image */}
       <View style={styles.imageContainer}>
-        <ThemedView style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={32} color="#81C784" />
-        </ThemedView>
+        {product.image ? (
+          <Image 
+            source={{ uri: product.image }} 
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <ThemedView style={styles.imagePlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#81C784" />
+          </ThemedView>
+        )}
         
         {/* Badge Promo */}
         <View style={[styles.badge, { backgroundColor: badgeConfig.backgroundColor }]}>
@@ -67,8 +60,10 @@ function ProductCard({ product }: ProductCardProps) {
         </ThemedText>
         
         <View style={styles.priceContainer}>
-          <ThemedText style={styles.productPrice}>{product.price}</ThemedText>
-          <ThemedText style={styles.originalPrice}>{product.originalPrice}</ThemedText>
+          <ThemedText style={styles.productPrice}>{formatPrice(product.price)}</ThemedText>
+          {product.originalPrice && (
+            <ThemedText style={styles.originalPrice}>{formatPrice(product.originalPrice)}</ThemedText>
+          )}
         </View>
         
         <TouchableOpacity style={styles.addButton}>
@@ -81,6 +76,87 @@ function ProductCard({ product }: ProductCardProps) {
 }
 
 export default function BestOffers() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadBestOffers = async () => {
+      try {
+        console.log('💰 [BESTOFFERS] Début du chargement des meilleures offres');
+        setLoading(true);
+        const response = await apiClient.getProducts();
+        console.log('💰 [BESTOFFERS] Réponse API:', response);
+        
+        if (response.data) {
+          console.log('💰 [BESTOFFERS] Produits reçus:', response.data.length);
+          
+          // Debug: Afficher les détails des produits
+          console.log('💰 [BESTOFFERS] Détails des produits:', response.data.map(p => ({
+            name: p.name,
+            discount: p.discount,
+            hasDiscount: p.discount && p.discount > 0
+          })));
+          
+          // Filtrer les produits avec des réductions
+          const productsWithDiscount = response.data.filter(product => 
+            product.discount && product.discount > 0
+          );
+          console.log('💰 [BESTOFFERS] Produits avec réduction:', productsWithDiscount.length);
+          
+          // Si pas de produits avec réduction, prendre les 6 premiers produits
+          let bestOffers;
+          if (productsWithDiscount.length === 0) {
+            console.log('💰 [BESTOFFERS] Aucun produit avec réduction, affichage des 6 premiers produits');
+            bestOffers = response.data.slice(0, 6);
+          } else {
+            bestOffers = productsWithDiscount.slice(0, 6);
+          }
+          
+          console.log('💰 [BESTOFFERS] Meilleures offres finales:', bestOffers.length);
+          setProducts(bestOffers);
+        } else {
+          console.log('💰 [BESTOFFERS] Pas de données dans la réponse');
+        }
+      } catch (error) {
+        console.error('❌ [BESTOFFERS] Erreur lors du chargement des meilleures offres:', error);
+      } finally {
+        setLoading(false);
+        console.log('💰 [BESTOFFERS] Chargement terminé');
+      }
+    };
+
+    loadBestOffers();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.titleContainer}>
+          <ThemedText style={styles.sectionTitle}>Meilleures Offres</ThemedText>
+          <ThemedText style={styles.sectionSubtitle}>
+            Chargement...
+          </ThemedText>
+        </View>
+        <View style={styles.grid}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} style={[styles.productCard, { width: cardWidth }]}>
+              <View style={styles.imageContainer}>
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={32} color="#E5E7EB" />
+                </View>
+              </View>
+              <View style={styles.productInfo}>
+                <View style={[styles.productName, { backgroundColor: '#E5E7EB', height: 20, marginBottom: 8 }]} />
+                <View style={[styles.productPrice, { backgroundColor: '#E5E7EB', height: 18, marginBottom: 16 }]} />
+                <View style={[styles.addButton, { backgroundColor: '#E5E7EB' }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -91,7 +167,7 @@ export default function BestOffers() {
       </View>
       
       <View style={styles.grid}>
-        {bestOffers.map((product) => (
+        {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </View>
@@ -148,6 +224,10 @@ const styles = StyleSheet.create({
     height: 160,
     backgroundColor: '#E8F5E8',
     position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     flex: 1,
