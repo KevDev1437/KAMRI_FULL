@@ -282,6 +282,7 @@ export class ApiClient {
     country?: string;
     isDefault?: boolean;
   }): Promise<ApiResponse<any>> {
+    // L'ID de l'utilisateur sera récupéré automatiquement par le backend via le token JWT
     return this.fetchWithAuth('/addresses', {
       method: 'POST',
       body: JSON.stringify(addressData),

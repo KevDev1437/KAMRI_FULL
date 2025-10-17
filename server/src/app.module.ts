@@ -12,6 +12,7 @@ import { ProductsModule } from './products/products.module';
 import { SettingsModule } from './settings/settings.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
+import { UsersModule } from './users/users.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
@@ -32,6 +33,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     DashboardModule,
     AddressesModule,
     UserSettingsModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
