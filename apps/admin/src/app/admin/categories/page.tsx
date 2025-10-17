@@ -269,20 +269,30 @@ export default function CategoriesPage() {
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Mappings externes</h4>
                   
-                  {/* Mappings existants */}
+                  {/* Mappings existants - Dropdown compact */}
                   {categoryMappings.length > 0 && (
-                    <div className="space-y-1 mb-2">
-                      {categoryMappings.map((mapping, index) => (
-                        <div key={index} className="flex items-center justify-between bg-green-50 p-2 rounded text-xs">
+                    <div className="mb-2">
+                      <details className="group">
+                        <summary className="flex items-center justify-between cursor-pointer text-xs bg-green-50 p-2 rounded hover:bg-green-100 transition-colors">
                           <div className="flex items-center space-x-1">
                             <CheckCircle className="w-3 h-3 text-green-600" />
-                            <span className="text-green-700">
-                              {mapping.supplier?.name}: {mapping.externalCategory}
+                            <span className="text-green-700 font-medium">
+                              {categoryMappings.length} mapping{categoryMappings.length > 1 ? 's' : ''} configuré{categoryMappings.length > 1 ? 's' : ''}
                             </span>
                           </div>
-                          <span className="text-green-600 font-medium">Mappé</span>
+                          <span className="text-green-600 text-xs">▼</span>
+                        </summary>
+                        <div className="mt-2 space-y-1 pl-4">
+                          {categoryMappings.map((mapping, index) => (
+                            <div key={index} className="flex items-center justify-between bg-green-25 p-1 rounded text-xs">
+                              <span className="text-green-600">
+                                {mapping.supplier?.name}: {mapping.externalCategory}
+                              </span>
+                              <span className="text-green-500 text-xs">✓</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </details>
                     </div>
                   )}
                   

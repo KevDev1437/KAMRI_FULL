@@ -46,7 +46,8 @@ export class CategoriesService {
         name: data.name,
         description: data.description || '',
         icon: data.icon || '🛍️',
-        color: data.color || '#4CAF50'
+        color: data.color || '#4CAF50',
+        isDefault: false // ✅ S'assurer que les nouvelles catégories ne sont pas par défaut
       }
     });
   }

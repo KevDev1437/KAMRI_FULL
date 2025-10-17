@@ -21,7 +21,7 @@ export default function CategoryProductsPage() {
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('populaire');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]); // ✅ Augmenté pour les voitures
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
