@@ -1,8 +1,37 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { apiClient } from '../lib/api';
+
+interface CompanyInfo {
+  companyName: string;
+  companyEmail: string;
+  companyPhone: string;
+  companyAddress: string;
+}
 
 export default function ContactInfo() {
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCompanyInfo = async () => {
+      try {
+        const response = await apiClient.getCompanyInfo();
+        if (response.data) {
+          setCompanyInfo(response.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des informations de l\'entreprise:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCompanyInfo();
+  }, []);
+
   const contactMethods = [
     {
       icon: (
@@ -11,7 +40,7 @@ export default function ContactInfo() {
         </svg>
       ),
       title: 'Email',
-      content: 'support@kamri.com',
+      content: companyInfo?.companyEmail || 'support@kamri.com',
       description: 'Réponse sous 24h'
     },
     {
@@ -31,8 +60,19 @@ export default function ContactInfo() {
         </svg>
       ),
       title: 'Téléphone',
-      content: '+33 1 23 45 67 89',
+      content: companyInfo?.companyPhone || '+33 1 23 45 67 89',
       description: 'Appel gratuit'
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      title: 'Adresse',
+      content: companyInfo?.companyAddress || '123 Rue de la Paix, 75001 Paris',
+      description: 'Siège social'
     }
   ];
 
@@ -68,6 +108,30 @@ export default function ContactInfo() {
       color: 'hover:text-blue-600'
     }
   ];
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded mb-6"></div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

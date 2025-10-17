@@ -49,4 +49,26 @@ export class SettingsService {
 
     return settings;
   }
+
+  async getCompanyInfo() {
+    const settings = await this.prisma.settings.findFirst();
+    
+    if (!settings) {
+      // Retourner des valeurs par défaut si aucun paramètre n'existe
+      return {
+        companyName: 'KAMRI',
+        companyEmail: 'admin@kamri.com',
+        companyPhone: '+33 1 23 45 67 89',
+        companyAddress: '123 Rue de la Paix, 75001 Paris',
+      };
+    }
+
+    // Retourner seulement les informations de l'entreprise (publiques)
+    return {
+      companyName: settings.companyName,
+      companyEmail: settings.companyEmail,
+      companyPhone: settings.companyPhone,
+      companyAddress: settings.companyAddress,
+    };
+  }
 }

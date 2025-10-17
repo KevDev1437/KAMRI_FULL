@@ -24,4 +24,5 @@ export class SettingsController {
   updateSettings(@Body() updateSettingsDto: UpdateSettingsDto) {
     return this.settingsService.updateSettings(updateSettingsDto);
   }
+
 }

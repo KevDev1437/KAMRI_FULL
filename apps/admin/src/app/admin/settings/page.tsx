@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { apiClient } from '@/lib/api'
 import {
     DollarSign,
+    Edit,
     Globe,
     Moon,
     Palette,
@@ -56,6 +57,8 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
+  const [showCompanyEditModal, setShowCompanyEditModal] = useState(false)
+  const [showApiEditModal, setShowApiEditModal] = useState(false)
   const { isAuthenticated } = useAuth()
   const { theme, accentColor, setTheme, setAccentColor } = useTheme()
 
@@ -93,6 +96,51 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error)
       alert('Erreur lors de la sauvegarde des paramètres')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Fonction spécifique pour sauvegarder les informations de l'entreprise
+  const handleSaveCompanyInfo = async () => {
+    try {
+      setIsSaving(true)
+      const companyData = {
+        companyName: settings.companyName,
+        companyEmail: settings.companyEmail,
+        companyPhone: settings.companyPhone,
+        companyAddress: settings.companyAddress,
+      }
+      const response = await apiClient.updateSettings(companyData)
+      if (response.data) {
+        alert('Informations de l\'entreprise sauvegardées avec succès !')
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des informations de l\'entreprise:', error)
+      alert('Erreur lors de la sauvegarde des informations de l\'entreprise')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Fonction spécifique pour sauvegarder la configuration API
+  const handleSaveApiSettings = async () => {
+    try {
+      setIsSaving(true)
+      const apiData = {
+        apiRateLimit: settings.apiRateLimit,
+        autoSync: settings.autoSync,
+        notifications: settings.notifications,
+        emailNotifications: settings.emailNotifications,
+        smsNotifications: settings.smsNotifications,
+      }
+      const response = await apiClient.updateSettings(apiData)
+      if (response.data) {
+        alert('Configuration API sauvegardée avec succès !')
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de la configuration API:', error)
+      alert('Erreur lors de la sauvegarde de la configuration API')
     } finally {
       setIsSaving(false)
     }
@@ -276,57 +324,51 @@ export default function SettingsPage() {
         {/* Company Information */}
         <Card className="kamri-card">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Settings className="w-5 h-5 text-primary-500" />
-              <span>Informations de l'entreprise</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-primary-500" />
+                <span>Informations de l'entreprise</span>
+              </div>
+              <Button 
+                onClick={() => setShowCompanyEditModal(true)}
+                variant="outline"
+                size="sm"
+                className="kamri-button"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nom de l'entreprise
-              </label>
-              <Input
-                value={settings.companyName}
-                onChange={(e) => setSettings({...settings, companyName: e.target.value})}
-                placeholder="KAMRI"
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom de l'entreprise
+                </label>
+                <p className="text-gray-900 font-medium">{settings.companyName}</p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <Input
-                value={settings.companyEmail}
-                onChange={(e) => setSettings({...settings, companyEmail: e.target.value})}
-                placeholder="admin@kamri.com"
-                type="email"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <p className="text-gray-900">{settings.companyEmail}</p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Téléphone
-              </label>
-              <Input
-                value={settings.companyPhone}
-                onChange={(e) => setSettings({...settings, companyPhone: e.target.value})}
-                placeholder="+33 1 23 45 67 89"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Téléphone
+                </label>
+                <p className="text-gray-900">{settings.companyPhone}</p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Adresse
-              </label>
-              <textarea
-                value={settings.companyAddress}
-                onChange={(e) => setSettings({...settings, companyAddress: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                rows={3}
-                placeholder="123 Rue de la Paix, 75001 Paris"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Adresse
+                </label>
+                <p className="text-gray-900">{settings.companyAddress}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -405,6 +447,18 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
+
+            {/* Bouton pour enregistrer la configuration API */}
+            <div className="pt-4 border-t border-gray-200">
+              <Button 
+                onClick={handleSaveApiSettings}
+                className="kamri-button"
+                disabled={isSaving}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Enregistrer la configuration
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -439,6 +493,90 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Popup d'édition des informations de l'entreprise */}
+      {showCompanyEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl mx-4">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-primary-500" />
+                <span>Modifier les informations de l'entreprise</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nom de l'entreprise
+                  </label>
+                  <Input
+                    value={settings.companyName}
+                    onChange={(e) => setSettings({...settings, companyName: e.target.value})}
+                    placeholder="KAMRI"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <Input
+                    value={settings.companyEmail}
+                    onChange={(e) => setSettings({...settings, companyEmail: e.target.value})}
+                    placeholder="admin@kamri.com"
+                    type="email"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Téléphone
+                  </label>
+                  <Input
+                    value={settings.companyPhone}
+                    onChange={(e) => setSettings({...settings, companyPhone: e.target.value})}
+                    placeholder="+33 1 23 45 67 89"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Adresse
+                  </label>
+                  <textarea
+                    value={settings.companyAddress}
+                    onChange={(e) => setSettings({...settings, companyAddress: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    rows={3}
+                    placeholder="123 Rue de la Paix, 75001 Paris"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCompanyEditModal(false)}
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    await handleSaveCompanyInfo()
+                    setShowCompanyEditModal(false)
+                  }}
+                  className="kamri-button"
+                  disabled={isSaving}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Sauvegarder
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

@@ -340,6 +340,23 @@ export class ApiClient {
       body: JSON.stringify(orderData),
     });
   }
+
+  // Settings methods
+  async getSettings(): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/settings');
+  }
+
+  async updateSettings(settingsData: any): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData),
+    });
+  }
+
+  // Company info (public)
+  async getCompanyInfo(): Promise<ApiResponse<any>> {
+    return this.fetchPublic('/settings/company-info');
+  }
 }
 
 // Instance globale
