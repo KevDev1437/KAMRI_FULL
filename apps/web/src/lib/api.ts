@@ -109,28 +109,6 @@ export class ApiClient {
     return !!this.token;
   }
 
-  // Méthode générique pour les appels API
-  private async fetchPublic(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        return { data };
-      } else {
-        return { error: data.message || 'Erreur API' };
-      }
-    } catch (error) {
-      return { error: 'Erreur réseau' };
-    }
-  }
 
   private async fetchPublic(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
     console.log('🌐 [API] fetchPublic appelé', { endpoint });
@@ -193,7 +171,7 @@ export class ApiClient {
   }
 
   async getProduct(id: string): Promise<ApiResponse<Product>> {
-    return this.fetchWithAuth(`/products/${id}`);
+    return this.fetchPublic(`/products/${id}`);
   }
 
   // Catégories
@@ -246,25 +224,25 @@ export class ApiClient {
   }
 
   // Wishlist methods
-  async getWishlist(userId: string): Promise<ApiResponse<any[]>> {
-    return this.fetchWithAuth(`/wishlist/${userId}`);
+  async getWishlist(): Promise<ApiResponse<any[]>> {
+    return this.fetchWithAuth('/wishlist');
   }
 
-  async addToWishlist(userId: string, productId: string): Promise<ApiResponse<any>> {
+  async addToWishlist(productId: string): Promise<ApiResponse<any>> {
     return this.fetchWithAuth('/wishlist', {
       method: 'POST',
-      body: JSON.stringify({ userId, productId }),
+      body: JSON.stringify({ productId }),
     });
   }
 
-  async removeFromWishlist(userId: string, productId: string): Promise<ApiResponse<void>> {
-    return this.fetchWithAuth(`/wishlist/${userId}/${productId}`, {
+  async removeFromWishlist(productId: string): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth(`/wishlist/${productId}`, {
       method: 'DELETE',
     });
   }
 
-  async clearWishlist(userId: string): Promise<ApiResponse<void>> {
-    return this.fetchWithAuth(`/wishlist/${userId}`, {
+  async clearWishlist(): Promise<ApiResponse<void>> {
+    return this.fetchWithAuth('/wishlist', {
       method: 'DELETE',
     });
   }

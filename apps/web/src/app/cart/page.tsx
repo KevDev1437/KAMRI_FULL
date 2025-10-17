@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import HomeFooter from '../../components/HomeFooter';
 import ModernHeader from '../../components/ModernHeader';
+import RecommendedProducts from '../../components/RecommendedProducts';
 import { useCart } from '../../contexts/CartContext';
 
 export default function CartPage() {
@@ -301,27 +302,7 @@ export default function CartPage() {
             </motion.div>
 
             {/* Produits recommandés */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="bg-white rounded-2xl shadow-lg p-6 mt-6"
-            >
-              <h3 className="text-lg font-semibold text-[#424242] mb-4">Vous pourriez aussi aimer</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { name: 'iPhone 15', price: 999, image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=200' },
-                  { name: 'AirPods Max', price: 549, image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=200' },
-                  { name: 'Apple Watch', price: 399, image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=200' }
-                ].map((product, index) => (
-                  <div key={index} className="flex flex-col items-center p-4 hover:bg-gray-50 rounded-lg transition-colors duration-300 cursor-pointer border border-gray-100">
-                    <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg mb-3" />
-                    <h4 className="font-medium text-[#424242] text-center mb-1">{product.name}</h4>
-                    <p className="text-sm text-[#4CAF50] font-semibold">{product.price}€</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+            <RecommendedProducts />
           </div>
 
           {/* Sidebar - Résumé et commande */}

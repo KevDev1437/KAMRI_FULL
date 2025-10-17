@@ -223,7 +223,7 @@ export default function FavoritesPage() {
                 </a>
               </motion.div>
             ) : (
-              <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+              <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
                 {sortedFavorites.map((item, index) => (
                   <motion.div
                     key={item.id}
@@ -238,13 +238,17 @@ export default function FavoritesPage() {
                         <img
                           src={item.product.image || '/images/placeholder-product.png'}
                           alt={item.product.name}
-                          className="w-20 h-20 object-cover rounded-lg"
+                          className="w-24 h-24 object-cover rounded-lg flex-shrink-0"
                         />
                         
                         {/* Détails */}
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-[#424242] mb-1">{item.product.name}</h3>
-                          <p className="text-sm text-gray-500 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-[#424242] mb-2 overflow-hidden" style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>{item.product.name}</h3>
+                          <p className="text-sm text-gray-500 mb-3">
                             {item.product.category?.name || 'Non catégorisé'} • {item.product.supplier?.name || 'N/A'}
                           </p>
                           

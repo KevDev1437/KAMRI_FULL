@@ -62,17 +62,27 @@ export default function ProductDetailsPage() {
         
         // Charger le produit spécifique
         const productResponse = await apiClient.getProduct(productId);
+        console.log('🔍 [ProductDetail] Response from API:', productResponse);
+        
         if (productResponse.data) {
-          setProduct(productResponse.data);
+          // L'API backend retourne { data: product, message: '...' }
+          // Notre API client retourne { data: { data: product, message: '...' } }
+          const backendData = productResponse.data.data || productResponse.data;
+          console.log('📦 [ProductDetail] Product data:', backendData);
+          setProduct(backendData);
           
           // Charger tous les produits pour les produits similaires
           const productsResponse = await apiClient.getProducts();
           if (productsResponse.data) {
-            setAllProducts(productsResponse.data);
+            // Même logique pour les produits
+            const backendProductsData = productsResponse.data.data || productsResponse.data;
+            const products = Array.isArray(backendProductsData) ? backendProductsData : [];
+            setAllProducts(products);
+            
             // Trouver des produits similaires
             const similar = getSimilarProducts(
-              productsResponse.data, 
-              productResponse.data.category?.name || '', 
+              products, 
+              backendData.category?.name || '', 
               productId
             );
             setSimilarProducts(similar);

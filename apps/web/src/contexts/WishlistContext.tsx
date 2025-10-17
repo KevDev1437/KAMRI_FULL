@@ -64,10 +64,13 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
     try {
       setLoading(true);
       console.log('🔄 [refreshWishlist] Appel API getWishlist...');
-      const response = await apiClient.getWishlist(userId);
+      const response = await apiClient.getWishlist();
       console.log('📡 [refreshWishlist] Réponse API:', response);
       if (response.data) {
-        const items = Array.isArray(response.data) ? response.data : [];
+        // Le backend retourne { data: wishlist, message: '...' }
+        // Donc response.data contient { data: [...], message: '...' }
+        const backendData = response.data.data || response.data;
+        const items = Array.isArray(backendData) ? backendData : [];
         console.log('📦 [refreshWishlist] Items récupérés:', items.length, items);
         setWishlistItems(items);
         console.log('✅ [refreshWishlist] wishlistItems mis à jour avec:', items.length, 'items');
@@ -93,7 +96,7 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
     
     try {
       console.log('📡 [WishlistContext] Appel API...');
-      const response = await apiClient.addToWishlist(userId, productId);
+      const response = await apiClient.addToWishlist(productId);
       console.log('📡 [WishlistContext] Réponse API:', response);
       
       if (response.data) {
@@ -120,7 +123,7 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
     if (!userId) return;
     
     try {
-      await apiClient.removeFromWishlist(userId, productId);
+      await apiClient.removeFromWishlist(productId);
       await refreshWishlist();
     } catch (error) {
       console.error('Erreur lors de la suppression des favoris:', error);
@@ -132,7 +135,7 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children, us
     if (!userId) return;
     
     try {
-      await apiClient.clearWishlist(userId);
+      await apiClient.clearWishlist();
       await refreshWishlist();
     } catch (error) {
       console.error('Erreur lors du vidage des favoris:', error);
