@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { apiClient } from '@/lib/api'
 import {
     DollarSign,
@@ -56,6 +57,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
   const { isAuthenticated } = useAuth()
+  const { theme, accentColor, setTheme, setAccentColor } = useTheme()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -187,22 +189,22 @@ export default function SettingsPage() {
               </label>
               <div className="flex space-x-4">
                 <button
-                  onClick={() => setSettings({...settings, theme: 'light'})}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                    settings.theme === 'light' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                  onClick={() => setTheme('light')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'light' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <Sun className="w-4 h-4" />
                   <span>Clair</span>
                 </button>
                 <button
-                  onClick={() => setSettings({...settings, theme: 'dark'})}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                    settings.theme === 'dark' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                  onClick={() => setTheme('dark')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <Moon className="w-4 h-4" />
-                  <span>Sombre</span>
+                  <span>Gris</span>
                 </button>
               </div>
             </div>
@@ -214,13 +216,13 @@ export default function SettingsPage() {
               <div className="flex items-center space-x-3">
                 <input
                   type="color"
-                  value={settings.accentColor}
-                  onChange={(e) => setSettings({...settings, accentColor: e.target.value})}
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
                   className="w-12 h-10 border border-gray-200 rounded-lg cursor-pointer"
                 />
                 <Input
-                  value={settings.accentColor}
-                  onChange={(e) => setSettings({...settings, accentColor: e.target.value})}
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
                   className="flex-1"
                 />
               </div>
@@ -417,7 +419,7 @@ export default function SettingsPage() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">Thème</h4>
               <p className="text-sm text-gray-600">
-                {settings.theme === 'dark' ? 'Mode sombre' : 'Mode clair'} avec couleur d'accent {settings.accentColor}
+                {theme === 'dark' ? 'Mode gris' : 'Mode clair'} avec couleur d'accent {accentColor}
               </p>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">

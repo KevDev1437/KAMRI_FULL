@@ -1,7 +1,9 @@
 import AuthGuard from '@/components/AuthGuard'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import '../styles/theme.css'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -20,11 +22,13 @@ export default function RootLayout({
     <html lang="fr">
       <body className={inter.className}>
         <AuthProvider>
-          <AuthGuard>
-            <div className="min-h-screen bg-gray-50">
-              {children}
-            </div>
-          </AuthGuard>
+          <ThemeProvider>
+            <AuthGuard>
+              <div className="min-h-screen bg-gray-50">
+                {children}
+              </div>
+            </AuthGuard>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>
