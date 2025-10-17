@@ -148,9 +148,14 @@ export default function CartPage() {
                 </button>
                 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirm('Êtes-vous sûr de vouloir vider votre panier ?')) {
-                      setCartItems([]);
+                      try {
+                        await clearCart();
+                        console.log('✅ Panier vidé avec succès');
+                      } catch (error) {
+                        console.error('❌ Erreur lors du vidage du panier:', error);
+                      }
                     }
                   }}
                   className="flex items-center gap-2 text-red-500 hover:text-red-600 transition-colors duration-300"
@@ -252,7 +257,7 @@ export default function CartPage() {
                         </div>
                       </div>
                       
-                      {!item.inStock && (
+                      {item.product.stock <= 0 && (
                         <div className="mt-2">
                           <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-sm font-medium">
                             Rupture de stock
@@ -369,9 +374,12 @@ export default function CartPage() {
                   </svg>
                 </motion.button>
                 
-                <button className="w-full text-[#4CAF50] hover:text-[#45a049] font-medium transition-colors duration-300">
+                <a 
+                  href="/products" 
+                  className="w-full text-[#4CAF50] hover:text-[#45a049] font-medium transition-colors duration-300 text-center block py-2"
+                >
                   Continuer mes achats
-                </button>
+                </a>
               </div>
             </motion.div>
 

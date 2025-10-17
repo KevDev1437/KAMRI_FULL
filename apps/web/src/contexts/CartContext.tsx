@@ -13,6 +13,7 @@ interface CartItem {
     price: number;
     originalPrice?: number;
     image?: string;
+    stock: number;
     category?: {
       name: string;
     };
