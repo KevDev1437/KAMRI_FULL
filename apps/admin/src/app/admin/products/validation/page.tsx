@@ -68,7 +68,11 @@ export default function ProductValidationPage() {
     try {
       const response = await apiClient.getProductsReadyForValidation(selectedCategoryId || undefined)
       if (response.data) {
-        setPendingProducts(response.data)
+        // L'API retourne { data: [...], message: "..." }, on doit extraire data
+        const productsData = response.data.data || response.data;
+        // S'assurer que productsData est un tableau
+        const productsArray = Array.isArray(productsData) ? productsData : [];
+        setPendingProducts(productsArray);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des produits prêts pour validation:', error)

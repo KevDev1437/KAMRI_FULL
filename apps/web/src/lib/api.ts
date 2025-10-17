@@ -132,6 +132,33 @@ export class ApiClient {
     }
   }
 
+  private async fetchPublic(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
+    console.log('🌐 [API] fetchPublic appelé', { endpoint });
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      const data = await response.json();
+      console.log('📡 [API] Réponse publique reçue', { status: response.status, data });
+
+      if (response.ok) {
+        return { data };
+      } else {
+        console.log('❌ [API] Erreur API publique', { status: response.status, error: data.message });
+        return { error: data.message || 'Erreur API' };
+      }
+    } catch (error) {
+      console.log('❌ [API] Erreur réseau publique', error);
+      return { error: 'Erreur réseau' };
+    }
+  }
+
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<ApiResponse> {
     console.log('🔑 [API] fetchWithAuth appelé', { endpoint, hasToken: !!this.token });
     
@@ -171,7 +198,7 @@ export class ApiClient {
 
   // Catégories
   async getCategories(): Promise<ApiResponse<Category[]>> {
-    return this.fetchWithAuth('/categories');
+    return this.fetchPublic('/categories');
   }
 
   async createCategory(categoryData: { name: string; description?: string; icon?: string; color?: string }): Promise<ApiResponse<Category>> {

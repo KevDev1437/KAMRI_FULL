@@ -37,6 +37,7 @@ model Category {
   description String?
   icon        String?   @default("🛍️")
   color       String?   @default("#4CAF50")
+  isDefault   Boolean   @default(false) // ✅ Catégories par défaut non supprimables
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

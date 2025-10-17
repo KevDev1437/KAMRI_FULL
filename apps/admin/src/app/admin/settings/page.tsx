@@ -70,7 +70,9 @@ export default function SettingsPage() {
       setIsLoading(true)
       const response = await apiClient.getSettings()
       if (response.data) {
-        setSettings(response.data)
+        // L'API retourne { data: {...}, message: "..." }, on doit extraire data
+        const settingsData = response.data.data || response.data;
+        setSettings(settingsData);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres:', error)

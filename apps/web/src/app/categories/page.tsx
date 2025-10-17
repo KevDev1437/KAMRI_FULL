@@ -44,19 +44,26 @@ export default function CategoriesPage() {
         
         // Charger les catégories depuis l'API
         const categoriesResponse = await apiClient.getCategories();
+        console.log('🔍 [CATEGORIES] Response from API:', categoriesResponse);
+        
         if (categoriesResponse.data) {
-          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
-          const categoriesList = Array.isArray(categoriesData) ? categoriesData : [];
+          // L'API backend retourne { data: categories, message: '...' }
+          // Notre API client retourne { data: { data: categories, message: '...' } }
+          const backendData = categoriesResponse.data.data || categoriesResponse.data;
+          const categoriesList = Array.isArray(backendData) ? backendData : [];
+          console.log('📂 [CATEGORIES] Categories list:', categoriesList);
           
           // Charger les produits pour compter par catégorie
           const productsResponse = await apiClient.getProducts();
           if (productsResponse.data) {
-            const products = productsResponse.data;
+            // Même logique pour les produits
+            const backendProductsData = productsResponse.data.data || productsResponse.data;
+            const products = Array.isArray(backendProductsData) ? backendProductsData : [];
             
             // Enrichir les catégories avec le nombre de produits et la configuration
             const enrichedCategories = categoriesList.map(category => {
               const productCount = products.filter((product: Product) => 
-                product.category?.id === category.id
+                product.category?.name === category.name
               ).length;
               
               const config = getCategoryConfig(category);
@@ -91,10 +98,12 @@ export default function CategoriesPage() {
           }
         } else {
           // Si pas de catégories, afficher un message
+          console.log('⚠️ [CATEGORIES] No data in response');
           setCategories([]);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des catégories:', error);
+        console.error('❌ [CATEGORIES] Erreur lors du chargement des catégories:', error);
+        setCategories([]);
       } finally {
         setLoading(false);
       }

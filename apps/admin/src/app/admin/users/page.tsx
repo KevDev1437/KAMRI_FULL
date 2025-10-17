@@ -2,21 +2,21 @@
 
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import {
-    Edit,
-    Mail,
-    Plus,
-    Search,
-    Shield,
-    Trash2,
-    User,
-    UserCheck,
-    Users,
-    UserX
+  Edit,
+  Mail,
+  Plus,
+  Search,
+  Shield,
+  Trash2,
+  User,
+  UserCheck,
+  Users,
+  UserX
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -51,7 +51,11 @@ export default function UsersPage() {
       setIsLoading(true)
       const response = await apiClient.getUsers()
       if (response.data) {
-        setUsers(response.data)
+        // L'API retourne { data: [...], message: "..." }, on doit extraire data
+        const usersData = response.data.data || response.data;
+        // S'assurer que usersData est un tableau
+        const usersArray = Array.isArray(usersData) ? usersData : [];
+        setUsers(usersArray);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error)

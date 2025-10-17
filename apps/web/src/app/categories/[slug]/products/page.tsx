@@ -6,31 +6,8 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import HomeFooter from '../../../../components/HomeFooter';
 import ModernHeader from '../../../../components/ModernHeader';
-import ProductCard from '../../../../components/ProductCard';
 import ProductFilters from '../../../../components/ProductFilters';
-import { apiClient } from '../../../../lib/api';
-
-interface Category {
-  id: string;
-  name: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string | null;
-  category: {
-    id: string;
-    name: string;
-  } | null;
-  badge: string | null;
-  stock: number;
-  supplier: {
-    name: string;
-  };
-}
+import { apiClient, Category, Product } from '../../../../lib/api';
 
 export default function CategoryProductsPage() {
   const params = useParams();
@@ -58,9 +35,14 @@ export default function CategoryProductsPage() {
         
         // Charger toutes les catégories pour trouver celle correspondant au slug
         const categoriesResponse = await apiClient.getCategories();
+        console.log('🔍 [CATEGORY-PRODUCTS] Response from API:', categoriesResponse);
+        
         if (categoriesResponse.data) {
-          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
-          const categories = Array.isArray(categoriesData) ? categoriesData : [];
+          // L'API backend retourne { data: categories, message: '...' }
+          // Notre API client retourne { data: { data: categories, message: '...' } }
+          const backendData = categoriesResponse.data.data || categoriesResponse.data;
+          const categories = Array.isArray(backendData) ? backendData : [];
+          console.log('📂 [CATEGORY-PRODUCTS] Categories list:', categories);
           
           // Debug: Afficher les catégories et le slug
           console.log('🔍 [PRODUCTS] Slug recherché (encodé):', slug);
@@ -83,9 +65,12 @@ export default function CategoryProductsPage() {
             // Charger tous les produits
             const productsResponse = await apiClient.getProducts();
             if (productsResponse.data) {
+              // Même logique pour les produits
+              const backendProductsData = productsResponse.data.data || productsResponse.data;
+              const products = Array.isArray(backendProductsData) ? backendProductsData : [];
               // Filtrer les produits de cette catégorie
-              const categoryProducts = productsResponse.data.filter((product: Product) => 
-                product.category?.id === foundCategory.id
+              const categoryProducts = products.filter((product) => 
+                product.category?.name === foundCategory.name
               );
               setProducts(categoryProducts);
             }
@@ -292,7 +277,51 @@ export default function CategoryProductsPage() {
                     : 'grid-cols-1'
                 }`}>
                   {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <div key={product.id} className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300">
+                      <Link href={`/product/${product.id}`} className="block">
+                        <div className="h-56 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative overflow-hidden">
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <svg className="h-16 w-16 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          {product.badge && (
+                            <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold bg-[#4CAF50] text-white">
+                              {product.badge}
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-6">
+                          <div className="mb-2">
+                            <span className="text-sm text-[#81C784] font-medium">
+                              {product.supplier?.name || 'N/A'}
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-semibold text-[#424242] mb-3 line-clamp-2">
+                            {product.name}
+                          </h3>
+                          <div className="flex items-baseline gap-2 mb-4">
+                            <p className="text-2xl font-bold text-[#4CAF50]">
+                              {product.price.toFixed(2)}€
+                            </p>
+                            {product.originalPrice && (
+                              <p className="text-lg text-[#9CA3AF] line-through">
+                                {product.originalPrice.toFixed(2)}€
+                              </p>
+                            )}
+                          </div>
+                          <div className="w-full bg-[#4CAF50] text-white py-3 px-6 rounded-full font-bold text-center">
+                            Voir détails
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
                   ))}
                 </div>
 

@@ -2,19 +2,19 @@
 
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import {
-    CheckCircle,
-    Clock,
-    Eye,
-    Package,
-    Search,
-    ShoppingCart,
-    Truck,
-    XCircle
+  CheckCircle,
+  Clock,
+  Eye,
+  Package,
+  Search,
+  ShoppingCart,
+  Truck,
+  XCircle
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -59,7 +59,11 @@ export default function OrdersPage() {
       setIsLoading(true)
       const response = await apiClient.getOrders()
       if (response.data) {
-        setOrders(response.data)
+        // L'API retourne { data: [...], message: "..." }, on doit extraire data
+        const ordersData = response.data.data || response.data;
+        // S'assurer que ordersData est un tableau
+        const ordersArray = Array.isArray(ordersData) ? ordersData : [];
+        setOrders(ordersArray);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des commandes:', error)
@@ -147,7 +151,7 @@ export default function OrdersPage() {
     }
   }
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = orders && Array.isArray(orders) ? orders.filter(order => {
     const matchesSearch = 
       order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -156,7 +160,7 @@ export default function OrdersPage() {
     const matchesStatus = statusFilter === 'Tous' || order.status === statusFilter
     
     return matchesSearch && matchesStatus
-  })
+  }) : []
 
   return (
     <div className="space-y-6">

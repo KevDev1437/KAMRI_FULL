@@ -10,11 +10,17 @@ interface Product {
   price: number;
   originalPrice: number | null;
   image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
+  rating?: number;
+  reviews?: number;
   badge: string | null;
-  brand: string;
+  brand?: string;
+  supplier?: {
+    name: string;
+  };
 }
 
 interface ProductCardProps {
@@ -131,9 +137,9 @@ export default function ProductCard({ product }: ProductCardProps) {
       
       {/* Product info */}
       <div className="p-6">
-        <div className="mb-2">
-          <span className="text-sm text-[#81C784] font-medium">{product.brand}</span>
-        </div>
+              <div className="mb-2">
+                <span className="text-sm text-[#81C784] font-medium">{product.brand || product.supplier?.name || 'N/A'}</span>
+              </div>
         
         <h3 className="text-lg font-semibold text-[#424242] mb-3 line-clamp-2">{product.name}</h3>
         
@@ -143,7 +149,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             {[...Array(5)].map((_, i) => (
               <svg
                 key={i}
-                className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}
+                className={`h-4 w-4 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -151,7 +157,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               </svg>
             ))}
           </div>
-          <span className="text-sm text-[#81C784]">({product.reviews})</span>
+          <span className="text-sm text-[#81C784]">({product.reviews || 0})</span>
         </div>
         
         {/* Price */}

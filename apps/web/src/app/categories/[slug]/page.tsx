@@ -7,28 +7,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import HomeFooter from '../../../components/HomeFooter';
 import ModernHeader from '../../../components/ModernHeader';
-import { apiClient } from '../../../lib/api';
-
-interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string | null;
-  badge: string | null;
-  stock: number;
-  supplier: {
-    name: string;
-  };
-}
+import { apiClient, Category, Product } from '../../../lib/api';
 
 export default function CategoryPage() {
   const params = useParams();
@@ -48,9 +27,14 @@ export default function CategoryPage() {
         
         // Charger toutes les catégories pour trouver celle correspondant au slug
         const categoriesResponse = await apiClient.getCategories();
+        console.log('🔍 [CATEGORY-SLUG] Response from API:', categoriesResponse);
+        
         if (categoriesResponse.data) {
-          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
-          const categories = Array.isArray(categoriesData) ? categoriesData : [];
+          // L'API backend retourne { data: categories, message: '...' }
+          // Notre API client retourne { data: { data: categories, message: '...' } }
+          const backendData = categoriesResponse.data.data || categoriesResponse.data;
+          const categories = Array.isArray(backendData) ? backendData : [];
+          console.log('📂 [CATEGORY-SLUG] Categories list:', categories);
           
           // Debug: Afficher les catégories et le slug
           console.log('🔍 Slug recherché (encodé):', slug);
@@ -73,8 +57,11 @@ export default function CategoryPage() {
             // Charger les produits de cette catégorie (limité à 6 pour la page d'accueil)
             const productsResponse = await apiClient.getProducts();
             if (productsResponse.data) {
-              const categoryProducts = productsResponse.data.filter((product: Product) => 
-                product.category?.id === foundCategory.id
+              // Même logique pour les produits
+              const backendProductsData = productsResponse.data.data || productsResponse.data;
+              const products = Array.isArray(backendProductsData) ? backendProductsData : [];
+              const categoryProducts = products.filter((product) => 
+                product.category?.name === foundCategory.name
               );
               setFeaturedProducts(categoryProducts.slice(0, 6));
             }
@@ -193,57 +180,58 @@ export default function CategoryPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredProducts.map((product, index) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
-                >
-                  <div className="relative h-48 bg-gray-100">
-                    {product.image ? (
-                      <img 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400">
-                        🛍️
-                      </div>
-                    )}
-                    {product.badge && (
-                      <div className="absolute top-3 left-3 bg-[#4CAF50] text-white px-2 py-1 rounded-full text-xs font-semibold">
-                        {product.badge}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold text-[#424242] mb-2 line-clamp-2">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-3">
-                      {product.supplier?.name || 'Fournisseur inconnu'}
-                    </p>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xl font-bold text-[#4CAF50]">
-                          {product.price.toFixed(2)}€
-                        </span>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="text-sm text-gray-500 line-through">
-                            {product.originalPrice.toFixed(2)}€
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm text-gray-500">
-                        {product.stock} en stock
-                      </span>
+                <Link key={product.id} href={`/product/${product.id}`}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
+                  >
+                    <div className="relative h-48 bg-gray-100">
+                      {product.image ? (
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400">
+                          🛍️
+                        </div>
+                      )}
+                      {product.badge && (
+                        <div className="absolute top-3 left-3 bg-[#4CAF50] text-white px-2 py-1 rounded-full text-xs font-semibold">
+                          {product.badge}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </motion.div>
+                    
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-[#424242] mb-2 line-clamp-2">
+                        {product.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-3">
+                        {product.supplier?.name || 'Fournisseur inconnu'}
+                      </p>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xl font-bold text-[#4CAF50]">
+                            {product.price.toFixed(2)}€
+                          </span>
+                          {product.originalPrice && product.originalPrice > product.price && (
+                            <span className="text-sm text-gray-500 line-through">
+                              {product.originalPrice.toFixed(2)}€
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {product.stock} en stock
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
               ))}
             </div>
           </div>

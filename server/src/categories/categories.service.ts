@@ -59,6 +59,15 @@ export class CategoriesService {
   }
 
   async remove(id: string) {
+    // Vérifier si c'est une catégorie par défaut
+    const category = await this.prisma.category.findUnique({
+      where: { id }
+    });
+
+    if (category?.isDefault) {
+      throw new Error('Impossible de supprimer une catégorie par défaut');
+    }
+
     // Vérifier s'il y a des produits dans cette catégorie
     const productsCount = await this.prisma.product.count({
       where: { categoryId: id }

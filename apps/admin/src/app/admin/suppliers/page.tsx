@@ -58,7 +58,11 @@ export default function SuppliersPage() {
       setIsLoading(true)
       const response = await apiClient.getSuppliers()
       if (response.data) {
-        setSuppliers(response.data)
+        // L'API retourne { data: [...], message: "..." }, on doit extraire data
+        const suppliersData = response.data.data || response.data;
+        // S'assurer que suppliersData est un tableau
+        const suppliersArray = Array.isArray(suppliersData) ? suppliersData : [];
+        setSuppliers(suppliersArray);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des fournisseurs:', error)
