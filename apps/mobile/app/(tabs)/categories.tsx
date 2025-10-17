@@ -1,66 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
+import { apiClient, Product } from '../../lib/api';
 
 const { width } = Dimensions.get('window');
 
-// Données mock pour les 7 catégories fixes
-const categories = [
-  {
-    id: 1,
-    name: 'Mode',
-    icon: '👕',
-    color: '#FF6B6B',
-    count: 156
-  },
-  {
-    id: 2,
-    name: 'Technologie',
-    icon: '💻',
-    color: '#4ECDC4',
-    count: 89
-  },
-  {
-    id: 3,
-    name: 'Maison',
-    icon: '🏠',
-    color: '#45B7D1',
-    count: 234
-  },
-  {
-    id: 4,
-    name: 'Beauté',
-    icon: '💄',
-    color: '#FECA57',
-    count: 123
-  },
-  {
-    id: 5,
-    name: 'Accessoires',
-    icon: '🎒',
-    color: '#96CEB4',
-    count: 67
-  },
-  {
-    id: 6,
-    name: 'Sport',
-    icon: '⚽',
-    color: '#A8E6CF',
-    count: 45
-  },
-  {
-    id: 7,
-    name: 'Enfants',
-    icon: '🧸',
-    color: '#FFB6C1',
-    count: 78
-  }
-];
+// Utiliser les icônes et couleurs du backend
+const getCategoryConfig = (category: any) => {
+  return {
+    icon: category.icon || '🛍️',
+    color: category.color || '#4CAF50'
+  };
+};
 
 const trendingItems = [
   {
@@ -87,11 +44,88 @@ const trendingItems = [
 ];
 
 export default function CategoriesScreen() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [popularScrollIndex, setPopularScrollIndex] = useState(0);
   const [trendingScrollIndex, setTrendingScrollIndex] = useState(0);
   const popularFlatListRef = useRef<FlatList>(null);
   const trendingFlatListRef = useRef<FlatList>(null);
+
+  // Charger les catégories depuis l'API
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        console.log('📂 [CATEGORIES-MOBILE] Début du chargement des catégories');
+        setLoading(true);
+        
+        // Charger les catégories depuis l'API
+        const categoriesResponse = await apiClient.getCategories();
+        console.log('📂 [CATEGORIES-MOBILE] Réponse API catégories:', categoriesResponse);
+        
+        if (categoriesResponse.data) {
+          const backendData = categoriesResponse.data.data || categoriesResponse.data;
+          const categoriesList = Array.isArray(backendData) ? backendData : [];
+          console.log('📂 [CATEGORIES-MOBILE] Catégories chargées:', categoriesList.length);
+          
+          // Charger les produits pour compter par catégorie
+          const productsResponse = await apiClient.getProducts();
+          if (productsResponse.data) {
+            const backendProductsData = productsResponse.data.data || productsResponse.data;
+            const products = Array.isArray(backendProductsData) ? backendProductsData : [];
+            console.log('🛍️ [CATEGORIES-MOBILE] Produits chargés:', products.length);
+            
+            // Enrichir les catégories avec le nombre de produits et la configuration
+            const enrichedCategories = categoriesList.map(category => {
+              const productCount = products.filter((product: Product) => 
+                product.category?.name === category.name
+              ).length;
+              
+              const config = getCategoryConfig(category);
+              
+              return {
+                id: category.id,
+                name: category.name,
+                count: productCount,
+                color: config.color,
+                icon: config.icon
+              };
+            });
+            
+            console.log('📂 [CATEGORIES-MOBILE] Catégories enrichies:', enrichedCategories);
+            setCategories(enrichedCategories);
+          } else {
+            // Si pas de produits, afficher quand même les catégories avec 0 produits
+            const enrichedCategories = categoriesList.map(category => {
+              const config = getCategoryConfig(category);
+              
+              return {
+                id: category.id,
+                name: category.name,
+                count: 0,
+                color: config.color,
+                icon: config.icon
+              };
+            });
+            
+            setCategories(enrichedCategories);
+          }
+        } else {
+          console.log('⚠️ [CATEGORIES-MOBILE] Pas de données dans la réponse');
+          setCategories([]);
+        }
+      } catch (error) {
+        console.error('❌ [CATEGORIES-MOBILE] Erreur lors du chargement des catégories:', error);
+        setCategories([]);
+      } finally {
+        setLoading(false);
+        console.log('📂 [CATEGORIES-MOBILE] Chargement terminé');
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Auto-scroll pour les catégories populaires - adaptatif selon le nombre de catégories affichées
   useEffect(() => {
@@ -125,8 +159,28 @@ export default function CategoriesScreen() {
     return () => clearInterval(interval);
   }, [trendingScrollIndex, trendingItems.length]);
 
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Fonctions de navigation comme sur le web
+  const handleCategoryClick = (category: any) => {
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    console.log('📂 [CATEGORIES-MOBILE] Navigation vers catégorie:', slug);
+    router.push(`/categories/${slug}`);
+  };
+
+  const handleViewAllClick = (category: any) => {
+    const slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    console.log('🛍️ [CATEGORIES-MOBILE] Navigation vers produits:', slug);
+    router.push(`/categories/${slug}/products`);
+  };
+
   const renderCategoryCard = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.categoryCard}>
+    <TouchableOpacity 
+      style={styles.categoryCard}
+      onPress={() => handleCategoryClick(item)}
+    >
       <View style={[styles.categoryIcon, { backgroundColor: item.color + '20' }]}>
         <ThemedText style={styles.categoryEmoji}>{item.icon}</ThemedText>
       </View>
@@ -204,17 +258,38 @@ export default function CategoriesScreen() {
         {/* Grille des catégories */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Toutes les catégories</ThemedText>
-          <View style={styles.categoriesGrid}>
-            {categories.map((category) => (
-              <TouchableOpacity key={category.id} style={styles.categoryCard}>
-                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                  <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
-                </View>
-                <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
-                <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
+          
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ThemedText style={styles.loadingIcon}>⏳</ThemedText>
+              <ThemedText style={styles.loadingTitle}>Chargement des catégories...</ThemedText>
+              <ThemedText style={styles.loadingSubtitle}>Veuillez patienter</ThemedText>
+            </View>
+          ) : filteredCategories.length > 0 ? (
+            <View style={styles.categoriesGrid}>
+              {filteredCategories.map((category) => (
+                <TouchableOpacity 
+                  key={category.id} 
+                  style={styles.categoryCard}
+                  onPress={() => handleCategoryClick(category)}
+                >
+                  <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                    <ThemedText style={styles.categoryEmoji}>{category.icon}</ThemedText>
+                  </View>
+                  <ThemedText style={styles.categoryName}>{category.name}</ThemedText>
+                  <ThemedText style={styles.categoryCount}>{category.count} produits</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyIcon}>📂</ThemedText>
+              <ThemedText style={styles.emptyTitle}>Aucune catégorie trouvée</ThemedText>
+              <ThemedText style={styles.emptySubtitle}>
+                {searchQuery ? 'Essayez un autre terme de recherche' : 'Les catégories seront disponibles bientôt'}
+              </ThemedText>
+            </View>
+          )}
         </View>
 
         {/* Catégories Populaires */}
@@ -224,7 +299,10 @@ export default function CategoriesScreen() {
             ref={popularFlatListRef}
             data={categories.slice(0, 4)}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.popularCard}>
+              <TouchableOpacity 
+                style={styles.popularCard}
+                onPress={() => handleCategoryClick(item)}
+              >
                 <View style={[styles.popularIcon, { backgroundColor: item.color + '20' }]}>
                   <ThemedText style={styles.popularEmoji}>{item.icon}</ThemedText>
                 </View>
@@ -581,5 +659,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  // États de chargement et d'erreur
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  loadingIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loadingSubtitle: {
+    fontSize: 14,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#81C784',
+    textAlign: 'center',
   },
 });

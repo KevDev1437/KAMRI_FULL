@@ -2,148 +2,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomNavigation from '../../components/BottomNavigation';
+import CurvedBottomNav from '../../components/CurvedBottomNav';
+import UnifiedHeader from '../../components/UnifiedHeader';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
+import { apiClient, Product } from '../../lib/api';
 
-// Mock data pour les produits (même que web)
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'mode',
-    type: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'tendance',
-    brand: 'KAMRI',
-    description: 'T-shirt en coton bio premium avec coupe moderne et confortable. Parfait pour toutes les occasions.',
-    sizes: ['S', 'M', 'L', 'XL'],
-    colors: ['Blanc', 'Noir', 'Gris'],
-    specifications: null,
-    inStock: true,
-    stockCount: 15
-  },
-  { 
-    id: '2', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'technologie',
-    type: 'tech',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand',
-    description: 'Smartphone haut de gamme avec écran OLED 6.7", processeur 8 cœurs et caméra 108MP.',
-    sizes: null,
-    colors: ['Noir', 'Blanc', 'Bleu'],
-    specifications: {
-      'Écran': '6.7" OLED',
-      'Processeur': '8 cœurs 3.2GHz',
-      'Mémoire': '256GB',
-      'Caméra': '108MP',
-      'Batterie': '5000mAh',
-      'OS': 'Android 14'
-    },
-    inStock: true,
-    stockCount: 8
-  },
-  { 
-    id: '3', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'mode',
-    type: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
-    brand: 'KAMRI',
-    description: 'Jean slim fit en denim stretch pour un confort optimal et un style moderne.',
-    sizes: ['28', '30', '32', '34', '36'],
-    colors: ['Bleu', 'Noir'],
-    specifications: null,
-    inStock: true,
-    stockCount: 12
-  },
-  { 
-    id: '4', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: require('../../assets/images/modelo.png'),
-    images: [require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png'), require('../../assets/images/modelo.png')],
-    category: 'technologie',
-    type: 'tech',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech',
-    description: 'Laptop gaming haute performance avec carte graphique dédiée et écran 144Hz.',
-    sizes: null,
-    colors: ['Noir', 'Rouge'],
-    specifications: {
-      'Processeur': 'Intel i7-12700H',
-      'Carte Graphique': 'RTX 4060 8GB',
-      'RAM': '16GB DDR5',
-      'Stockage': '512GB SSD',
-      'Écran': '15.6" 144Hz',
-      'OS': 'Windows 11'
-    },
-    inStock: true,
-    stockCount: 5
-  }
-];
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  image: any;
-  images: any[];
-  category: string;
-  type: 'mode' | 'tech';
-  rating: number;
-  reviews: number;
-  badge: string | null;
-  brand: string;
-  description: string;
-  sizes: string[] | null;
-  colors: string[];
-  specifications: Record<string, string> | null;
-  inStock: boolean;
-  stockCount: number;
-}
-
-// Fonction pour récupérer un produit par ID
-function getProductById(id: string): Product | null {
-  return mockProducts.find(product => product.id === id) || null;
-}
-
-// Fonction pour récupérer des produits similaires
-function getSimilarProducts(category: string, currentId: string): Product[] {
-  return mockProducts
-    .filter(product => product.category === category && product.id !== currentId)
-    .slice(0, 3);
+// Interface Product mise à jour pour correspondre à l'API
+interface ProductDetails extends Product {
+  description?: string;
+  sizes?: string[] | null;
+  colors?: string[];
+  specifications?: Record<string, string> | null;
+  inStock?: boolean;
+  stockCount?: number;
+  images?: string[];
+  type?: 'mode' | 'tech';
+  rating?: number;
+  reviews?: number;
+  brand?: string;
 }
 
 export default function ProductDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   
-  const [product, setProduct] = useState<Product | null>(null);
-  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [product, setProduct] = useState<ProductDetails | null>(null);
+  const [similarProducts, setSimilarProducts] = useState<ProductDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -151,31 +36,191 @@ export default function ProductDetailsScreen() {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
-    const foundProduct = getProductById(id);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      setSimilarProducts(getSimilarProducts(foundProduct.category, foundProduct.id));
-      setSelectedColor(foundProduct.colors[0]);
+    const loadProduct = async () => {
+      try {
+        console.log('🛍️ [PRODUCT-DETAILS] Chargement du produit:', id);
+        setLoading(true);
+        
+        // Charger le produit depuis l'API
+        const response = await apiClient.getProduct(id);
+        console.log('🛍️ [PRODUCT-DETAILS] Réponse API:', response);
+        
+        if (response.data) {
+          const productData = response.data.data || response.data;
+          console.log('🛍️ [PRODUCT-DETAILS] Produit chargé:', productData);
+          console.log('🛍️ [PRODUCT-DETAILS] Image originale:', productData.image);
+          console.log('🛍️ [PRODUCT-DETAILS] Images relation:', productData.images);
+          console.log('🛍️ [PRODUCT-DETAILS] Type des images:', typeof productData.images, Array.isArray(productData.images));
+          
+          // Enrichir avec des données par défaut pour l'affichage
+          const enrichedProduct: ProductDetails = {
+            ...productData,
+            description: productData.description || 'Produit de qualité supérieure',
+            sizes: productData.sizes || ['S', 'M', 'L', 'XL'],
+            colors: productData.colors || ['Blanc', 'Noir', 'Gris'],
+            specifications: productData.specifications || null,
+            inStock: productData.stock > 0,
+            stockCount: productData.stock || 0,
+            images: (() => {
+              // Si le produit a des images dans la base de données (relation Image)
+              if (productData.images && Array.isArray(productData.images) && productData.images.length > 0) {
+                console.log('🖼️ [PRODUCT-DETAILS] Images depuis la base de données:', productData.images);
+                return productData.images.map((img: any) => img.url || img);
+              }
+              
+              // Sinon, utiliser l'image principale et générer des variantes
+              if (!productData.image) return [];
+              
+              const baseImages = [productData.image];
+              
+              // Générer des variantes d'images pour la démonstration
+              if (productData.image.includes('dummyjson')) {
+                // Pour DummyJSON, générer des variantes réalistes
+                const variants = [
+                  productData.image.replace('thumbnail', 'image1'),
+                  productData.image.replace('thumbnail', 'image2'),
+                  productData.image.replace('thumbnail', 'image3'),
+                  productData.image.replace('thumbnail', 'image4')
+                ].filter(img => img !== productData.image);
+                
+                return [...baseImages, ...variants];
+              } else if (productData.image.includes('fakestoreapi')) {
+                // Pour Fake Store API, générer des variantes avec Picsum
+                const variants = [
+                  'https://picsum.photos/300/300?random=1',
+                  'https://picsum.photos/300/300?random=2',
+                  'https://picsum.photos/300/300?random=3'
+                ];
+                
+                return [...baseImages, ...variants];
+              } else {
+                // Pour d'autres sources, générer des variantes avec des paramètres différents
+                const variants = [
+                  `${productData.image}?v=1&t=${Date.now()}`,
+                  `${productData.image}?v=2&t=${Date.now()}`,
+                  `${productData.image}?v=3&t=${Date.now()}`
+                ];
+                
+                return [...baseImages, ...variants];
+              }
+            })(),
+            type: productData.category?.name?.toLowerCase().includes('mode') ? 'mode' : 'tech',
+            rating: 4.5,
+            reviews: Math.floor(Math.random() * 200) + 50,
+            brand: productData.supplier?.name || 'KAMRI'
+          };
+          
+          setProduct(enrichedProduct);
+          console.log('🛍️ [PRODUCT-DETAILS] Images générées:', enrichedProduct.images);
+          console.log('🛍️ [PRODUCT-DETAILS] Nombre d\'images:', enrichedProduct.images.length);
+          console.log('🛍️ [PRODUCT-DETAILS] Source d\'image:', productData.image);
+          
+          // Charger des produits similaires avec logique avancée
+          if (productData.category?.id) {
+            const similarResponse = await apiClient.getProducts();
+            if (similarResponse.data) {
+              const allProducts = similarResponse.data.data || similarResponse.data;
+              
+              // Logique de similarité avancée
+              const similar = allProducts
+                .filter((p: Product) => p.id !== id) // Exclure le produit actuel
+                .map((p: Product) => {
+                  let similarityScore = 0;
+                  
+                  // 1. Même catégorie = +3 points
+                  if (p.category?.id === productData.category?.id) {
+                    similarityScore += 3;
+                  }
+                  
+                  // 2. Même fournisseur = +2 points
+                  if (p.supplier?.name === productData.supplier?.name) {
+                    similarityScore += 2;
+                  }
+                  
+                  // 3. Prix similaire (±20%) = +2 points
+                  const priceDiff = Math.abs(p.price - productData.price) / productData.price;
+                  if (priceDiff <= 0.2) {
+                    similarityScore += 2;
+                  }
+                  
+                  // 4. Même gamme de prix = +1 point
+                  const isSamePriceRange = 
+                    (p.price < 50 && productData.price < 50) ||
+                    (p.price >= 50 && p.price < 200 && productData.price >= 50 && productData.price < 200) ||
+                    (p.price >= 200 && productData.price >= 200);
+                  if (isSamePriceRange) {
+                    similarityScore += 1;
+                  }
+                  
+                  // 5. Mots-clés similaires dans le nom = +1 point
+                  const currentWords = productData.name.toLowerCase().split(' ');
+                  const productWords = p.name.toLowerCase().split(' ');
+                  const commonWords = currentWords.filter(word => 
+                    word.length > 3 && productWords.includes(word)
+                  );
+                  if (commonWords.length > 0) {
+                    similarityScore += 1;
+                  }
+                  
+                  return {
+                    ...p,
+                    similarityScore,
+                    description: p.description || 'Produit de qualité supérieure',
+                    sizes: p.sizes || ['S', 'M', 'L', 'XL'],
+                    colors: p.colors || ['Blanc', 'Noir', 'Gris'],
+                    specifications: p.specifications || null,
+                    inStock: p.stock > 0,
+                    stockCount: p.stock || 0,
+                    images: p.image ? [p.image] : [],
+                    type: p.category?.name?.toLowerCase().includes('mode') ? 'mode' : 'tech',
+                    rating: 4.5,
+                    reviews: Math.floor(Math.random() * 200) + 50,
+                    brand: p.supplier?.name || 'KAMRI'
+                  };
+                })
+                .filter(p => p.similarityScore > 0) // Garder seulement ceux avec une similarité
+                .sort((a, b) => b.similarityScore - a.similarityScore) // Trier par score de similarité
+                .slice(0, 3) // Prendre les 3 meilleurs
+                .map(p => {
+                  // Supprimer le score de similarité du résultat final
+                  const { similarityScore, ...productWithoutScore } = p;
+                  return productWithoutScore;
+                });
+              
+              console.log('🔍 [PRODUCT-DETAILS] Produits similaires trouvés:', similar.length);
+              console.log('🔍 [PRODUCT-DETAILS] Critères de similarité appliqués');
+              setSimilarProducts(similar);
+            }
+          }
+          
+          // Sélectionner la première couleur par défaut
+          if (enrichedProduct.colors && enrichedProduct.colors.length > 0) {
+            setSelectedColor(enrichedProduct.colors[0]);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [PRODUCT-DETAILS] Erreur lors du chargement du produit:', error);
+      } finally {
+        setLoading(false);
+        console.log('🛍️ [PRODUCT-DETAILS] Chargement terminé');
+      }
+    };
+
+    if (id) {
+      loadProduct();
     }
-    setLoading(false);
   }, [id]);
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <ThemedView style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#424242" />
-            </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>Chargement...</ThemedText>
-            <View style={{ width: 24 }} />
-          </ThemedView>
-        </SafeAreaView>
+        <UnifiedHeader />
         <View style={styles.loadingContainer}>
-          <ThemedText>Chargement du produit...</ThemedText>
+          <ThemedText style={styles.loadingIcon}>⏳</ThemedText>
+          <ThemedText style={styles.loadingTitle}>Chargement du produit...</ThemedText>
+          <ThemedText style={styles.loadingSubtitle}>Veuillez patienter</ThemedText>
         </View>
-        <BottomNavigation />
+        <CurvedBottomNav />
       </View>
     );
   }
@@ -183,15 +228,7 @@ export default function ProductDetailsScreen() {
   if (!product) {
     return (
       <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <ThemedView style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#424242" />
-            </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>Produit non trouvé</ThemedText>
-            <View style={{ width: 24 }} />
-          </ThemedView>
-        </SafeAreaView>
+        <UnifiedHeader />
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorIcon}>😞</ThemedText>
           <ThemedText style={styles.errorTitle}>Produit non trouvé</ThemedText>
@@ -199,33 +236,29 @@ export default function ProductDetailsScreen() {
             Le produit que vous recherchez n'existe pas.
           </ThemedText>
         </View>
-        <BottomNavigation />
+        <CurvedBottomNav />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#424242" />
-          </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>{product.name}</ThemedText>
-          <TouchableOpacity>
-            <Ionicons name="heart-outline" size={24} color="#424242" />
-          </TouchableOpacity>
-        </ThemedView>
-      </SafeAreaView>
+      <UnifiedHeader />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Image principale */}
         <View style={styles.imageContainer}>
-          <Image
-            source={product.images[selectedImage]}
-            style={styles.mainImage}
-            resizeMode="cover"
-          />
+          {product.images && product.images.length > 0 ? (
+            <Image
+              source={{ uri: product.images[selectedImage] }}
+              style={styles.mainImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <Ionicons name="image-outline" size={64} color="#9CA3AF" />
+            </View>
+          )}
           
           {/* Badge */}
           {product.badge && (
@@ -242,20 +275,22 @@ export default function ProductDetailsScreen() {
         </View>
 
         {/* Miniatures */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbnailsContainer}>
-          {product.images.map((image, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.thumbnail,
-                selectedImage === index && styles.selectedThumbnail
-              ]}
-              onPress={() => setSelectedImage(index)}
-            >
-              <Image source={image} style={styles.thumbnailImage} resizeMode="cover" />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {product.images && product.images.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbnailsContainer}>
+            {product.images.map((image, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.thumbnail,
+                  selectedImage === index && styles.selectedThumbnail
+                ]}
+                onPress={() => setSelectedImage(index)}
+              >
+                <Image source={{ uri: image }} style={styles.thumbnailImage} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Informations produit */}
         <ThemedView style={styles.productInfo}>
@@ -404,7 +439,14 @@ export default function ProductDetailsScreen() {
                   style={styles.similarProduct}
                   onPress={() => router.push(`/product/${similarProduct.id}`)}
                 >
-                  <Image source={similarProduct.image} style={styles.similarImage} resizeMode="cover" />
+                  <Image 
+                    source={similarProduct.images && similarProduct.images.length > 0 
+                      ? { uri: similarProduct.images[0] } 
+                      : require('../../assets/images/modelo.png')
+                    } 
+                    style={styles.similarImage} 
+                    resizeMode="cover" 
+                  />
                   <ThemedText style={styles.similarName} numberOfLines={2}>
                     {similarProduct.name}
                   </ThemedText>
@@ -418,7 +460,7 @@ export default function ProductDetailsScreen() {
         )}
       </ScrollView>
 
-      <BottomNavigation />
+      <CurvedBottomNav />
     </View>
   );
 }
@@ -426,7 +468,8 @@ export default function ProductDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F0F8F0',
+    paddingBottom: 120, // Espace pour la barre de navigation courbée
   },
   safeArea: {
     backgroundColor: '#FFFFFF',
@@ -458,6 +501,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loadingSubtitle: {
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
@@ -490,6 +551,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  placeholderImage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+  },
   badge: {
     position: 'absolute',
     top: 12,
@@ -508,20 +575,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 8,
-    borderWidth: 2,
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    marginRight: 12,
+    borderWidth: 3,
     borderColor: 'transparent',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   selectedThumbnail: {
     borderColor: '#4CAF50',
+    shadowColor: '#4CAF50',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   thumbnailImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 9,
   },
   productInfo: {
     backgroundColor: '#FFFFFF',

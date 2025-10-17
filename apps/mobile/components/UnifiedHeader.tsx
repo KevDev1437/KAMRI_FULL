@@ -36,11 +36,26 @@ const pageConfig = {
     showSearch: true,
     showActions: true,
   },
+  '/product/': {
+    title: 'Produits',
+    icon: 'cube-outline',
+    showSearch: true,
+    showActions: true,
+    showBackButton: false,
+  },
   '/categories': {
     title: 'Catégories',
     icon: 'list-outline',
     showSearch: true,
     showActions: true,
+  },
+  '/categories/': {
+    title: 'Catégories',
+    icon: 'list-outline',
+    showSearch: true,
+    showActions: true,
+    showBackButton: true,
+    showBreadcrumb: true,
   },
   '/(tabs)/categories': {
     title: 'Catégories',
@@ -137,6 +152,16 @@ export default function UnifiedHeader() {
       return pageConfig[pathname as keyof typeof pageConfig];
     }
     
+    // Logique spéciale pour les pages de détails de produits
+    if (pathname.startsWith('/product/')) {
+      return pageConfig['/product/'];
+    }
+    
+    // Logique spéciale pour les pages de catégories
+    if (pathname.startsWith('/categories/')) {
+      return pageConfig['/categories/'];
+    }
+    
     // Recherche par correspondance partielle
     for (const [route, config] of Object.entries(pageConfig)) {
       if (pathname.startsWith(route)) {
@@ -211,6 +236,33 @@ export default function UnifiedHeader() {
             <Ionicons name={currentConfig.icon as any} size={20} color="#4CAF50" />
             <ThemedText style={styles.titleButtonText}>{currentConfig.title}</ThemedText>
           </View>
+          
+          {/* Étiquette "Détails" pour les pages de détails de produits */}
+          {pathname.startsWith('/product/') && (
+            <View style={styles.detailsButton}>
+              <Ionicons name="information-circle-outline" size={16} color="#81C784" />
+              <ThemedText style={styles.detailsButtonText}>Détails</ThemedText>
+            </View>
+          )}
+
+          {/* Étiquette de catégorie pour les pages de catégories */}
+          {pathname.startsWith('/categories/') && (() => {
+            const slug = pathname.split('/')[2] || '';
+            const categoryName = decodeURIComponent(slug)
+              .replace(/-/g, ' ')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ');
+            
+            return (
+              <View style={styles.categoryButton}>
+                <Ionicons name="list-outline" size={16} color="#81C784" />
+                <ThemedText style={styles.categoryButtonText}>
+                  {categoryName || 'Catégorie'}
+                </ThemedText>
+              </View>
+            );
+          })()}
 
           {/* Bouton Filtres (pour les pages qui en ont besoin) */}
           {(pathname.includes('/products') || pathname.includes('/promotions')) && (
@@ -285,6 +337,24 @@ const styles = StyleSheet.create({
     height: 30,
     transform: [{ scale: 2.5 }],
   },
+  backButton: {
+    padding: 8,
+    marginRight: 12,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  titleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#424242',
+    textAlign: 'center',
+  },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -345,6 +415,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4CAF50',
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#E8F5E8',
+    marginLeft: 8,
+    gap: 4,
+  },
+  detailsButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#81C784',
+  },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#E8F5E8',
+    marginLeft: 8,
+    gap: 4,
+  },
+  categoryButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#81C784',
   },
   filterButton: {
     flexDirection: 'row',

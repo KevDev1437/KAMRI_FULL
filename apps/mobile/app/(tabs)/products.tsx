@@ -9,176 +9,87 @@ import UnifiedHeader from '../../components/UnifiedHeader';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useFilter } from '../../contexts/FilterContext';
+import { apiClient, Category, Product } from '../../lib/api';
 
-// Mock data pour les produits avec les 7 catégories fixes
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'tendances',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '2', 
-    name: 'Jean Slim Fit', 
-    price: 59.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.2,
-    reviews: 89,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '4', 
-    name: 'Veste Denim', 
-    price: 79.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'mode',
-    rating: 4.3,
-    reviews: 67,
-    badge: null,
-    brand: 'KAMRI'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '6', 
-    name: 'Sac à Main', 
-    price: 49.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.1,
-    reviews: 45,
-    badge: 'nouveau',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99, 
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '8', 
-    name: 'Chaise Design', 
-    price: 199.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'maison',
-    rating: 4.4,
-    reviews: 78,
-    badge: 'tendances',
-    brand: 'HomeStyle'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '10', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  },
-  { 
-    id: '11', 
-    name: 'Jouet Éducatif', 
-    price: 29.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'enfants',
-    rating: 4.5,
-    reviews: 67,
-    badge: 'nouveau',
-    brand: 'KidsBrand'
-  },
-  { 
-    id: '12', 
-    name: 'Crème Hydratante', 
-    price: 24.99, 
-    originalPrice: null,
-    image: null, 
-    category: 'beaute',
-    rating: 4.2,
-    reviews: 134,
-    badge: 'top-ventes',
-    brand: 'BeautyBrand'
-  },
-];
-
+// Interface Product mise à jour pour correspondre à l'API
 interface Product {
   id: string;
   name: string;
   price: number;
-  originalPrice: number | null;
+  originalPrice?: number | null;
   image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
-  badge: string | null;
-  brand: string;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
+  badge?: string | null;
+  stock: number;
+  supplier?: {
+    name: string;
+  };
+  discount?: number;
 }
 
 export default function ProductsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { showFilters, setShowFilters } = useFilter();
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Charger les données depuis l'API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        console.log('🛍️ [PRODUCTS] Début du chargement des données');
+        setLoading(true);
+        
+        // Charger les catégories
+        console.log('📂 [PRODUCTS] Chargement des catégories...');
+        const categoriesResponse = await apiClient.getCategories();
+        console.log('📂 [PRODUCTS] Réponse catégories:', categoriesResponse);
+        
+        if (categoriesResponse.data) {
+          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
+          const categoriesList = Array.isArray(categoriesData) ? categoriesData : [];
+          console.log('📂 [PRODUCTS] Catégories chargées:', categoriesList.length);
+          setCategories(categoriesList);
+        }
+
+        // Charger les produits
+        console.log('🛍️ [PRODUCTS] Chargement des produits...');
+        const productsResponse = await apiClient.getProducts();
+        console.log('🛍️ [PRODUCTS] Réponse produits:', productsResponse);
+        
+        if (productsResponse.data) {
+          const productsData = productsResponse.data.data || productsResponse.data;
+          const productsList = Array.isArray(productsData) ? productsData : [];
+          console.log('🛍️ [PRODUCTS] Produits chargés:', productsList.length);
+          
+          // Debug: Afficher les détails des premiers produits
+          console.log('🛍️ [PRODUCTS] Détails des produits:', productsList.slice(0, 3).map(p => ({
+            name: p.name,
+            category: p.category?.name,
+            hasImage: !!p.image,
+            price: p.price
+          })));
+          
+          setProducts(productsList);
+        }
+      } catch (error) {
+        console.error('❌ [PRODUCTS] Erreur lors du chargement des données:', error);
+      } finally {
+        setLoading(false);
+        console.log('🛍️ [PRODUCTS] Chargement terminé');
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Filtrage des produits
   useEffect(() => {
@@ -186,14 +97,16 @@ export default function ProductsScreen() {
 
     // Filtre par catégorie
     if (selectedCategory !== 'tous') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => 
+        product.category?.id === selectedCategory
+      );
     }
 
     // Filtre par recherche
     if (searchQuery) {
       filtered = filtered.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.supplier?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -213,11 +126,11 @@ export default function ProductsScreen() {
       case 'nouveautes':
         filtered.sort((a, b) => b.id.localeCompare(a.id));
         break;
-      case 'note':
-        filtered.sort((a, b) => b.rating - a.rating);
+      case 'stock':
+        filtered.sort((a, b) => b.stock - a.stock);
         break;
       default: // populaire
-        filtered.sort((a, b) => b.reviews - a.reviews);
+        filtered.sort((a, b) => b.stock - a.stock);
     }
 
     setFilteredProducts(filtered);
@@ -232,6 +145,7 @@ export default function ProductsScreen() {
         <CategoryTabs
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
+          categories={categories}
         />
 
         {/* Filtres mobiles */}
@@ -301,26 +215,39 @@ export default function ProductsScreen() {
         {/* Résultats */}
         <View style={styles.resultsContainer}>
           <ThemedText style={styles.resultsText}>
-            {filteredProducts.length} produits trouvés
+            {loading ? 'Chargement...' : `${filteredProducts.length} produits trouvés`}
           </ThemedText>
         </View>
 
-        {/* Grille de produits */}
-        <View style={styles.productsGrid}>
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
-
-        {/* Message si aucun produit */}
-        {filteredProducts.length === 0 && (
-          <View style={styles.emptyState}>
-            <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
-            <ThemedText style={styles.emptyTitle}>Aucun produit trouvé</ThemedText>
-            <ThemedText style={styles.emptySubtitle}>
-              Essayez de modifier vos critères de recherche
+        {/* État de chargement */}
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ThemedText style={styles.loadingIcon}>⏳</ThemedText>
+            <ThemedText style={styles.loadingTitle}>Chargement des produits...</ThemedText>
+            <ThemedText style={styles.loadingSubtitle}>
+              Veuillez patienter
             </ThemedText>
           </View>
+        ) : (
+          <>
+            {/* Grille de produits */}
+            <View style={styles.productsGrid}>
+              {filteredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </View>
+
+            {/* Message si aucun produit */}
+            {filteredProducts.length === 0 && (
+              <View style={styles.emptyState}>
+                <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
+                <ThemedText style={styles.emptyTitle}>Aucun produit trouvé</ThemedText>
+                <ThemedText style={styles.emptySubtitle}>
+                  Essayez de modifier vos critères de recherche
+                </ThemedText>
+              </View>
+            )}
+          </>
         )}
         
         <HomeFooter />
@@ -603,6 +530,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptySubtitle: {
+    fontSize: 16,
+    color: '#81C784',
+    textAlign: 'center',
+  },
+  loadingState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loadingSubtitle: {
     fontSize: 16,
     color: '#81C784',
     textAlign: 'center',

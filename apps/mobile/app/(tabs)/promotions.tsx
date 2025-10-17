@@ -7,180 +7,187 @@ import HomeFooter from '../../components/HomeFooter';
 import ProductCard from '../../components/ProductCard';
 import UnifiedHeader from '../../components/UnifiedHeader';
 import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
 import { useFilter } from '../../contexts/FilterContext';
+import { apiClient, Category, Product } from '../../lib/api';
 
-// Mock data pour les produits en promotion uniquement
-const mockProducts = [
-  { 
-    id: '1', 
-    name: 'T-Shirt Premium', 
-    price: 29.99, 
-    originalPrice: 39.99,
-    image: null, 
-    category: 'mode',
-    rating: 4.5,
-    reviews: 128,
-    badge: 'promo',
-    brand: 'KAMRI'
-  },
-  { 
-    id: '3', 
-    name: 'Smartphone Pro', 
-    price: 899.99, 
-    originalPrice: 999.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.8,
-    reviews: 256,
-    badge: 'promo',
-    brand: 'TechBrand'
-  },
-  { 
-    id: '5', 
-    name: 'Laptop Gaming', 
-    price: 1299.99, 
-    originalPrice: 1499.99,
-    image: null, 
-    category: 'technologie',
-    rating: 4.7,
-    reviews: 189,
-    badge: 'promo',
-    brand: 'GameTech'
-  },
-  { 
-    id: '7', 
-    name: 'Parfum Élégant', 
-    price: 89.99,
-    originalPrice: 119.99,
-    image: null, 
-    category: 'beaute',
-    rating: 4.6,
-    reviews: 203,
-    badge: 'promo',
-    brand: 'Luxury'
-  },
-  { 
-    id: '9', 
-    name: 'Montre Connectée', 
-    price: 199.99, 
-    originalPrice: 249.99,
-    image: null, 
-    category: 'accessoires',
-    rating: 4.4,
-    reviews: 156,
-    badge: 'promo',
-    brand: 'TechWatch'
-  },
-  { 
-    id: '11', 
-    name: 'Chaussures Sport', 
-    price: 79.99, 
-    originalPrice: 99.99,
-    image: null, 
-    category: 'sport',
-    rating: 4.3,
-    reviews: 89,
-    badge: 'promo',
-    brand: 'SportBrand'
-  }
-];
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
-  badge: string | null;
-  brand: string;
-}
-
-export default function PromotionsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+export default function PromotionsPage() {
+  const { showFilters, toggleFilters } = useFilter();
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('tous');
+  const [loading, setLoading] = useState<boolean>(true);
+  
+  // États pour les filtres
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const { showFilters, setShowFilters } = useFilter();
   const [sortBy, setSortBy] = useState<string>('populaire');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
 
-  // Filtrage des produits - SEULEMENT les produits en promotion
+  // Charger les données depuis l'API
   useEffect(() => {
-    let filtered = products.filter(product => product.badge === 'promo');
+    const loadData = async () => {
+      try {
+        console.log('🎯 [PROMOTIONS-MOBILE] Début du chargement des données');
+        setLoading(true);
+        
+        // Charger les catégories
+        const categoriesResponse = await apiClient.getCategories();
+        if (categoriesResponse.data) {
+          const categoriesData = categoriesResponse.data.data || categoriesResponse.data;
+          const categoriesList = Array.isArray(categoriesData) ? categoriesData : [];
+          console.log('📂 [PROMOTIONS-MOBILE] Catégories chargées:', categoriesList.length);
+          setCategories(categoriesList);
+        }
 
-    // Filtre par catégorie
+        // Charger les produits
+        const productsResponse = await apiClient.getProducts();
+        if (productsResponse.data) {
+          const backendData = productsResponse.data.data || productsResponse.data;
+          const productsList = Array.isArray(backendData) ? backendData : [];
+          console.log('🛍️ [PROMOTIONS-MOBILE] Produits chargés:', productsList.length);
+          setProducts(productsList);
+        }
+      } catch (error) {
+        console.error('❌ [PROMOTIONS-MOBILE] Erreur lors du chargement des données:', error);
+      } finally {
+        setLoading(false);
+        console.log('🎯 [PROMOTIONS-MOBILE] Chargement terminé');
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Fonction de filtrage simple et claire
+  const filterProducts = () => {
+    console.log('🎯 [PROMOTIONS-MOBILE] === DÉBUT DU FILTRAGE ===');
+    console.log('🎯 [PROMOTIONS-MOBILE] Produits totaux:', products.length);
+    console.log('🎯 [PROMOTIONS-MOBILE] Catégorie sélectionnée:', selectedCategory);
+    console.log('🎯 [PROMOTIONS-MOBILE] Recherche:', searchQuery);
+    console.log('🎯 [PROMOTIONS-MOBILE] Tri:', sortBy);
+    console.log('🎯 [PROMOTIONS-MOBILE] Prix:', priceRange);
+    
+    // Étape 1: Filtrer seulement les produits en promotion
+    let promoProducts = products.filter(product => {
+      const isPromo = product.badge === 'promo' || (product.originalPrice && product.originalPrice > product.price);
+      return isPromo;
+    });
+    
+    console.log('🎯 [PROMOTIONS-MOBILE] Produits en promotion:', promoProducts.length);
+    
+    // Étape 2: Filtrer par catégorie si nécessaire
     if (selectedCategory !== 'tous') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      console.log('🎯 [PROMOTIONS-MOBILE] Filtrage par catégorie:', selectedCategory);
+      
+      promoProducts = promoProducts.filter(product => {
+        const categoryId = product.category?.id;
+        const matches = categoryId === selectedCategory;
+        console.log('🎯 [PROMOTIONS-MOBILE] Produit:', product.name, 'Catégorie:', categoryId, 'Match:', matches);
+        return matches;
+      });
     }
-
-    // Filtre par recherche
+    
+    // Étape 3: Filtrer par recherche
     if (searchQuery) {
-      filtered = filtered.filter(product => 
+      promoProducts = promoProducts.filter(product => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.supplier?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
-    // Filtre par prix
-    filtered = filtered.filter(product => 
+    
+    // Étape 4: Filtrer par prix
+    promoProducts = promoProducts.filter(product => 
       product.price >= priceRange[0] && product.price <= priceRange[1]
     );
-
-    // Tri
+    
+    // Étape 5: Trier
     switch (sortBy) {
       case 'prix_croissant':
-        filtered.sort((a, b) => a.price - b.price);
+        promoProducts.sort((a, b) => a.price - b.price);
         break;
       case 'prix_decroissant':
-        filtered.sort((a, b) => b.price - a.price);
+        promoProducts.sort((a, b) => b.price - a.price);
         break;
       case 'nouveautes':
-        filtered.sort((a, b) => b.id.localeCompare(a.id));
+        promoProducts.sort((a, b) => b.id.localeCompare(a.id));
         break;
-      case 'note':
-        filtered.sort((a, b) => b.rating - a.rating);
+      case 'stock':
+        promoProducts.sort((a, b) => b.stock - a.stock);
         break;
       default: // populaire
-        filtered.sort((a, b) => b.reviews - a.reviews);
+        promoProducts.sort((a, b) => b.stock - a.stock);
     }
+    
+    console.log('🎯 [PROMOTIONS-MOBILE] Produits finaux après filtrage:', promoProducts.length);
+    console.log('🎯 [PROMOTIONS-MOBILE] === FIN DU FILTRAGE ===');
+    
+    setFilteredProducts(promoProducts);
+  };
 
-    setFilteredProducts(filtered);
+  // Déclencher le filtrage quand les produits ou les filtres changent
+  useEffect(() => {
+    if (products.length > 0) {
+      filterProducts();
+    }
   }, [products, selectedCategory, searchQuery, sortBy, priceRange]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.loadingContainer}>
+          <ThemedText style={styles.loadingIcon}>⏳</ThemedText>
+          <ThemedText style={styles.loadingTitle}>Chargement des promotions...</ThemedText>
+          <ThemedText style={styles.loadingSubtitle}>Veuillez patienter</ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <UnifiedHeader />
-
+      
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* En-tête de la page */}
-        <View style={styles.headerContainer}>
-          <ThemedText style={styles.headerTitle}>🎉 Promotions</ThemedText>
-          <ThemedText style={styles.headerSubtitle}>
-            Découvrez nos meilleures offres et économisez sur vos achats
-          </ThemedText>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroContent}>
+            <ThemedText style={styles.heroTitle}>🎯 Promotions</ThemedText>
+            <ThemedText style={styles.heroSubtitle}>
+              Découvrez nos meilleures offres et économisez sur vos achats
+            </ThemedText>
+            <ThemedText style={styles.heroStats}>
+              {filteredProducts.length} produits en promotion
+            </ThemedText>
+          </View>
         </View>
 
-        {/* Catégories */}
-        <CategoryTabs
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-        />
-
-        {/* Filtres mobiles */}
+        {/* Filtres */}
         {showFilters && (
-          <ThemedView style={styles.filtersContainer}>
+          <View style={styles.filtersContainer}>
             <View style={styles.filtersHeader}>
               <ThemedText style={styles.filtersTitle}>Filtres</ThemedText>
-              <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <TouchableOpacity onPress={toggleFilters}>
                 <Ionicons name="close" size={24} color="#424242" />
               </TouchableOpacity>
             </View>
             
-            {/* Tri */}
+            <View style={styles.filterSection}>
+              <ThemedText style={styles.filterLabel}>Rechercher</ThemedText>
+              <View style={styles.searchInputContainer}>
+                <Ionicons name="search" size={20} color="#81C784" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher des promotions..."
+                  placeholderTextColor="#9CA3AF"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+            </View>
+            
             <View style={styles.filterSection}>
               <ThemedText style={styles.filterLabel}>Trier par</ThemedText>
               <View style={styles.sortButtons}>
@@ -189,7 +196,7 @@ export default function PromotionsScreen() {
                   { value: 'nouveautes', label: 'Nouveautés' },
                   { value: 'prix_croissant', label: 'Prix ↑' },
                   { value: 'prix_decroissant', label: 'Prix ↓' },
-                  { value: 'note', label: 'Note' },
+                  { value: 'stock', label: 'Stock' },
                 ].map((option) => (
                   <TouchableOpacity
                     key={option.value}
@@ -210,7 +217,6 @@ export default function PromotionsScreen() {
               </View>
             </View>
 
-            {/* Prix */}
             <View style={styles.filterSection}>
               <ThemedText style={styles.filterLabel}>Prix</ThemedText>
               <View style={styles.priceInputs}>
@@ -231,27 +237,28 @@ export default function PromotionsScreen() {
                 />
               </View>
             </View>
-          </ThemedView>
+          </View>
         )}
 
-        {/* Résultats */}
-        <View style={styles.resultsContainer}>
-          <ThemedText style={styles.resultsText}>
-            {filteredProducts.length} produits en promotion trouvés
-          </ThemedText>
+        {/* Onglets de catégories */}
+        <View style={styles.categoriesSection}>
+          <CategoryTabs 
+            categories={categories}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+          />
         </View>
 
-        {/* Grille de produits */}
-        <View style={styles.productsGrid}>
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
-
-        {/* Message si aucun produit */}
-        {filteredProducts.length === 0 && (
-          <View style={styles.emptyState}>
-            <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
+        {/* Grille des produits */}
+        {filteredProducts.length > 0 ? (
+          <View style={styles.productsGrid}>
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <ThemedText style={styles.emptyIcon}>🎯</ThemedText>
             <ThemedText style={styles.emptyTitle}>Aucune promotion trouvée</ThemedText>
             <ThemedText style={styles.emptySubtitle}>
               Essayez de modifier vos critères de recherche
@@ -261,7 +268,7 @@ export default function PromotionsScreen() {
         
         <HomeFooter />
       </ScrollView>
-
+      
       <CurvedBottomNav />
     </View>
   );
@@ -271,28 +278,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingBottom: 120, // Espace pour la barre de navigation courbée
+    paddingBottom: 100,
   },
   scrollView: {
     flex: 1,
-    marginTop: -2, // Réduire l'espace entre header et contenu
-    paddingBottom: 120, // Espace suffisant pour la barre de navigation courbée
+    marginTop: -2,
+    paddingBottom: 120,
   },
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
   },
-  headerTitle: {
-    fontSize: 28,
+  loadingIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  loadingTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#424242',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  headerSubtitle: {
+  loadingSubtitle: {
     fontSize: 16,
     color: '#81C784',
     textAlign: 'center',
+  },
+  heroSection: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    marginBottom: 8,
+  },
+  heroContent: {
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#E8F5E8',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  heroStats: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   filtersContainer: {
     backgroundColor: '#FFFFFF',
@@ -325,6 +369,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#424242',
     marginBottom: 8,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#424242',
+    paddingVertical: 0,
   },
   sortButtons: {
     flexDirection: 'row',
@@ -369,14 +430,10 @@ const styles = StyleSheet.create({
     color: '#81C784',
     fontWeight: '500',
   },
-  resultsContainer: {
-    paddingHorizontal: 16,
+  categoriesSection: {
+    backgroundColor: '#FFFFFF',
     paddingVertical: 12,
-  },
-  resultsText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#424242',
+    marginBottom: 8,
   },
   productsGrid: {
     flexDirection: 'row',
@@ -385,7 +442,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
   },
-  emptyState: {
+  emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 32,

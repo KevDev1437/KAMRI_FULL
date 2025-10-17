@@ -50,11 +50,22 @@ export default function CurvedBottomNav() {
 
   // Trouver l'élément actif - Normaliser le pathname
   const normalizedPathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
-  const activeItem = navItems.find(item => 
-    normalizedPathname === item.route || 
-    normalizedPathname === item.route.replace('/(tabs)', '') ||
-    pathname === item.route.replace('/(tabs)', '')
-  ) || navItems[0];
+  
+  // Logique spéciale pour les pages de détails de produits
+  const isProductDetail = pathname.startsWith('/product/');
+  const isCategoryPage = pathname.startsWith('/categories/');
+  
+  const activeItem = navItems.find(item => {
+    if (isProductDetail && item.route === '/(tabs)/products') {
+      return true; // Page de détails = onglet Produits actif
+    }
+    if (isCategoryPage && item.route === '/(tabs)/categories') {
+      return true; // Page de catégorie = onglet Catégories actif
+    }
+    return normalizedPathname === item.route || 
+           normalizedPathname === item.route.replace('/(tabs)', '') ||
+           pathname === item.route.replace('/(tabs)', '');
+  }) || navItems[0];
   
   console.log('Current pathname:', pathname);
   console.log('Active item:', activeItem);

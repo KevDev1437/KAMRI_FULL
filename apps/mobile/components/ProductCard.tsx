@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { useRouter } from 'expo-router';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -9,13 +9,22 @@ interface Product {
   id: string;
   name: string;
   price: number;
-  originalPrice: number | null;
+  originalPrice?: number | null;
   image: string | null;
-  category: string;
-  rating: number;
-  reviews: number;
-  badge: string | null;
-  brand: string;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
+  badge?: string | null;
+  stock: number;
+  supplier?: {
+    name: string;
+  };
+  discount?: number;
+  // Champs pour l'affichage (générés côté client)
+  rating?: number;
+  reviews?: number;
+  brand?: string;
 }
 
 interface ProductCardProps {
@@ -39,11 +48,19 @@ export default function ProductCard({ product }: ProductCardProps) {
       onPress={() => router.push(`/product/${product.id}`)}
     >
       <ThemedView style={styles.productCardContent}>
-      {/* Image placeholder */}
+      {/* Image */}
       <View style={styles.imageContainer}>
-        <ThemedView style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={32} color="#81C784" />
-        </ThemedView>
+        {product.image ? (
+          <Image 
+            source={{ uri: product.image }} 
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <ThemedView style={styles.imagePlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#81C784" />
+          </ThemedView>
+        )}
         
         {/* Badge */}
         {product.badge && (
@@ -65,7 +82,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       
       {/* Product info */}
       <View style={styles.productInfo}>
-        <ThemedText style={styles.brandText}>{product.brand}</ThemedText>
+        <ThemedText style={styles.brandText}>{product.supplier?.name || product.brand || 'KAMRI'}</ThemedText>
         
         <ThemedText style={styles.productName} numberOfLines={2}>
           {product.name}
@@ -77,13 +94,13 @@ export default function ProductCard({ product }: ProductCardProps) {
             {[...Array(5)].map((_, i) => (
               <Ionicons
                 key={i}
-                name={i < Math.floor(product.rating) ? 'star' : 'star-outline'}
+                name={i < Math.floor(product.rating || 4.5) ? 'star' : 'star-outline'}
                 size={12}
-                color={i < Math.floor(product.rating) ? '#FFD700' : '#E0E0E0'}
+                color={i < Math.floor(product.rating || 4.5) ? '#FFD700' : '#E0E0E0'}
               />
             ))}
           </View>
-          <ThemedText style={styles.reviewsText}>({product.reviews})</ThemedText>
+          <ThemedText style={styles.reviewsText}>({product.reviews || Math.floor(Math.random() * 200) + 50})</ThemedText>
         </View>
         
         {/* Price */}
@@ -123,6 +140,10 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: '#E8F5E8',
     position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     flex: 1,

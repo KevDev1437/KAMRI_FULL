@@ -2,23 +2,38 @@ import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+}
+
 interface CategoryTabsProps {
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
+  categories?: Category[];
 }
 
-const categories = [
-  { id: 'tous', name: 'Tous', icon: '🛍️' },
-  { id: 'mode', name: 'Mode', icon: '👕' },
-  { id: 'technologie', name: 'Tech', icon: '💻' },
-  { id: 'maison', name: 'Maison', icon: '🏠' },
-  { id: 'beaute', name: 'Beauté', icon: '💅' },
-  { id: 'accessoires', name: 'Accessoires', icon: '🎒' },
-  { id: 'sport', name: 'Sport', icon: '⚽' },
-  { id: 'enfants', name: 'Enfants', icon: '🧸' },
-];
+export default function CategoryTabs({ selectedCategory, setSelectedCategory, categories }: CategoryTabsProps) {
+  // Catégories par défaut si aucune n'est fournie
+  const defaultCategories = [
+    { id: 'tous', name: 'Tous', icon: '🛍️' },
+    { id: 'mode', name: 'Mode', icon: '👕' },
+    { id: 'technologie', name: 'Tech', icon: '💻' },
+    { id: 'maison', name: 'Maison', icon: '🏠' },
+    { id: 'beaute', name: 'Beauté', icon: '💅' },
+    { id: 'accessoires', name: 'Accessoires', icon: '🎒' },
+    { id: 'sport', name: 'Sport', icon: '⚽' },
+    { id: 'enfants', name: 'Enfants', icon: '🧸' },
+  ];
 
-export default function CategoryTabs({ selectedCategory, setSelectedCategory }: CategoryTabsProps) {
+  // Utiliser les catégories fournies ou les catégories par défaut
+  const displayCategories = categories && categories.length > 0 
+    ? [{ id: 'tous', name: 'Tous', icon: '🛍️' }, ...categories]
+    : defaultCategories;
+  
+  console.log('📂 [CATEGORY-TABS] Catégories affichées:', displayCategories.map(c => ({ id: c.id, name: c.name })));
   return (
     <ThemedView style={styles.container}>
       <ScrollView 
@@ -26,16 +41,19 @@ export default function CategoryTabs({ selectedCategory, setSelectedCategory }: 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {categories.map((category) => (
+        {displayCategories.map((category) => (
           <TouchableOpacity
             key={category.id}
             style={[
               styles.categoryButton,
               selectedCategory === category.id && styles.selectedCategory
             ]}
-            onPress={() => setSelectedCategory(category.id)}
+            onPress={() => {
+              console.log('📂 [CATEGORY-TABS] Catégorie sélectionnée:', category.id, category.name);
+              setSelectedCategory(category.id);
+            }}
           >
-            <ThemedText style={styles.categoryIcon}>{category.icon}</ThemedText>
+            <ThemedText style={styles.categoryIcon}>{category.icon || '🛍️'}</ThemedText>
             <ThemedText style={[
               styles.categoryText,
               selectedCategory === category.id && styles.selectedText
