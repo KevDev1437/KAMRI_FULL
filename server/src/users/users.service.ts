@@ -66,6 +66,37 @@ export class UsersService {
     });
   }
 
+  async getUserOrders(userId: string) {
+    console.log('📦 [UsersService] Récupération des commandes pour userId:', userId);
+    
+    const orders = await this.prisma.order.findMany({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                price: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    console.log('📦 [UsersService] Commandes trouvées:', orders.length);
+    return {
+      data: orders,
+      message: 'Commandes récupérées avec succès',
+    };
+  }
+
   async update(id: string, data: { 
     name?: string; 
     email?: string; 

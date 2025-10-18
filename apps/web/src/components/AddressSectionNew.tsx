@@ -28,7 +28,7 @@ export default function AddressSectionNew() {
     city: '',
     state: '',
     zipCode: '',
-    country: 'FR',
+    country: '',
     isDefault: false
   });
 
@@ -69,7 +69,7 @@ export default function AddressSectionNew() {
       city: '',
       state: '',
       zipCode: '',
-      country: 'FR',
+      country: '',
       isDefault: false
     });
     setShowModal(true);
@@ -335,16 +335,13 @@ export default function AddressSectionNew() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pays
                 </label>
-                <select
+                <input
+                  type="text"
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Entrez votre pays"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50]"
-                >
-                  <option value="FR">France</option>
-                  <option value="BE">Belgique</option>
-                  <option value="CH">Suisse</option>
-                  <option value="CA">Canada</option>
-                </select>
+                />
               </div>
 
               <div className="flex items-center">

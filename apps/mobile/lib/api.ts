@@ -179,7 +179,7 @@ class ApiClient {
   // Méthodes pour les adresses
   async getAddresses(): Promise<ApiResponse<Address[]>> {
     console.log('🏠 [MOBILE API] Récupération des adresses');
-    return this.fetch('/api/users/profile');
+    return this.fetch('/api/addresses');
   }
 
   async addAddress(addressData: Omit<Address, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Address>> {
@@ -202,6 +202,26 @@ class ApiClient {
     console.log('🗑️ [MOBILE API] Suppression de l\'adresse:', addressId);
     return this.fetch(`/api/addresses/${addressId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour les commandes
+  async getOrders(): Promise<ApiResponse<any[]>> {
+    console.log('📦 [MOBILE API] Récupération des commandes');
+    return this.fetch('/api/users/orders');
+  }
+
+  // Méthodes pour les paramètres utilisateur
+  async getUserSettings(): Promise<ApiResponse<any>> {
+    console.log('⚙️ [MOBILE API] Récupération des paramètres utilisateur');
+    return this.fetch('/api/users/settings');
+  }
+
+  async updateUserSettings(settings: any): Promise<ApiResponse<any>> {
+    console.log('⚙️ [MOBILE API] Mise à jour des paramètres utilisateur:', settings);
+    return this.fetch('/api/users/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
     });
   }
 }

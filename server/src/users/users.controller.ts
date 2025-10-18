@@ -81,6 +81,14 @@ export class UsersController {
     };
   }
 
+  @Get('orders')
+  @ApiOperation({ summary: 'Récupérer les commandes de l\'utilisateur connecté' })
+  @ApiResponse({ status: 200, description: 'Commandes récupérées avec succès' })
+  async getUserOrders(@GetUser() user: any) {
+    console.log('📦 [UsersController] getUserOrders appelé avec user:', user);
+    return this.usersService.getUserOrders(user.userId);
+  }
+
   @Put(':id')
   @ApiOperation({ summary: 'Modifier un utilisateur' })
   @ApiResponse({ status: 200, description: 'Utilisateur modifié avec succès' })
