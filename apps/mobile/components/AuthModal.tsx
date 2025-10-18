@@ -135,17 +135,6 @@ export default function AuthModal({ visible, onClose, onLoginSuccess }: AuthModa
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Bouton de test rapide */}
-      <TouchableOpacity 
-        style={styles.testButton}
-        onPress={() => {
-          setLoginData({ email: 'demo@kamri.com', password: '' });
-        }}
-      >
-        <ThemedText style={styles.testButtonText}>
-          🧪 Test rapide (demo@kamri.com)
-        </ThemedText>
-      </TouchableOpacity>
 
       {/* Connexion sociale */}
       <View style={styles.socialContainer}>
@@ -488,21 +477,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4CAF50',
     fontWeight: '600',
-  },
-  testButton: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  testButtonText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
   },
   benefitsContainer: {
     flexDirection: 'row',
