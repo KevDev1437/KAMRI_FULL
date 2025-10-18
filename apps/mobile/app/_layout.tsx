@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { AuthProvider } from '../contexts/AuthContext';
+import { CounterProvider } from '../contexts/CounterContext';
 import { FilterProvider } from '../contexts/FilterContext';
 import { useColorScheme } from '../hooks/use-color-scheme';
 
@@ -16,8 +17,9 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <FilterProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <CounterProvider>
+        <FilterProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
@@ -27,7 +29,8 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
-      </FilterProvider>
+        </FilterProvider>
+      </CounterProvider>
     </AuthProvider>
   );
 }

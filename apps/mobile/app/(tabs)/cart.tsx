@@ -9,10 +9,12 @@ import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCounters } from '../../contexts/CounterContext';
 import { apiClient } from '../../lib/api';
 
 export default function CartScreen() {
   const { user, isAuthenticated } = useAuth();
+  const { cartCount, syncFromAPI } = useCounters();
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,8 +38,23 @@ export default function CartScreen() {
       const response = await apiClient.getCart();
       if (response.data) {
         const cartData = response.data.data || response.data;
-        setCartItems(Array.isArray(cartData) ? cartData : []);
-        console.log('🛒 [PANIER-MOBILE] Panier chargé:', cartData);
+        const cartItemsArray = Array.isArray(cartData) ? cartData : [];
+        
+        // Extraire les données des produits depuis la structure imbriquée
+        const extractedCartItems = cartItemsArray.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity || 1,
+          addedDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue',
+          ...item.product, // Extraire toutes les propriétés du produit
+        }));
+        
+        setCartItems(extractedCartItems);
+        console.log('🛒 [PANIER-MOBILE] Panier chargé:', extractedCartItems);
+        
+        // Calculer la quantité totale et synchroniser le compteur
+        const totalQuantity = extractedCartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+        syncFromAPI(0, totalQuantity); // On ne met à jour que le panier ici
       } else {
         console.log('❌ [PANIER-MOBILE] Aucune donnée de panier reçue');
         console.log('❌ [PANIER-MOBILE] Erreur:', response.error);
@@ -62,6 +79,14 @@ export default function CartScreen() {
   useEffect(() => {
     loadCart();
   }, [isAuthenticated, user]);
+
+  // Recharger le panier quand le compteur change (ajout/suppression depuis d'autres pages)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('🔄 [PANIER-MOBILE] Compteur panier changé, rechargement...');
+      loadCart();
+    }
+  }, [cartCount, isAuthenticated, user]);
 
   // Calculs
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -249,7 +274,7 @@ export default function CartScreen() {
           </TouchableOpacity>
         </View>
 
-        {!item.inStock && (
+        {item.stock <= 0 && (
           <View style={styles.outOfStockBadge}>
             <ThemedText style={styles.outOfStockText}>Rupture de stock</ThemedText>
           </View>

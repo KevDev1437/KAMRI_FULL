@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { apiClient, Product } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -16,6 +17,10 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  const { isAuthenticated, user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+
   // Utilisation des couleurs d'étiquettes cohérentes pour "promo"
   const badgeConfig = getBadgeConfig('promo');
   
@@ -25,6 +30,51 @@ function ProductCard({ product }: ProductCardProps) {
   
   // Calcul du pourcentage de réduction basé sur le discount
   const discountPercentage = product.discount || 0;
+
+  // Gestion des favoris
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter aux favoris');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await apiClient.removeFromWishlist(product.id);
+        setIsFavorite(false);
+        console.log('❤️ [BEST-OFFERS] Retiré des favoris:', product.name);
+      } else {
+        await apiClient.addToWishlist(product.id);
+        setIsFavorite(true);
+        console.log('❤️ [BEST-OFFERS] Ajouté aux favoris:', product.name);
+      }
+    } catch (error) {
+      console.error('❌ [BEST-OFFERS] Erreur favoris:', error);
+      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+    }
+  };
+
+  // Gestion du panier
+  const handleAddToCart = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter au panier');
+      return;
+    }
+
+    if (isAddingToCart) return;
+
+    try {
+      setIsAddingToCart(true);
+      await apiClient.addToCart(product.id, 1);
+      console.log('🛒 [BEST-OFFERS] Ajouté au panier:', product.name);
+      Alert.alert('Succès', 'Produit ajouté au panier !');
+    } catch (error) {
+      console.error('❌ [BEST-OFFERS] Erreur panier:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter au panier');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
   
   return (
     <ThemedView style={[styles.productCard, { width: cardWidth }]}>
@@ -51,6 +101,18 @@ function ProductCard({ product }: ProductCardProps) {
             }
           </ThemedText>
         </View>
+
+        {/* Favorite button */}
+        <TouchableOpacity 
+          style={styles.favoriteButton}
+          onPress={handleToggleFavorite}
+        >
+          <Ionicons 
+            name={isFavorite ? "heart" : "heart-outline"} 
+            size={20} 
+            color={isFavorite ? "#E91E63" : "#81C784"} 
+          />
+        </TouchableOpacity>
       </View>
       
       {/* Product info */}
@@ -66,9 +128,15 @@ function ProductCard({ product }: ProductCardProps) {
           )}
         </View>
         
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={[styles.addButton, isAddingToCart && styles.addButtonDisabled]}
+          onPress={handleAddToCart}
+          disabled={isAddingToCart}
+        >
           <Ionicons name="add" size={16} color="#FFFFFF" />
-          <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
+          <ThemedText style={styles.addButtonText}>
+            {isAddingToCart ? 'Ajout...' : 'Ajouter'}
+          </ThemedText>
         </TouchableOpacity>
       </View>
     </ThemedView>
@@ -289,5 +357,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

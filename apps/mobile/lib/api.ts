@@ -287,9 +287,27 @@ class ApiClient {
 
   // Méthode utilitaire pour obtenir l'userId depuis le token
   private getUserId(): string {
-    // Pour l'instant, on retourne un userId par défaut
-    // TODO: Extraire l'userId du token JWT
-    return 'user-id-placeholder';
+    if (!this.token) {
+      console.warn('⚠️ [MOBILE API] Aucun token disponible');
+      return 'user-id-placeholder';
+    }
+
+    try {
+      // Décoder le token JWT pour extraire l'userId
+      const payload = JSON.parse(atob(this.token.split('.')[1]));
+      const userId = payload.userId || payload.sub || payload.id;
+      
+      if (userId) {
+        console.log('👤 [MOBILE API] UserId extrait du token:', userId);
+        return userId;
+      } else {
+        console.warn('⚠️ [MOBILE API] Aucun userId trouvé dans le token');
+        return 'user-id-placeholder';
+      }
+    } catch (error) {
+      console.error('❌ [MOBILE API] Erreur lors du décodage du token:', error);
+      return 'user-id-placeholder';
+    }
   }
 }
 

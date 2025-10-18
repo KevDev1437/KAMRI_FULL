@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { useCounters } from '../contexts/CounterContext';
 import { useFilter } from '../contexts/FilterContext';
 import { apiClient } from '../lib/api';
 import AuthModal from './AuthModal';
@@ -146,10 +147,7 @@ export default function UnifiedHeader() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const { toggleFilters } = useFilter();
-  
-  // États pour les compteurs réels
-  const [favoritesCount, setFavoritesCount] = useState(0);
-  const [cartCount, setCartCount] = useState(0);
+  const { favoritesCount, cartCount, setFavoritesCount, setCartCount } = useCounters();
 
   // Détection de la page active
   const getPageConfig = () => {
@@ -199,23 +197,27 @@ export default function UnifiedHeader() {
       const favoritesResponse = await apiClient.getWishlist();
       if (favoritesResponse.data) {
         const favoritesData = favoritesResponse.data;
+        console.log('🔔 [HEADER] Données favoris reçues:', favoritesData);
         setFavoritesCount(Array.isArray(favoritesData) ? favoritesData.length : 0);
+        console.log('🔔 [HEADER] Compteur favoris défini:', Array.isArray(favoritesData) ? favoritesData.length : 0);
       }
       
       // Charger le panier
       const cartResponse = await apiClient.getCart();
       if (cartResponse.data) {
         const cartData = cartResponse.data;
+        console.log('🛒 [HEADER] Données panier reçues:', cartData);
         const cartItems = Array.isArray(cartData) ? cartData : [];
         const totalQuantity = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
         setCartCount(totalQuantity);
+        console.log('🛒 [HEADER] Compteur panier défini:', totalQuantity);
       }
     } catch (error) {
       console.error('❌ [HEADER] Erreur lors du chargement des compteurs:', error);
       setFavoritesCount(0);
       setCartCount(0);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, setFavoritesCount, setCartCount]);
 
   // Recharger les compteurs quand l'utilisateur change
   useEffect(() => {
@@ -336,6 +338,7 @@ export default function UnifiedHeader() {
                   <ThemedText style={styles.badgeText}>{favoritesCount}</ThemedText>
                 </View>
               )}
+              {(() => { console.log('🔔 [HEADER] Rendu - favoritesCount:', favoritesCount); return null; })()}
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
@@ -347,6 +350,7 @@ export default function UnifiedHeader() {
                   <ThemedText style={styles.badgeText}>{cartCount}</ThemedText>
                 </View>
               )}
+              {(() => { console.log('🛒 [HEADER] Rendu - cartCount:', cartCount); return null; })()}
             </TouchableOpacity>
           </View>
         </ThemedView>

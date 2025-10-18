@@ -9,10 +9,12 @@ import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCounters } from '../../contexts/CounterContext';
 import { apiClient } from '../../lib/api';
 
 export default function FavoritesScreen() {
   const { user, isAuthenticated } = useAuth();
+  const { favoritesCount, syncFromAPI } = useCounters();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,8 +42,22 @@ export default function FavoritesScreen() {
       const response = await apiClient.getWishlist();
       if (response.data) {
         const wishlistData = response.data.data || response.data;
-        setFavorites(Array.isArray(wishlistData) ? wishlistData : []);
-        console.log('❤️ [FAVORIS-MOBILE] Favoris chargés:', wishlistData);
+        const favoritesArray = Array.isArray(wishlistData) ? wishlistData : [];
+        
+        // Extraire les données des produits depuis la structure imbriquée
+        const extractedFavorites = favoritesArray.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          addedDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue',
+          ...item.product, // Extraire toutes les propriétés du produit
+          isLiked: true, // Toujours true dans les favoris
+        }));
+        
+        setFavorites(extractedFavorites);
+        console.log('❤️ [FAVORIS-MOBILE] Favoris chargés:', extractedFavorites);
+        
+        // Synchroniser le compteur avec les vraies données
+        syncFromAPI(extractedFavorites.length, 0); // On ne met à jour que les favoris ici
       } else {
         console.log('❌ [FAVORIS-MOBILE] Aucune donnée de favoris reçue');
         console.log('❌ [FAVORIS-MOBILE] Erreur:', response.error);
@@ -67,10 +83,18 @@ export default function FavoritesScreen() {
     loadFavorites();
   }, [isAuthenticated, user]);
 
+  // Recharger les favoris quand le compteur change (ajout/suppression depuis d'autres pages)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('🔄 [FAVORIS-MOBILE] Compteur favoris changé, rechargement...');
+      loadFavorites();
+    }
+  }, [favoritesCount, isAuthenticated, user]);
+
   const filteredFavorites = favorites.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
+    const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (item.category?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+    const matchesCategory = filterCategory === 'all' || item.category?.name === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -195,7 +219,7 @@ export default function FavoritesScreen() {
           </TouchableOpacity>
         </View>
         
-        <ThemedText style={styles.itemCategory}>{item.category}</ThemedText>
+        <ThemedText style={styles.itemCategory}>{item.category?.name || 'Catégorie inconnue'}</ThemedText>
         
         <View style={styles.ratingRow}>
           <View style={styles.ratingContainer}>
@@ -225,15 +249,15 @@ export default function FavoritesScreen() {
         <View style={styles.stockRow}>
           <View style={styles.stockInfo}>
             <Ionicons 
-              name={item.inStock ? "checkmark-circle" : "close-circle"} 
+              name={item.stock > 0 ? "checkmark-circle" : "close-circle"} 
               size={16} 
-              color={item.inStock ? "#4CAF50" : "#FF5722"} 
+              color={item.stock > 0 ? "#4CAF50" : "#FF5722"} 
             />
             <ThemedText style={[
               styles.stockText, 
-              { color: item.inStock ? "#4CAF50" : "#FF5722" }
+              { color: item.stock > 0 ? "#4CAF50" : "#FF5722" }
             ]}>
-              {item.inStock ? `${item.stockCount} en stock` : 'Rupture de stock'}
+              {item.stock > 0 ? `${item.stock} en stock` : 'Rupture de stock'}
             </ThemedText>
           </View>
           

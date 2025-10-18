@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { useCounters } from '../contexts/CounterContext';
 import { apiClient, Product } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -14,8 +16,61 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product }: ProductCardProps) {
+  const { isAuthenticated, user } = useAuth();
+  const { incrementFavorites, decrementFavorites, incrementCart } = useCounters();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+
   const formatPrice = (price: number) => {
     return `${price.toFixed(2)}€`;
+  };
+
+  // Gestion des favoris
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter aux favoris');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await apiClient.removeFromWishlist(product.id);
+        setIsFavorite(false);
+        decrementFavorites();
+        console.log('❤️ [PRODUCT-GRID] Retiré des favoris:', product.name);
+      } else {
+        await apiClient.addToWishlist(product.id);
+        setIsFavorite(true);
+        incrementFavorites();
+        console.log('❤️ [PRODUCT-GRID] Ajouté aux favoris:', product.name);
+      }
+    } catch (error) {
+      console.error('❌ [PRODUCT-GRID] Erreur favoris:', error);
+      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+    }
+  };
+
+  // Gestion du panier
+  const handleAddToCart = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter au panier');
+      return;
+    }
+
+    if (isAddingToCart) return;
+
+    try {
+      setIsAddingToCart(true);
+      await apiClient.addToCart(product.id, 1);
+      incrementCart(1);
+      console.log('🛒 [PRODUCT-GRID] Ajouté au panier:', product.name);
+      Alert.alert('Succès', 'Produit ajouté au panier !');
+    } catch (error) {
+      console.error('❌ [PRODUCT-GRID] Erreur panier:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter au panier');
+    } finally {
+      setIsAddingToCart(false);
+    }
   };
 
   return (
@@ -33,8 +88,15 @@ function ProductCard({ product }: ProductCardProps) {
             <Ionicons name="image-outline" size={32} color="#9CA3AF" />
           </ThemedView>
         )}
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={20} color="#9CA3AF" />
+        <TouchableOpacity 
+          style={styles.favoriteButton}
+          onPress={handleToggleFavorite}
+        >
+          <Ionicons 
+            name={isFavorite ? "heart" : "heart-outline"} 
+            size={20} 
+            color={isFavorite ? "#E91E63" : "#9CA3AF"} 
+          />
         </TouchableOpacity>
       </View>
       
@@ -45,9 +107,15 @@ function ProductCard({ product }: ProductCardProps) {
         </ThemedText>
         <ThemedText style={styles.productPrice}>{formatPrice(product.price)}</ThemedText>
         
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={[styles.addButton, isAddingToCart && styles.addButtonDisabled]}
+          onPress={handleAddToCart}
+          disabled={isAddingToCart}
+        >
           <Ionicons name="add" size={16} color="#FFFFFF" />
-          <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
+          <ThemedText style={styles.addButtonText}>
+            {isAddingToCart ? 'Ajout...' : 'Ajouter'}
+          </ThemedText>
         </TouchableOpacity>
       </View>
     </ThemedView>
@@ -242,5 +310,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
   },
 });

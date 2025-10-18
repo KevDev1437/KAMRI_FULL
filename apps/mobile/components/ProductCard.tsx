@@ -1,7 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { useCounters } from '../contexts/CounterContext';
+import { apiClient } from '../lib/api';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -33,6 +37,10 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
+  const { incrementFavorites, decrementFavorites, incrementCart } = useCounters();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   
   // Utilisation des couleurs d'étiquettes cohérentes
   const badgeConfig = getBadgeConfig(product.badge as any);
@@ -41,6 +49,54 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountPercentage = product.originalPrice 
     ? calculateDiscountPercentage(product.originalPrice, product.price)
     : 0;
+
+  // Gestion des favoris
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter aux favoris');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await apiClient.removeFromWishlist(product.id);
+        setIsFavorite(false);
+        decrementFavorites();
+        console.log('❤️ [PRODUCT-CARD] Retiré des favoris:', product.name);
+      } else {
+        await apiClient.addToWishlist(product.id);
+        setIsFavorite(true);
+        incrementFavorites();
+        console.log('❤️ [PRODUCT-CARD] Ajouté aux favoris:', product.name);
+      }
+    } catch (error) {
+      console.error('❌ [PRODUCT-CARD] Erreur favoris:', error);
+      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+    }
+  };
+
+  // Gestion du panier
+  const handleAddToCart = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour ajouter au panier');
+      return;
+    }
+
+    if (isAddingToCart) return;
+
+    try {
+      setIsAddingToCart(true);
+      await apiClient.addToCart(product.id, 1);
+      incrementCart(1);
+      console.log('🛒 [PRODUCT-CARD] Ajouté au panier:', product.name);
+      Alert.alert('Succès', 'Produit ajouté au panier !');
+    } catch (error) {
+      console.error('❌ [PRODUCT-CARD] Erreur panier:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter au panier');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
 
   return (
     <TouchableOpacity 
@@ -75,8 +131,15 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {/* Favorite button */}
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={20} color="#81C784" />
+        <TouchableOpacity 
+          style={styles.favoriteButton}
+          onPress={handleToggleFavorite}
+        >
+          <Ionicons 
+            name={isFavorite ? "heart" : "heart-outline"} 
+            size={20} 
+            color={isFavorite ? "#E91E63" : "#81C784"} 
+          />
         </TouchableOpacity>
       </View>
       
@@ -111,9 +174,15 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </View>
         
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={[styles.addButton, isAddingToCart && styles.addButtonDisabled]}
+          onPress={handleAddToCart}
+          disabled={isAddingToCart}
+        >
           <Ionicons name="add" size={16} color="#FFFFFF" />
-          <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
+          <ThemedText style={styles.addButtonText}>
+            {isAddingToCart ? 'Ajout...' : 'Ajouter'}
+          </ThemedText>
         </TouchableOpacity>
       </View>
       </ThemedView>
@@ -234,5 +303,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
   },
 });
