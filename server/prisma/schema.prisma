@@ -14,6 +14,10 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  firstName String?  // Prénom
+  lastName  String?  // Nom de famille
+  phone     String?  // Téléphone
+  address   String?  // Adresse principale
   password  String   // Mot de passe hashé
   role      String   @default("user") // user, admin
   status    String   @default("active") // active, suspended, inactive

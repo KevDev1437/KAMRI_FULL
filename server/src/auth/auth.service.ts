@@ -22,16 +22,20 @@ export class AuthService {
     return null;
   }
 
-  async login(email: string) {
+  async login(email: string | any) {
     console.log('🔑 [AuthService] Tentative de connexion pour:', email);
     
+    // Si email est un objet, extraire la vraie valeur email
+    const actualEmail = typeof email === 'string' ? email : email.email;
+    console.log('📧 [AuthService] Email extrait:', actualEmail);
+    
     // Vérifier si l'utilisateur existe
-    let user = await this.validateUser(email);
+    let user = await this.validateUser(actualEmail);
     
     // Si l'utilisateur n'existe pas, le créer automatiquement
     if (!user) {
       console.log('👤 [AuthService] Utilisateur non trouvé, création automatique...');
-      user = await this.createUser(email, email.split('@')[0], 'auto-generated');
+      user = await this.createUser(actualEmail, actualEmail.split('@')[0], 'auto-generated');
       console.log('✅ [AuthService] Utilisateur créé:', user.id);
     } else {
       console.log('✅ [AuthService] Utilisateur trouvé:', user.id);
@@ -57,9 +61,13 @@ export class AuthService {
     };
   }
 
-  async register(email: string, name: string, password: string = 'auto-generated', role: string = 'user') {
+  async register(email: string | any, name: string, password: string = 'auto-generated', role: string = 'user') {
+    // Si email est un objet, extraire la vraie valeur email
+    const actualEmail = typeof email === 'string' ? email : email.email;
+    console.log('📧 [AuthService] Email extrait pour register:', actualEmail);
+    
     const existingUser = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: actualEmail },
     });
 
     if (existingUser) {
@@ -70,7 +78,7 @@ export class AuthService {
     
     const user = await this.prisma.user.create({
       data: {
-        email,
+        email: actualEmail,
         name,
         password: hashedPassword,
         role,
@@ -95,11 +103,15 @@ export class AuthService {
     };
   }
 
-  async createUser(email: string, name: string, password: string) {
+  async createUser(email: string | any, name: string, password: string) {
+    // Si email est un objet, extraire la vraie valeur email
+    const actualEmail = typeof email === 'string' ? email : email.email;
+    console.log('📧 [AuthService] Email extrait pour createUser:', actualEmail);
+    
     const hashedPassword = await bcrypt.hash(password, 10);
     return this.prisma.user.create({
       data: {
-        email,
+        email: actualEmail,
         name,
         password: hashedPassword,
         role: 'user',

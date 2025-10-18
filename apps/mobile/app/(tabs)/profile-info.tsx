@@ -1,34 +1,111 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import UnifiedHeader from '../../components/UnifiedHeader';
 import { ThemedText } from '../../components/themed-text';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient, User } from '../../lib/api';
 
 export default function ProfileInfoScreen() {
-  const [userInfo, setUserInfo] = useState({
-    firstName: 'Ulrich',
-    lastName: 'Kevin',
-    email: 'ulrich.kevin@email.com',
-    phone: '+33 6 12 34 56 78',
-    birthDate: '15 Janvier 1990',
-    address: '123 Rue de la Paix, 75001 Paris',
-    memberSince: '15 Janvier 2024'
-  });
-
+  const { user } = useAuth();
+  const [userInfo, setUserInfo] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedInfo, setEditedInfo] = useState(userInfo);
+  const [editedInfo, setEditedInfo] = useState<Partial<User>>({});
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = () => {
-    setUserInfo(editedInfo);
-    setIsEditing(false);
-    Alert.alert('Succès', 'Vos informations ont été mises à jour');
+  // Charger les données du profil
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        console.log('👤 [PROFILE-INFO] Chargement du profil utilisateur depuis API');
+        setLoading(true);
+        
+        // TOUJOURS charger depuis l'API pour avoir les données les plus récentes
+        const response = await apiClient.getUserProfile();
+        if (response.data) {
+          // Extraire les vraies données utilisateur (elles sont dans response.data.data)
+          const userData = response.data.data || response.data;
+          console.log('👤 [PROFILE-INFO] Données utilisateur extraites depuis API:', userData);
+          
+          setUserInfo(userData);
+          setEditedInfo({
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            email: userData.email,
+            phone: userData.phone || '',
+            address: userData.address || '',
+          });
+          console.log('👤 [PROFILE-INFO] Profil chargé depuis API:', userData);
+        }
+      } catch (error) {
+        console.error('❌ [PROFILE-INFO] Erreur lors du chargement du profil:', error);
+        Alert.alert('Erreur', 'Impossible de charger vos informations');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [user]); // Se déclenche quand l'utilisateur change (connexion/déconnexion)
+
+  const handleSave = async () => {
+    try {
+      console.log('💾 [PROFILE-INFO] === DÉBUT DE LA SAUVEGARDE ===');
+      console.log('💾 [PROFILE-INFO] Données à sauvegarder:', editedInfo);
+      console.log('💾 [PROFILE-INFO] Type de editedInfo:', typeof editedInfo);
+      console.log('💾 [PROFILE-INFO] Clés disponibles:', Object.keys(editedInfo));
+      console.log('💾 [PROFILE-INFO] Valeurs:', {
+        firstName: editedInfo.firstName,
+        lastName: editedInfo.lastName,
+        email: editedInfo.email,
+        phone: editedInfo.phone
+      });
+      
+      console.log('💾 [PROFILE-INFO] Appel de l\'API updateUserProfile...');
+      const response = await apiClient.updateUserProfile(editedInfo);
+      
+      console.log('💾 [PROFILE-INFO] Réponse reçue:', response);
+      console.log('💾 [PROFILE-INFO] response.data:', response.data);
+      console.log('💾 [PROFILE-INFO] response.error:', response.error);
+      
+      if (response.data) {
+        console.log('✅ [PROFILE-INFO] Profil mis à jour avec succès:', response.data);
+        
+        // Extraire les vraies données utilisateur (elles sont dans response.data.data)
+        const userData = response.data.data || response.data;
+        console.log('✅ [PROFILE-INFO] Données utilisateur extraites:', userData);
+        
+        setUserInfo(userData);
+        setIsEditing(false);
+        Alert.alert('Succès', 'Vos informations ont été mises à jour');
+        console.log('✅ [PROFILE-INFO] État mis à jour, mode édition fermé');
+      } else {
+        console.error('❌ [PROFILE-INFO] Échec de la mise à jour:', response.error);
+        Alert.alert('Erreur', 'Impossible de sauvegarder vos modifications');
+      }
+    } catch (error) {
+      console.error('❌ [PROFILE-INFO] Erreur lors de la sauvegarde:', error);
+      console.error('❌ [PROFILE-INFO] Stack trace:', error.stack);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde');
+    } finally {
+      console.log('💾 [PROFILE-INFO] === FIN DE LA SAUVEGARDE ===');
+    }
   };
 
   const handleCancel = () => {
-    setEditedInfo(userInfo);
+    if (userInfo) {
+      console.log('🔄 [PROFILE-INFO] Annulation - restauration des données originales:', userInfo);
+      setEditedInfo({
+        firstName: userInfo.firstName || '',
+        lastName: userInfo.lastName || '',
+        email: userInfo.email,
+        phone: userInfo.phone || '',
+        address: userInfo.address || '',
+      });
+    }
     setIsEditing(false);
   };
 
@@ -36,25 +113,41 @@ export default function ProfileInfoScreen() {
     setIsEditing(true);
   };
 
-  const renderPersonalInfo = () => (
-    <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>Informations personnelles</ThemedText>
-      
-      {/* Avatar et infos principales */}
-      <View style={styles.avatarCard}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>
-              {userInfo.firstName[0]}{userInfo.lastName[0]}
+  const renderPersonalInfo = () => {
+    if (!userInfo) {
+      return (
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Informations personnelles</ThemedText>
+          <View style={styles.loadingContainer}>
+            <ThemedText style={styles.loadingText}>Chargement...</ThemedText>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.section}>
+        <ThemedText style={styles.sectionTitle}>Informations personnelles</ThemedText>
+        
+        {/* Avatar et infos principales */}
+        <View style={styles.avatarCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <ThemedText style={styles.avatarText}>
+                {(userInfo.firstName?.[0] || 'U')}{(userInfo.lastName?.[0] || 'K')}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.userInfo}>
+            <ThemedText style={styles.userName}>
+              {userInfo.firstName || 'Utilisateur'} {userInfo.lastName || 'KAMRI'}
+            </ThemedText>
+            <ThemedText style={styles.userEmail}>{userInfo.email}</ThemedText>
+            <ThemedText style={styles.memberSince}>
+              Membre depuis le {new Date(userInfo.createdAt).toLocaleDateString('fr-FR')}
             </ThemedText>
           </View>
         </View>
-        <View style={styles.userInfo}>
-          <ThemedText style={styles.userName}>{userInfo.firstName} {userInfo.lastName}</ThemedText>
-          <ThemedText style={styles.userEmail}>{userInfo.email}</ThemedText>
-          <ThemedText style={styles.memberSince}>Membre depuis le {userInfo.memberSince}</ThemedText>
-        </View>
-      </View>
 
       {/* Détails des informations */}
       <View style={styles.infoCard}>
@@ -69,7 +162,7 @@ export default function ProfileInfoScreen() {
                 onChangeText={(text) => setEditedInfo({ ...editedInfo, firstName: text })}
               />
             ) : (
-              <ThemedText style={styles.infoValue}>{userInfo.firstName}</ThemedText>
+              <ThemedText style={styles.infoValue}>{userInfo.firstName || 'Non renseigné'}</ThemedText>
             )}
           </View>
         </View>
@@ -85,7 +178,7 @@ export default function ProfileInfoScreen() {
                 onChangeText={(text) => setEditedInfo({ ...editedInfo, lastName: text })}
               />
             ) : (
-              <ThemedText style={styles.infoValue}>{userInfo.lastName}</ThemedText>
+              <ThemedText style={styles.infoValue}>{userInfo.lastName || 'Non renseigné'}</ThemedText>
             )}
           </View>
         </View>
@@ -119,24 +212,7 @@ export default function ProfileInfoScreen() {
                 keyboardType="phone-pad"
               />
             ) : (
-              <ThemedText style={styles.infoValue}>{userInfo.phone}</ThemedText>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.infoItem}>
-          <Ionicons name="calendar" size={20} color="#4CAF50" />
-          <View style={styles.infoContent}>
-            <ThemedText style={styles.infoLabel}>Date de naissance</ThemedText>
-            {isEditing ? (
-              <TextInput
-                style={styles.infoInput}
-                value={editedInfo.birthDate}
-                onChangeText={(text) => setEditedInfo({ ...editedInfo, birthDate: text })}
-                placeholder="DD/MM/YYYY"
-              />
-            ) : (
-              <ThemedText style={styles.infoValue}>{userInfo.birthDate}</ThemedText>
+              <ThemedText style={styles.infoValue}>{userInfo.phone || 'Non renseigné'}</ThemedText>
             )}
           </View>
         </View>
@@ -148,15 +224,18 @@ export default function ProfileInfoScreen() {
             {isEditing ? (
               <TextInput
                 style={styles.infoInput}
-                value={editedInfo.address}
+                value={editedInfo.address || ''}
                 onChangeText={(text) => setEditedInfo({ ...editedInfo, address: text })}
+                placeholder="Votre adresse complète"
                 multiline
+                numberOfLines={2}
               />
             ) : (
-              <ThemedText style={styles.infoValue}>{userInfo.address}</ThemedText>
+              <ThemedText style={styles.infoValue}>{userInfo.address || 'Non renseigné'}</ThemedText>
             )}
           </View>
         </View>
+
       </View>
 
       {/* Boutons d'action */}
@@ -179,6 +258,19 @@ export default function ProfileInfoScreen() {
       </View>
     </View>
   );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.loadingContainer}>
+          <ThemedText style={styles.loadingText}>Chargement de vos informations...</ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -406,5 +498,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#4CAF50',
+    marginTop: 12,
+    fontWeight: '500',
   },
 });

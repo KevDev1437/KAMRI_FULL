@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     Alert,
     Image,
@@ -34,28 +34,48 @@ export default function AuthModal({ visible, onClose, onLoginSuccess }: AuthModa
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
+  // Nettoyer les données au montage du composant
+  React.useEffect(() => {
+    if (visible) {
+      console.log('🧹 [AUTH-MODAL] Nettoyage des données de connexion');
+      setLoginData({ email: '', password: '' });
+      setIsLoading(false);
+    }
+  }, [visible]);
+
 
   const handleLogin = async () => {
     if (!loginData.email) {
-      Alert.alert('Erreur', 'Veuillez entrer votre email ou numéro de téléphone');
+      Alert.alert('Erreur', 'Veuillez entrer votre email');
+      return;
+    }
+
+    if (isLoading) {
+      console.log('⏳ [AUTH-MODAL] Connexion déjà en cours, ignorer le clic');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Simulation d'authentification
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('🔐 [AUTH-MODAL] Tentative de connexion avec:', loginData.email);
+      console.log('🔐 [AUTH-MODAL] Type de email:', typeof loginData.email);
+      console.log('🔐 [AUTH-MODAL] Email complet:', JSON.stringify(loginData.email));
       
-      // Stratégie Temu : Accepter n'importe quel email et créer un utilisateur
-      const email = loginData.email;
-      const firstName = email.includes('@') ? email.split('@')[0] : 'Utilisateur';
-      const lastName = 'KAMRI';
+      // Utiliser l'API réelle pour la connexion
+      const success = await login(loginData.email);
       
-      login({ firstName, lastName, email });
-      onLoginSuccess?.();
-      onClose();
-    } catch {
-      Alert.alert('Erreur', 'Une erreur est survenue');
+      if (success) {
+        console.log('✅ [AUTH-MODAL] Connexion réussie');
+        Alert.alert('Succès', 'Connexion réussie !');
+        onClose();
+        onLoginSuccess?.();
+      } else {
+        console.log('❌ [AUTH-MODAL] Échec de la connexion');
+        Alert.alert('Erreur', 'Impossible de se connecter. Veuillez réessayer.');
+      }
+    } catch (error) {
+      console.error('❌ [AUTH-MODAL] Erreur lors de la connexion:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
     }

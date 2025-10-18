@@ -31,6 +31,18 @@ export interface Category {
   description?: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CartItem {
   product: Product;
   quantity: number;
@@ -102,6 +114,50 @@ export class ApiClient {
     this.token = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
+    }
+  }
+
+  // Méthodes pour les utilisateurs
+  async getUserProfile(): Promise<ApiResponse<User>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { data: data.data || data };
+      } else {
+        return { error: data.message || 'Erreur lors de la récupération du profil' };
+      }
+    } catch (error) {
+      return { error: 'Erreur réseau' };
+    }
+  }
+
+  async updateUserProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.token}`,
+        },
+        body: JSON.stringify(userData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { data: data.data || data };
+      } else {
+        return { error: data.message || 'Erreur lors de la mise à jour' };
+      }
+    } catch (error) {
+      return { error: 'Erreur réseau' };
     }
   }
 

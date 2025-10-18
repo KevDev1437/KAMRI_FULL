@@ -142,7 +142,7 @@ export default function UnifiedHeader() {
   const pathname = usePathname();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const { isAuthenticated, user, login } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { toggleFilters } = useFilter();
 
   // Détection de la page active
@@ -311,7 +311,7 @@ export default function UnifiedHeader() {
         onClose={() => setShowAuthModal(false)}
         onLoginSuccess={() => {
           setShowAuthModal(false);
-          login({ firstName: 'Ulrich', lastName: 'Kevin', email: 'test@test.com' });
+          // La connexion est déjà gérée par le contexte AuthContext
         }}
       />
     </SafeAreaView>

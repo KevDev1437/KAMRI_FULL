@@ -3,16 +3,18 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { apiClient } from '../lib/api';
 
 export default function PersonalInfo() {
   const { user, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [userInfo, setUserInfo] = useState({
-    name: user?.name || '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
     email: user?.email || '',
-    phone: '', // Pas encore dans le backend
-    address: '', // Pas encore dans le backend
+    phone: user?.phone || '',
+    address: user?.address || '',
     memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : ''
   });
 
@@ -20,17 +22,32 @@ export default function PersonalInfo() {
 
   // Mettre à jour les données quand l'utilisateur change
   useEffect(() => {
-    if (user) {
-      const newUserInfo = {
-        name: user.name || '',
-        email: user.email || '',
-        phone: '', // Pas encore dans le backend
-        address: '', // Pas encore dans le backend
-        memberSince: user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : ''
-      };
-      setUserInfo(newUserInfo);
-      setFormData(newUserInfo);
-    }
+    const loadUserProfile = async () => {
+      try {
+        console.log('👤 [PersonalInfo] Chargement du profil utilisateur depuis API');
+        
+        const response = await apiClient.getUserProfile();
+        if (response.data) {
+          const userData = response.data;
+          console.log('👤 [PersonalInfo] Données utilisateur extraites depuis API:', userData);
+          
+          const newUserInfo = {
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            address: userData.address || '',
+            memberSince: userData.createdAt ? new Date(userData.createdAt).toLocaleDateString('fr-FR') : ''
+          };
+          setUserInfo(newUserInfo);
+          setFormData(newUserInfo);
+        }
+      } catch (error) {
+        console.error('❌ [PersonalInfo] Erreur lors du chargement du profil:', error);
+      }
+    };
+
+    loadUserProfile();
   }, [user]);
 
   const handleSave = async () => {
@@ -38,18 +55,22 @@ export default function PersonalInfo() {
     try {
       console.log('💾 [PersonalInfo] Sauvegarde du profil...', formData);
       
-      const result = await updateProfile({
-        name: formData.name,
-        email: formData.email
+      const response = await apiClient.updateUserProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address
       });
 
-      if (result.success) {
-        console.log('✅ [PersonalInfo] Profil mis à jour avec succès');
+      if (response.data) {
+        console.log('✅ [PersonalInfo] Profil mis à jour avec succès:', response.data);
         setUserInfo(formData);
         setIsEditing(false);
+        alert('Profil mis à jour avec succès !');
       } else {
-        console.log('❌ [PersonalInfo] Erreur lors de la mise à jour:', result.error);
-        alert('Erreur lors de la mise à jour: ' + result.error);
+        console.log('❌ [PersonalInfo] Erreur lors de la mise à jour:', response.error);
+        alert('Erreur lors de la mise à jour: ' + response.error);
       }
     } catch (error) {
       console.error('❌ [PersonalInfo] Erreur:', error);
@@ -77,7 +98,7 @@ export default function PersonalInfo() {
           {/* Avatar */}
           <div className="relative">
             <div className="w-24 h-24 bg-[#4CAF50] rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {userInfo.name.split(' ').map(n => n[0]).join('')}
+              {(userInfo.firstName?.[0] || 'U')}{(userInfo.lastName?.[0] || 'K')}
             </div>
             <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-[#4CAF50] rounded-full flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +109,9 @@ export default function PersonalInfo() {
 
           {/* Informations */}
           <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-2xl font-bold text-[#424242] mb-2">{userInfo.name}</h2>
+            <h2 className="text-2xl font-bold text-[#424242] mb-2">
+              {userInfo.firstName || 'Utilisateur'} {userInfo.lastName || 'KAMRI'}
+            </h2>
             <p className="text-[#4CAF50] font-medium mb-1">{userInfo.email}</p>
             <p className="text-gray-500 text-sm">Membre depuis le {userInfo.memberSince}</p>
           </div>
@@ -138,20 +161,37 @@ export default function PersonalInfo() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Nom complet */}
+          {/* Prénom */}
           <div>
             <label className="block text-sm font-medium text-[#424242] mb-2">
-              Nom complet
+              Prénom
             </label>
             {isEditing ? (
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] transition-all duration-300"
               />
             ) : (
-              <p className="text-[#424242] py-3">{userInfo.name}</p>
+              <p className="text-[#424242] py-3">{userInfo.firstName || 'Non renseigné'}</p>
+            )}
+          </div>
+
+          {/* Nom */}
+          <div>
+            <label className="block text-sm font-medium text-[#424242] mb-2">
+              Nom
+            </label>
+            {isEditing ? (
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] transition-all duration-300"
+              />
+            ) : (
+              <p className="text-[#424242] py-3">{userInfo.lastName || 'Non renseigné'}</p>
             )}
           </div>
 
@@ -185,7 +225,7 @@ export default function PersonalInfo() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] transition-all duration-300"
               />
             ) : (
-              <p className="text-[#424242] py-3">{userInfo.phone}</p>
+              <p className="text-[#424242] py-3">{userInfo.phone || 'Non renseigné'}</p>
             )}
           </div>
 
@@ -202,7 +242,7 @@ export default function PersonalInfo() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] transition-all duration-300"
               />
             ) : (
-              <p className="text-[#424242] py-3">{userInfo.address}</p>
+              <p className="text-[#424242] py-3">{userInfo.address || 'Non renseigné'}</p>
             )}
           </div>
         </div>

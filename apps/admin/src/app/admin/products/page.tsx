@@ -70,19 +70,30 @@ export default function ProductsPage() {
       // Charger les produits
       const productsResponse = await apiClient.getProducts()
       if (productsResponse.data) {
-        setProducts(productsResponse.data)
+        const productsData = productsResponse.data.data || productsResponse.data
+        const productsList = Array.isArray(productsData) ? productsData : []
+        console.log('🛍️ [ADMIN-PRODUCTS] Produits chargés:', productsList.length)
+        setProducts(productsList)
       }
 
       // Charger les catégories
       const categoriesResponse = await apiClient.getCategories()
       if (categoriesResponse.data) {
-        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [])
+        const categoriesData = categoriesResponse.data.data || categoriesResponse.data
+        const categoriesList = Array.isArray(categoriesData) ? categoriesData : []
+        console.log('📂 [ADMIN-PRODUCTS] Catégories chargées:', categoriesList.length)
+        console.log('📂 [ADMIN-PRODUCTS] Catégories:', categoriesList.map(c => ({ id: c.id, name: c.name })))
+        setCategories(categoriesList)
       }
 
       // Charger les fournisseurs
       const suppliersResponse = await apiClient.getSuppliers()
       if (suppliersResponse.data) {
-        setSuppliers(Array.isArray(suppliersResponse.data) ? suppliersResponse.data : [])
+        const suppliersData = suppliersResponse.data.data || suppliersResponse.data
+        const suppliersList = Array.isArray(suppliersData) ? suppliersData : []
+        console.log('🚚 [ADMIN-PRODUCTS] Fournisseurs chargés:', suppliersList.length)
+        console.log('🚚 [ADMIN-PRODUCTS] Fournisseurs:', suppliersList.map(s => ({ id: s.id, name: s.name })))
+        setSuppliers(suppliersList)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
@@ -159,11 +170,22 @@ export default function ProductsPage() {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategory === 'Toutes' || product.category?.name === selectedCategory
     const matchesSupplier = selectedSupplier === 'Tous' || product.supplier?.name === selectedSupplier
+    
+    // Logs de debug pour le filtrage par catégorie
+    if (selectedCategory !== 'Toutes') {
+      console.log('🔍 [ADMIN-PRODUCTS] Filtrage par catégorie:', selectedCategory)
+      console.log('🔍 [ADMIN-PRODUCTS] Produit:', product.name, 'Catégorie:', product.category?.name, 'Match:', matchesCategory)
+    }
+    
     return matchesSearch && matchesCategory && matchesSupplier
   })
 
   const categoryOptions = ['Toutes', ...(categories || []).map(cat => cat.name)]
   const supplierOptions = ['Tous', ...(suppliers || []).map(sup => sup.name)]
+  
+  // Logs de debug pour les catégories
+  console.log('📂 [ADMIN-PRODUCTS] Catégories disponibles:', categories?.length || 0)
+  console.log('📂 [ADMIN-PRODUCTS] Options de catégories:', categoryOptions)
 
   return (
     <div className="space-y-6">
@@ -184,10 +206,11 @@ export default function ProductsPage() {
 
       {/* Filters */}
       <Card className="kamri-card">
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row gap-6 items-end">
             {/* Search */}
             <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Recherche</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -200,26 +223,39 @@ export default function ProductsPage() {
             </div>
 
             {/* Category Filter */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              {categoryOptions.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
+            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
+              <label className="text-sm font-medium text-gray-700 mb-2">Catégorie</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  console.log('📂 [ADMIN-PRODUCTS] Catégorie sélectionnée:', e.target.value)
+                  setSelectedCategory(e.target.value)
+                }}
+                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
+              >
+                {categoryOptions.map(category => (
+                  <option key={category} value={category}>
+                    {category} {category !== 'Toutes' && `(${products.filter(p => p.category?.name === category).length})`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Supplier Filter */}
-            <select
-              value={selectedSupplier}
-              onChange={(e) => setSelectedSupplier(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              {supplierOptions.map(supplier => (
-                <option key={supplier} value={supplier}>{supplier}</option>
-              ))}
-            </select>
+            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
+              <label className="text-sm font-medium text-gray-700 mb-2">Fournisseur</label>
+              <select
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
+              >
+                {supplierOptions.map(supplier => (
+                  <option key={supplier} value={supplier}>
+                    {supplier} {supplier !== 'Tous' && `(${products.filter(p => p.supplier?.name === supplier).length})`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <Button
               variant="outline"
@@ -232,6 +268,18 @@ export default function ProductsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Results Info */}
+      <div className="flex justify-between items-center text-sm text-gray-600">
+        <div>
+          {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
+          {selectedCategory !== 'Toutes' && ` dans la catégorie "${selectedCategory}"`}
+          {selectedSupplier !== 'Tous' && ` du fournisseur "${selectedSupplier}"`}
+        </div>
+        <div>
+          Total: {products.length} produit{products.length > 1 ? 's' : ''}
+        </div>
+      </div>
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

@@ -5,8 +5,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 interface User {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
   role: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthContextType {
@@ -16,7 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  updateProfile: (data: { name?: string; email?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,14 +54,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setToken(storedToken);
           
           // Récupérer le profil utilisateur
-          const response = await fetch('http://localhost:3001/api/auth/profile', {
+          const response = await fetch('http://localhost:3001/api/users/profile', {
             headers: {
               'Authorization': `Bearer ${storedToken}`,
             },
           });
 
           if (response.ok) {
-            const userData = await response.json();
+            const responseData = await response.json();
+            const userData = responseData.data || responseData;
             setUser(userData);
             console.log('✅ [AuthProvider] Utilisateur connecté:', userData.email);
           } else {
@@ -121,12 +128,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   };
 
-  const updateProfile = async (data: { name?: string; email?: string }): Promise<{ success: boolean; error?: string }> => {
+  const updateProfile = async (data: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string }): Promise<{ success: boolean; error?: string }> => {
     try {
       console.log('👤 [AuthProvider] Mise à jour du profil:', data);
       
-      const response = await fetch('http://localhost:3001/api/auth/profile', {
-        method: 'POST',
+      const response = await fetch('http://localhost:3001/api/users/profile', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -134,15 +141,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify(data),
       });
 
-      const userData = await response.json();
+      const responseData = await response.json();
 
       if (response.ok) {
-        console.log('✅ [AuthProvider] Profil mis à jour:', userData.email);
-        setUser(userData);
+        console.log('✅ [AuthProvider] Profil mis à jour:', responseData.data);
+        setUser(responseData.data);
         return { success: true };
       } else {
-        console.log('❌ [AuthProvider] Erreur de mise à jour:', userData.message);
-        return { success: false, error: userData.message || 'Erreur de mise à jour' };
+        console.log('❌ [AuthProvider] Erreur de mise à jour:', responseData.message);
+        return { success: false, error: responseData.message || 'Erreur de mise à jour' };
       }
     } catch (error) {
       console.error('❌ [AuthProvider] Erreur réseau:', error);
