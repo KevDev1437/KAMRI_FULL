@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { usePathname, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useFilter } from '../contexts/FilterContext';
+import { apiClient } from '../lib/api';
 import AuthModal from './AuthModal';
 import UserMenu from './UserMenu';
 import { ThemedText } from './themed-text';
@@ -144,6 +146,10 @@ export default function UnifiedHeader() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const { toggleFilters } = useFilter();
+  
+  // États pour les compteurs réels
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
 
   // Détection de la page active
   const getPageConfig = () => {
@@ -179,6 +185,49 @@ export default function UnifiedHeader() {
   };
 
   const currentConfig = getPageConfig();
+
+  // Charger les compteurs réels
+  const loadCounters = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setFavoritesCount(0);
+      setCartCount(0);
+      return;
+    }
+
+    try {
+      // Charger les favoris
+      const favoritesResponse = await apiClient.getWishlist();
+      if (favoritesResponse.data) {
+        const favoritesData = favoritesResponse.data;
+        setFavoritesCount(Array.isArray(favoritesData) ? favoritesData.length : 0);
+      }
+      
+      // Charger le panier
+      const cartResponse = await apiClient.getCart();
+      if (cartResponse.data) {
+        const cartData = cartResponse.data;
+        const cartItems = Array.isArray(cartData) ? cartData : [];
+        const totalQuantity = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+        setCartCount(totalQuantity);
+      }
+    } catch (error) {
+      console.error('❌ [HEADER] Erreur lors du chargement des compteurs:', error);
+      setFavoritesCount(0);
+      setCartCount(0);
+    }
+  }, [isAuthenticated, user]);
+
+  // Recharger les compteurs quand l'utilisateur change
+  useEffect(() => {
+    loadCounters();
+  }, [loadCounters]);
+
+  // Recharger les compteurs quand l'écran est focus
+  useFocusEffect(
+    useCallback(() => {
+      loadCounters();
+    }, [loadCounters])
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -282,18 +331,22 @@ export default function UnifiedHeader() {
               onPress={() => router.push('/(tabs)/favorites')}
             >
               <Ionicons name="heart-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>2</ThemedText>
-              </View>
+              {favoritesCount > 0 && (
+                <View style={styles.actionBadge}>
+                  <ThemedText style={styles.badgeText}>{favoritesCount}</ThemedText>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => router.push('/(tabs)/cart')}
             >
               <Ionicons name="bag-outline" size={20} color="#4CAF50" />
-              <View style={styles.actionBadge}>
-                <ThemedText style={styles.badgeText}>3</ThemedText>
-              </View>
+              {cartCount > 0 && (
+                <View style={styles.actionBadge}>
+                  <ThemedText style={styles.badgeText}>{cartCount}</ThemedText>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </ThemedView>

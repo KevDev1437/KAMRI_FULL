@@ -1,56 +1,67 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../lib/api';
 
 export default function CartScreen() {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      quantity: 1,
-      size: '256GB',
-      color: 'Titanium Naturel',
-      inStock: true,
-      savings: 100
-    },
-    {
-      id: '2',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      quantity: 2,
-      size: 'Standard',
-      color: 'Blanc',
-      inStock: true,
-      savings: 60
-    },
-    {
-      id: '3',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      quantity: 1,
-      size: '13"',
-      color: 'Gris sidéral',
-      inStock: false,
-      savings: 0
-    }
-  ]);
+  const { user, isAuthenticated } = useAuth();
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [promoCode, setPromoCode] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
-  const [selectedItems, setSelectedItems] = useState(new Set(['1', '2', '3']));
+  const [selectedItems, setSelectedItems] = useState(new Set());
+
+  // Charger le panier depuis l'API
+  const loadCart = async () => {
+    if (!isAuthenticated || !user) {
+      console.log('❌ [PANIER-MOBILE] Utilisateur non connecté');
+      setCartItems([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('🛒 [PANIER-MOBILE] Chargement du panier pour:', user.email);
+      setLoading(true);
+      
+      const response = await apiClient.getCart();
+      if (response.data) {
+        const cartData = response.data.data || response.data;
+        setCartItems(Array.isArray(cartData) ? cartData : []);
+        console.log('🛒 [PANIER-MOBILE] Panier chargé:', cartData);
+      } else {
+        console.log('❌ [PANIER-MOBILE] Aucune donnée de panier reçue');
+        console.log('❌ [PANIER-MOBILE] Erreur:', response.error);
+        setCartItems([]);
+      }
+    } catch (error) {
+      console.error('❌ [PANIER-MOBILE] Erreur lors du chargement du panier:', error);
+      setCartItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Recharger le panier quand l'écran est focus
+  useFocusEffect(
+    useCallback(() => {
+      loadCart();
+    }, [isAuthenticated, user])
+  );
+
+  // Charger le panier au montage
+  useEffect(() => {
+    loadCart();
+  }, [isAuthenticated, user]);
 
   // Calculs
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -65,16 +76,29 @@ export default function CartScreen() {
     ? itemsWithDiscount.reduce((sum, item) => sum + calculateDiscountPercentage(item.originalPrice, item.price), 0) / itemsWithDiscount.length
     : 0;
 
-  const updateQuantity = (id: string, newQuantity: number) => {
+  const updateQuantity = async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
-    setCartItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
+    
+    try {
+      console.log('🛒 [PANIER-MOBILE] Mise à jour quantité:', itemId, 'vers', newQuantity);
+      
+      // Pour l'instant, on supprime et on rajoute avec la nouvelle quantité
+      // TODO: Créer un endpoint PATCH pour mettre à jour la quantité
+      const item = cartItems.find(item => item.id === itemId);
+      if (item) {
+        await apiClient.removeFromCart(itemId);
+        if (newQuantity > 0) {
+          await apiClient.addToCart(item.productId, newQuantity);
+        }
+        await loadCart(); // Recharger le panier
+      }
+    } catch (error) {
+      console.error('❌ [PANIER-MOBILE] Erreur lors de la mise à jour de la quantité:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la quantité');
+    }
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = (itemId: string) => {
     Alert.alert(
       'Supprimer l\'article',
       'Êtes-vous sûr de vouloir supprimer cet article de votre panier ?',
@@ -83,13 +107,20 @@ export default function CartScreen() {
         { 
           text: 'Supprimer', 
           style: 'destructive',
-          onPress: () => {
-            setCartItems(items => items.filter(item => item.id !== id));
-            setSelectedItems(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(id);
-              return newSet;
-            });
+          onPress: async () => {
+            try {
+              console.log('🗑️ [PANIER-MOBILE] Suppression article:', itemId);
+              await apiClient.removeFromCart(itemId);
+              await loadCart(); // Recharger le panier
+              setSelectedItems(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(itemId);
+                return newSet;
+              });
+            } catch (error) {
+              console.error('❌ [PANIER-MOBILE] Erreur lors de la suppression:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer l\'article');
+            }
           }
         }
       ]
@@ -122,6 +153,31 @@ export default function CartScreen() {
     } else {
       Alert.alert('Code invalide', 'Le code promo n\'est pas valide');
     }
+  };
+
+  const clearCart = () => {
+    Alert.alert(
+      'Vider le panier',
+      'Êtes-vous sûr de vouloir vider votre panier ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Vider', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ [PANIER-MOBILE] Vidage du panier');
+              await apiClient.clearCart();
+              await loadCart(); // Recharger le panier
+              setSelectedItems(new Set());
+            } catch (error) {
+              console.error('❌ [PANIER-MOBILE] Erreur lors du vidage:', error);
+              Alert.alert('Erreur', 'Impossible de vider le panier');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const proceedToCheckout = () => {
@@ -201,6 +257,35 @@ export default function CartScreen() {
       </View>
     </View>
   );
+
+  // Affichage pour utilisateur non connecté
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.notConnectedContainer}>
+          <ThemedText style={styles.notConnectedTitle}>Connexion requise</ThemedText>
+          <ThemedText style={styles.notConnectedSubtitle}>
+            Connectez-vous pour voir votre panier
+          </ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
+
+  // Affichage de chargement
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.loadingContainer}>
+          <ThemedText style={styles.loadingText}>Chargement de votre panier...</ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -749,5 +834,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Nouveaux styles pour les états
+  notConnectedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  notConnectedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  notConnectedSubtitle: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#4CAF50',
+    textAlign: 'center',
   },
 });

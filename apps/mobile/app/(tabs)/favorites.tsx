@@ -1,84 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDiscountPercentage, formatDiscountPercentage } from '@kamri/lib';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import CurvedBottomNav from '../../components/CurvedBottomNav';
 import HomeFooter from '../../components/HomeFooter';
 import { ThemedText } from '../../components/themed-text';
 import UnifiedHeader from '../../components/UnifiedHeader';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../lib/api';
 
 export default function FavoritesScreen() {
-  const [favorites, setFavorites] = useState([
-    {
-      id: '1',
-      name: 'iPhone 15 Pro Max',
-      price: 1299,
-      originalPrice: 1399,
-      image: 'https://images.unsplash.com/photo-1592899677977-9d26d3ba4f33?w=300',
-      category: 'Smartphones',
-      rating: 4.8,
-      reviews: 1247,
-      inStock: true,
-      stockCount: 15,
-      isOnSale: true,
-      savings: 100,
-      addedDate: '2024-01-15',
-      priceAlert: false,
-      isLiked: true
-    },
-    {
-      id: '2',
-      name: 'MacBook Air M2',
-      price: 1199,
-      originalPrice: 1199,
-      image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300',
-      category: 'Ordinateurs',
-      rating: 4.9,
-      reviews: 892,
-      inStock: false,
-      stockCount: 0,
-      isOnSale: false,
-      savings: 0,
-      addedDate: '2024-01-10',
-      priceAlert: true,
-      isLiked: true
-    },
-    {
-      id: '3',
-      name: 'AirPods Pro 2',
-      price: 249,
-      originalPrice: 279,
-      image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=300',
-      category: 'Audio',
-      rating: 4.7,
-      reviews: 2156,
-      inStock: true,
-      stockCount: 8,
-      isOnSale: true,
-      savings: 30,
-      addedDate: '2024-01-12',
-      priceAlert: false,
-      isLiked: true
-    },
-    {
-      id: '4',
-      name: 'Apple Watch Series 9',
-      price: 399,
-      originalPrice: 449,
-      image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=300',
-      category: 'Montres',
-      rating: 4.6,
-      reviews: 1834,
-      inStock: true,
-      stockCount: 22,
-      isOnSale: true,
-      savings: 50,
-      addedDate: '2024-01-08',
-      priceAlert: true,
-      isLiked: true
-    }
-  ]);
+  const { user, isAuthenticated } = useAuth();
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date'); // date, price, name, rating
@@ -87,6 +23,49 @@ export default function FavoritesScreen() {
   const [showFilters, setShowFilters] = useState(false);
 
   const categories = ['all', 'Smartphones', 'Ordinateurs', 'Audio', 'Montres', 'Accessoires'];
+
+  // Charger les favoris depuis l'API
+  const loadFavorites = async () => {
+    if (!isAuthenticated || !user) {
+      console.log('❌ [FAVORIS-MOBILE] Utilisateur non connecté');
+      setFavorites([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('❤️ [FAVORIS-MOBILE] Chargement des favoris pour:', user.email);
+      setLoading(true);
+      
+      const response = await apiClient.getWishlist();
+      if (response.data) {
+        const wishlistData = response.data.data || response.data;
+        setFavorites(Array.isArray(wishlistData) ? wishlistData : []);
+        console.log('❤️ [FAVORIS-MOBILE] Favoris chargés:', wishlistData);
+      } else {
+        console.log('❌ [FAVORIS-MOBILE] Aucune donnée de favoris reçue');
+        console.log('❌ [FAVORIS-MOBILE] Erreur:', response.error);
+        setFavorites([]);
+      }
+    } catch (error) {
+      console.error('❌ [FAVORIS-MOBILE] Erreur lors du chargement des favoris:', error);
+      setFavorites([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Recharger les favoris quand l'écran est focus
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [isAuthenticated, user])
+  );
+
+  // Charger les favoris au montage
+  useEffect(() => {
+    loadFavorites();
+  }, [isAuthenticated, user]);
 
   const filteredFavorites = favorites.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -109,15 +88,18 @@ export default function FavoritesScreen() {
     }
   });
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(items => 
-      items.map(item => 
-        item.id === id ? { ...item, isLiked: !item.isLiked } : item
-      )
-    );
+  const toggleFavorite = async (productId: string) => {
+    try {
+      console.log('❤️ [FAVORIS-MOBILE] Toggle favori:', productId);
+      await apiClient.addToWishlist(productId);
+      await loadFavorites(); // Recharger les favoris
+    } catch (error) {
+      console.error('❌ [FAVORIS-MOBILE] Erreur lors du toggle favori:', error);
+      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+    }
   };
 
-  const removeFromFavorites = (id: string) => {
+  const removeFromFavorites = (productId: string) => {
     Alert.alert(
       'Supprimer des favoris',
       'Êtes-vous sûr de vouloir supprimer cet article de vos favoris ?',
@@ -126,13 +108,20 @@ export default function FavoritesScreen() {
         { 
           text: 'Supprimer', 
           style: 'destructive',
-          onPress: () => {
-            setFavorites(items => items.filter(item => item.id !== id));
-            setSelectedItems(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(id);
-              return newSet;
-            });
+          onPress: async () => {
+            try {
+              console.log('🗑️ [FAVORIS-MOBILE] Suppression favori:', productId);
+              await apiClient.removeFromWishlist(productId);
+              await loadFavorites(); // Recharger les favoris
+              setSelectedItems(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(productId);
+                return newSet;
+              });
+            } catch (error) {
+              console.error('❌ [FAVORIS-MOBILE] Erreur lors de la suppression:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer des favoris');
+            }
           }
         }
       ]
@@ -279,6 +268,35 @@ export default function FavoritesScreen() {
       </View>
     </View>
   );
+
+  // Affichage pour utilisateur non connecté
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.notConnectedContainer}>
+          <ThemedText style={styles.notConnectedTitle}>Connexion requise</ThemedText>
+          <ThemedText style={styles.notConnectedSubtitle}>
+            Connectez-vous pour voir vos favoris
+          </ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
+
+  // Affichage de chargement
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <UnifiedHeader />
+        <View style={styles.loadingContainer}>
+          <ThemedText style={styles.loadingText}>Chargement de vos favoris...</ThemedText>
+        </View>
+        <CurvedBottomNav />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -831,6 +849,36 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  // Nouveaux styles pour les états
+  notConnectedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  notConnectedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#424242',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  notConnectedSubtitle: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#4CAF50',
     textAlign: 'center',
   },
 });

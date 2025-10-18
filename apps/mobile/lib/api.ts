@@ -69,7 +69,7 @@ class ApiClient {
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string> || {}),
     };
 
     // Ajouter le token JWT si disponible
@@ -223,6 +223,73 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
+  }
+
+  // Méthodes pour les favoris (wishlist)
+  async getWishlist(): Promise<ApiResponse<any[]>> {
+    console.log('❤️ [MOBILE API] Récupération des favoris');
+    return this.fetch('/api/wishlist');
+  }
+
+  async addToWishlist(productId: string): Promise<ApiResponse<any>> {
+    console.log('❤️ [MOBILE API] Ajout aux favoris:', productId);
+    return this.fetch('/api/wishlist', {
+      method: 'POST',
+      body: JSON.stringify({ productId }),
+    });
+  }
+
+  async removeFromWishlist(productId: string): Promise<ApiResponse<void>> {
+    console.log('❤️ [MOBILE API] Suppression des favoris:', productId);
+    return this.fetch(`/api/wishlist/${productId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearWishlist(): Promise<ApiResponse<void>> {
+    console.log('❤️ [MOBILE API] Vidage des favoris');
+    return this.fetch('/api/wishlist', {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthodes pour le panier (cart)
+  async getCart(): Promise<ApiResponse<any[]>> {
+    console.log('🛒 [MOBILE API] Récupération du panier');
+    return this.fetch(`/api/cart/${this.getUserId()}`);
+  }
+
+  async addToCart(productId: string, quantity: number = 1): Promise<ApiResponse<any>> {
+    console.log('🛒 [MOBILE API] Ajout au panier:', productId, 'quantité:', quantity);
+    return this.fetch('/api/cart', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        userId: this.getUserId(),
+        productId, 
+        quantity 
+      }),
+    });
+  }
+
+  async removeFromCart(itemId: string): Promise<ApiResponse<void>> {
+    console.log('🛒 [MOBILE API] Suppression du panier:', itemId);
+    return this.fetch(`/api/cart/${this.getUserId()}/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearCart(): Promise<ApiResponse<void>> {
+    console.log('🛒 [MOBILE API] Vidage du panier');
+    return this.fetch(`/api/cart/${this.getUserId()}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Méthode utilitaire pour obtenir l'userId depuis le token
+  private getUserId(): string {
+    // Pour l'instant, on retourne un userId par défaut
+    // TODO: Extraire l'userId du token JWT
+    return 'user-id-placeholder';
   }
 }
 
