@@ -8,6 +8,7 @@ import {
     ChevronLeft,
     ChevronRight,
     FolderOpen,
+    Globe,
     LayoutDashboard,
     Package,
     Settings,
@@ -44,6 +45,11 @@ const navigation = [
     name: 'Fournisseurs',
     href: '/admin/suppliers',
     icon: Truck,
+  },
+  {
+    name: 'CJ Dropshipping',
+    href: '/admin/cj-dropshipping',
+    icon: Globe,
   },
   {
     name: 'Commandes',

@@ -4,6 +4,7 @@ import { AddressesModule } from './addresses/addresses.module';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CJDropshippingModule } from './cj-dropshipping/cj-dropshipping.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -34,6 +35,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     AddressesModule,
     UserSettingsModule,
     UsersModule,
+    CJDropshippingModule,
   ],
 })
 export class AppModule {}

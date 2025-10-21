@@ -76,6 +76,7 @@ model Product {
   orderItems    OrderItem[]
   reviews       Review[]
   wishlist      Wishlist[]
+  cjMapping     CJProductMapping?
 
   @@map("products")
 }
@@ -120,6 +121,7 @@ model Order {
   // Relations
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
+  cjMapping CJOrderMapping?
 
   @@map("orders")
 }
@@ -278,6 +280,72 @@ model UserSettings {
   preferences String @default("{\"theme\": \"light\", \"language\": \"fr\", \"currency\": \"EUR\"}")
 
   @@map("user_settings")
+}
+
+// ===== MODÈLES CJ DROPSHIPPING =====
+
+// Configuration CJ Dropshipping
+model CJConfig {
+  id            String   @id @default(cuid())
+  email         String
+  apiKey        String
+  tier          String   @default("free") // free, plus, prime, advanced
+  platformToken String?
+  enabled       Boolean  @default(true)
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiry   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("cj_configs")
+}
+
+// Mapping produits CJ
+model CJProductMapping {
+  id          String   @id @default(cuid())
+  productId   String   @unique // ID produit KAMRI
+  cjProductId String   // PID CJ
+  cjSku       String
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([cjProductId])
+  @@map("cj_product_mappings")
+}
+
+// Mapping commandes CJ
+model CJOrderMapping {
+  id            String   @id @default(cuid())
+  orderId       String   @unique // ID commande KAMRI
+  cjOrderId     String   // CJ order ID
+  cjOrderNumber String   // orderNumber envoyé à CJ
+  status        String   // CREATED, PAID, SHIPPED, etc.
+  trackNumber   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([cjOrderId])
+  @@map("cj_order_mappings")
+}
+
+// Logs webhooks CJ
+model CJWebhookLog {
+  id        String   @id @default(cuid())
+  type      String   // PRODUCT, STOCK, ORDER, LOGISTICS
+  messageId String   @unique
+  payload   String   // JSON string
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([type, processed])
+  @@map("cj_webhook_logs")
 }
 
 

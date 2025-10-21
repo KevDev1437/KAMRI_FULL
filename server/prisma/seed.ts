@@ -74,6 +74,7 @@ async function main() {
     create: {
       email: 'admin@kamri.com',
       name: 'Admin KAMRI',
+      password: 'admin123', // Mot de passe par défaut (à hasher en production)
       role: 'admin',
       status: 'active',
     },
