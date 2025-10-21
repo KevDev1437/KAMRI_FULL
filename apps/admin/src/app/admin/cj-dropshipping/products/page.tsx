@@ -37,13 +37,23 @@ export default function CJProductsPage() {
     }
 
     setSearching(true);
+    setProducts([]); // Effacer les résultats précédents
     try {
       const results = await searchProducts(filters);
       setProducts(results);
     } catch (err) {
       console.error('Erreur lors de la recherche:', err);
+      setProducts([]); // Effacer en cas d'erreur
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleKeywordChange = (value: string) => {
+    setFilters(prev => ({ ...prev, keyword: value }));
+    // Effacer les résultats quand l'utilisateur tape un nouveau mot-clé
+    if (products.length > 0) {
+      setProducts([]);
     }
   };
 
@@ -108,7 +118,7 @@ export default function CJProductsPage() {
             <Input
               type="text"
               value={filters.keyword || ''}
-              onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+              onChange={(e) => handleKeywordChange(e.target.value)}
               placeholder="Ex: phone case, watch, bag"
               className="w-full"
             />
@@ -213,7 +223,7 @@ export default function CJProductsPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Prix</span>
                       <span className="font-bold text-green-600">
-                        ${product.sellPrice.toFixed(2)}
+                        ${isNaN(parseFloat(product.sellPrice)) ? '0.00' : parseFloat(product.sellPrice).toFixed(2)}
                       </span>
                     </div>
                     

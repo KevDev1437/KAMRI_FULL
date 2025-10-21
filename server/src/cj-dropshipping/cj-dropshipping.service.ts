@@ -144,11 +144,20 @@ export class CJDropshippingService {
    * Rechercher des produits
    */
   async searchProducts(query: CJProductSearchDto): Promise<CJProduct[]> {
+    this.logger.log('🔍 === DÉBUT RECHERCHE PRODUITS CJ ===');
+    this.logger.log('📝 Paramètres de recherche:', JSON.stringify(query, null, 2));
+    
     try {
+      this.logger.log('🚀 Initialisation du client CJ...');
       const client = await this.initializeClient();
+      this.logger.log('✅ Client CJ initialisé avec succès');
+
+      this.logger.log('📡 Appel API CJ searchProducts...');
+      // Augmenter le nombre de produits pour améliorer les chances de trouver des correspondances
+      const searchPageSize = Math.max(query.pageSize || 20, 100); // Au moins 100 produits
       const result = await client.searchProducts(query.keyword, {
         pageNum: query.pageNum,
-        pageSize: query.pageSize,
+        pageSize: searchPageSize,
         categoryId: query.categoryId,
         minPrice: query.minPrice,
         maxPrice: query.maxPrice,
@@ -156,9 +165,61 @@ export class CJDropshippingService {
         sortBy: query.sortBy,
       });
 
-      return result.list;
+      this.logger.log('📊 Résultat API CJ brut:', JSON.stringify({
+        total: result.total,
+        pageNum: result.pageNum,
+        pageSize: result.pageSize,
+        listLength: result.list?.length || 0
+      }, null, 2));
+
+      // Filtrage côté client si l'API CJ ne filtre pas correctement
+      let filteredProducts = result.list || [];
+      this.logger.log(`🔍 Avant filtrage: ${filteredProducts.length} produits`);
+
+      if (query.keyword && query.keyword.trim()) {
+        this.logger.log(`🔍 Filtrage par mot-clé: "${query.keyword}"`);
+        const keyword = query.keyword.toLowerCase();
+        
+        filteredProducts = result.list.filter(product => {
+          const name = (product.productName || '').toLowerCase();
+          const nameEn = (product.productNameEn || '').toLowerCase();
+          const sku = (product.productSku || '').toLowerCase();
+          const category = (product.categoryName || '').toLowerCase();
+
+          const matches = name.includes(keyword) ||
+                         nameEn.includes(keyword) ||
+                         sku.includes(keyword) ||
+                         category.includes(keyword);
+
+          if (matches) {
+            this.logger.log(`✅ Produit correspondant trouvé: ${product.productNameEn || product.productName} (SKU: ${product.productSku})`);
+          } else {
+            // Log des produits non correspondants pour debug
+            this.logger.log(`❌ Produit non correspondant: ${product.productNameEn || product.productName} (SKU: ${product.productSku})`);
+            this.logger.log(`   - Name: "${name}"`);
+            this.logger.log(`   - NameEn: "${nameEn}"`);
+            this.logger.log(`   - SKU: "${sku}"`);
+            this.logger.log(`   - Category: "${category}"`);
+            this.logger.log(`   - Keyword recherché: "${keyword}"`);
+          }
+
+          return matches;
+        });
+        
+        this.logger.log(`🔍 Après filtrage: ${filteredProducts.length} produits`);
+      }
+
+      this.logger.log('🎉 Recherche terminée avec succès');
+      this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ ===');
+      
+      return filteredProducts;
     } catch (error) {
-      this.logger.error('Erreur lors de la recherche de produits:', error);
+      this.logger.error('❌ === ERREUR RECHERCHE PRODUITS CJ ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 === FIN ERREUR RECHERCHE PRODUITS CJ ===');
       throw error;
     }
   }

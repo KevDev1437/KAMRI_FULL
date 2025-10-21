@@ -88,7 +88,7 @@ export interface CJFreightOption {
 @Injectable()
 export class CJAPIClient {
   private readonly logger = new Logger(CJAPIClient.name);
-  private readonly baseURL = 'https://developers.cjdropshipping.cn/api2.0/v1';
+  private readonly baseURL = 'https://developers.cjdropshipping.com/api2.0/v1';
   private axiosInstance: AxiosInstance;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
@@ -229,13 +229,19 @@ export class CJAPIClient {
     endpoint: string,
     data?: any
   ): Promise<CJResponse<T>> {
+    this.logger.log('🔍 === DÉBUT makeRequest ===');
+    this.logger.log('📝 Paramètres:', { method, endpoint, hasData: !!data });
+    
     // Gérer le rate limiting
     await this.handleRateLimit();
+    this.logger.log('✅ Rate limiting géré');
 
     // Vérifier et rafraîchir le token si nécessaire
     if (!this.accessToken || (this.tokenExpiry && new Date() >= this.tokenExpiry)) {
+      this.logger.log('🔄 Token expiré ou manquant, rafraîchissement...');
       await this.refreshAccessToken();
     }
+    this.logger.log('✅ Token valide');
 
     const headers: any = {
       'CJ-Access-Token': this.accessToken,
@@ -245,7 +251,11 @@ export class CJAPIClient {
       headers['platformToken'] = this.config.platformToken;
     }
 
+    this.logger.log('📡 Headers configurés:', Object.keys(headers));
+    this.logger.log('🌐 URL complète:', `${this.baseURL}${endpoint}`);
+
     try {
+      this.logger.log('📡 Envoi de la requête...');
       const response = await this.axiosInstance.request({
         method,
         url: endpoint,
@@ -253,14 +263,27 @@ export class CJAPIClient {
         headers,
       });
 
+      this.logger.log('✅ Réponse reçue:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        dataType: typeof response.data
+      });
+      this.logger.log('🔍 === FIN makeRequest ===');
       return response.data;
     } catch (error) {
+      this.logger.error('❌ === ERREUR makeRequest ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      
       if (error instanceof CJAPIError && error.code === 401) {
         // Token expiré, essayer de rafraîchir
-        this.logger.warn('Token expiré, tentative de rafraîchissement...');
+        this.logger.warn('🔄 Token expiré, tentative de rafraîchissement...');
         await this.refreshAccessToken();
         
         // Retry avec le nouveau token
+        this.logger.log('🔄 Retry avec nouveau token...');
         const retryResponse = await this.axiosInstance.request({
           method,
           url: endpoint,
@@ -306,10 +329,13 @@ export class CJAPIClient {
       sortBy?: string;
     } = {}
   ): Promise<{ list: CJProduct[]; total: number; pageNum: number; pageSize: number }> {
+    this.logger.log('🔍 === DÉBUT CLIENT API CJ searchProducts ===');
+    this.logger.log('📝 Paramètres reçus:', { keyword, options });
+    
     const params = {
       keyword,
       pageNum: options.pageNum || 1,
-      pageSize: options.pageSize || 20,
+      pageSize: Math.max(options.pageSize || 20, 10), // Minimum 10 selon la doc CJ
       categoryId: options.categoryId,
       minPrice: options.minPrice,
       maxPrice: options.maxPrice,
@@ -317,15 +343,54 @@ export class CJAPIClient {
       sortBy: options.sortBy || 'relevance',
     };
 
-    const response = await this.makeRequest('GET', '/product/search', { params });
-    return response.data as any;
+    this.logger.log('📊 Paramètres finaux:', JSON.stringify(params, null, 2));
+
+    // Utiliser le paramètre keyword de l'API CJ selon la documentation
+    const requestParams = {
+      pageNum: params.pageNum,
+      pageSize: params.pageSize,
+      countryCode: params.countryCode,
+      sortBy: params.sortBy,
+      keyword: params.keyword, // Utiliser le keyword de l'API CJ
+    };
+    
+    this.logger.log('📡 Paramètres de requête API:', JSON.stringify(requestParams, null, 2));
+    this.logger.log('🌐 URL complète: GET /product/list');
+    
+    try {
+      const response = await this.makeRequest('GET', '/product/list', { 
+        params: requestParams
+      });
+      
+      this.logger.log('✅ Réponse API CJ reçue');
+      this.logger.log('📊 Structure de la réponse:', {
+        hasData: !!response.data,
+        dataType: typeof response.data,
+        hasList: !!(response.data as any)?.list,
+        listLength: (response.data as any)?.list?.length || 0,
+        total: (response.data as any)?.total || 0
+      });
+      
+      const result = response.data as any;
+      this.logger.log('🎉 Client API CJ searchProducts terminé avec succès');
+      this.logger.log('🔍 === FIN CLIENT API CJ searchProducts ===');
+      
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CLIENT API CJ searchProducts ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('🔍 === FIN ERREUR CLIENT API CJ searchProducts ===');
+      throw error;
+    }
   }
 
   /**
    * Obtenir les détails d'un produit
    */
   async getProductDetails(pid: string): Promise<CJProduct> {
-    const response = await this.makeRequest('GET', `/product/detail/${pid}`);
+    const response = await this.makeRequest('GET', `/product/query`, { params: { pid } });
     return response.data as any;
   }
 
@@ -333,7 +398,7 @@ export class CJAPIClient {
    * Obtenir les variantes d'un produit
    */
   async getProductVariants(pid: string): Promise<CJVariant[]> {
-    const response = await this.makeRequest('GET', `/product/variant/${pid}`);
+    const response = await this.makeRequest('GET', `/product/variant/query`, { params: { pid } });
     return response.data as any;
   }
 
@@ -341,7 +406,7 @@ export class CJAPIClient {
    * Obtenir le stock d'un produit
    */
   async getProductStock(vid: string): Promise<any> {
-    const response = await this.makeRequest('GET', `/product/stock/${vid}`);
+    const response = await this.makeRequest('GET', `/produit/stock/queryByVid`, { params: { vid } });
     return response.data;
   }
 

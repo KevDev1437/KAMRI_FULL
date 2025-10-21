@@ -5,7 +5,7 @@ async function testCJDirect() {
   
   try {
     // Test direct de l'API CJ avec l'endpoint d'authentification
-    const authResponse = await axios.post('https://developers.cjdropshipping.cn/api2.0/v1/auth', {
+    const authResponse = await axios.post('https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken', {
       email: 'kamridev2.0@gmail.com',
       apiKey: 'd86440263e26415f8dad82f0829f3a7d'
     }, {
@@ -21,7 +21,7 @@ async function testCJDirect() {
     console.log('🔑 Access Token:', authResponse.data.data?.accessToken);
     
     // Maintenant tester avec l'access token
-    const response = await axios.get('https://developers.cjdropshipping.cn/api2.0/v1/product/list', {
+    const response = await axios.get('https://developers.cjdropshipping.com/api2.0/v1/product/list', {
       headers: {
         'CJ-Access-Token': authResponse.data.data.accessToken,
         'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ async function testCJDirect() {
       },
       params: {
         pageNum: 1,
-        pageSize: 1,
+        pageSize: 10,
         keyword: 'test'
       },
       timeout: 30000

@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
     Param,
     Post,
     Put,
@@ -24,6 +25,8 @@ import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class CJDropshippingController {
+  private readonly logger = new Logger(CJDropshippingController.name);
+  
   constructor(private readonly cjService: CJDropshippingService) {}
 
   // ===== CONFIGURATION =====
@@ -56,7 +59,30 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Rechercher des produits CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Liste des produits trouvés' })
   async searchProducts(@Query() query: CJProductSearchDto) {
-    return this.cjService.searchProducts(query);
+    this.logger.log('🔍 === DÉBUT CONTROLLER searchProducts ===');
+    this.logger.log('📝 Query reçue:', JSON.stringify(query, null, 2));
+    
+    try {
+      const result = await this.cjService.searchProducts(query);
+      this.logger.log('✅ Controller searchProducts terminé avec succès');
+      this.logger.log('📊 Nombre de produits retournés:', result.length);
+      this.logger.log('🔍 === FIN CONTROLLER searchProducts ===');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER searchProducts ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER searchProducts ===');
+      
+      // Retourner une réponse d'erreur structurée au lieu de throw
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erreur inconnue',
+        details: error
+      };
+    }
   }
 
   @Get('products/:pid')
