@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
+import axios, { AxiosInstance } from 'axios';
 
 export class CJAPIError extends Error {
   constructor(
@@ -88,7 +88,7 @@ export interface CJFreightOption {
 @Injectable()
 export class CJAPIClient {
   private readonly logger = new Logger(CJAPIClient.name);
-  private readonly baseURL = 'https://developers.cjdropshipping.com/api2.0/v1';
+  private readonly baseURL = 'https://developers.cjdropshipping.cn/api2.0/v1';
   private axiosInstance: AxiosInstance;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
@@ -146,12 +146,14 @@ export class CJAPIClient {
     try {
       this.checkConfig();
       this.logger.log('Authentification avec CJ Dropshipping...');
+      this.logger.log('Config:', JSON.stringify(this.config, null, 2));
       
-      const response = await this.axiosInstance.post('/user/login', {
+      const response = await this.axiosInstance.post('/authentication/getAccessToken', {
         email: this.config!.email,
         apiKey: this.config!.apiKey,
       });
 
+      this.logger.log('Response:', JSON.stringify(response.data, null, 2));
       const { data } = response.data;
       this.accessToken = data.accessToken;
       this.refreshToken = data.refreshToken;

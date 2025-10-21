@@ -112,10 +112,10 @@ export default function CJDropshippingPage() {
           <div>
             <p className="text-sm font-medium text-gray-600">Produits</p>
             <p className="text-2xl font-bold text-purple-600">
-              {stats?.products.total || 0}
+              {stats?.products?.total || 0}
             </p>
             <p className="text-xs text-gray-500">
-              {stats?.products.synced || 0} synchronisés
+              {stats?.products?.synced || 0} synchronisés
             </p>
           </div>
         </Card>
@@ -124,10 +124,10 @@ export default function CJDropshippingPage() {
           <div>
             <p className="text-sm font-medium text-gray-600">Commandes</p>
             <p className="text-2xl font-bold text-orange-600">
-              {stats?.orders.total || 0}
+              {stats?.orders?.total || 0}
             </p>
             <p className="text-xs text-gray-500">
-              {stats?.orders.active || 0} actives
+              {stats?.orders?.active || 0} actives
             </p>
           </div>
         </Card>

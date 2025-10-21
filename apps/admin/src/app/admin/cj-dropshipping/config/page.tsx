@@ -5,6 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJConfig } from '@/types/cj.types';
+import { debugAdminAuth, forceReconnect, testLogin } from '@/utils/debug-auth';
+import { checkAuthStatus, checkBackendHealth, forceLogout, testDirectLogin } from '@/utils/force-login';
+import { debugAuth, testCJAuthentication } from '@/utils/test-cj-auth';
 import { useEffect, useState } from 'react';
 
 export default function CJConfigPage() {
@@ -69,6 +72,72 @@ export default function CJConfigPage() {
     } finally {
       setTesting(false);
     }
+  };
+
+  const handleTestAuth = async () => {
+    console.log('🔐 Test d\'authentification...');
+    debugAuth();
+    const authOk = await testCJAuthentication();
+    if (authOk) {
+      alert('✅ Authentification OK ! Vous pouvez maintenant utiliser CJ Dropshipping.');
+    } else {
+      alert('❌ Problème d\'authentification. Vérifiez la console pour plus de détails.');
+    }
+  };
+
+  const handleDebugAdmin = () => {
+    console.log('🔍 Diagnostic complet de l\'authentification admin...');
+    debugAdminAuth();
+  };
+
+  const handleForceReconnect = () => {
+    if (confirm('Êtes-vous sûr de vouloir vous déconnecter et vous reconnecter ?')) {
+      forceReconnect();
+    }
+  };
+
+  const handleTestLogin = async () => {
+    const email = prompt('Email:', 'admin@kamri.com');
+    const password = prompt('Mot de passe:', 'password');
+    
+    if (email && password) {
+      console.log('🔐 Test de connexion avec credentials...');
+      const success = await testLogin(email, password);
+      if (success) {
+        alert('✅ Connexion réussie ! Rechargez la page.');
+        window.location.reload();
+      } else {
+        alert('❌ Connexion échouée. Vérifiez vos credentials.');
+      }
+    }
+  };
+
+  const handleCheckAuth = () => {
+    console.log('🔍 Vérification du statut d\'authentification...');
+    const status = checkAuthStatus();
+    alert(`Statut: ${status}`);
+  };
+
+  const handleForceLogout = () => {
+    if (confirm('Êtes-vous sûr de vouloir vous déconnecter complètement ?')) {
+      forceLogout();
+    }
+  };
+
+  const handleTestDirectLogin = async () => {
+    console.log('🔐 Test de connexion directe...');
+    const success = await testDirectLogin();
+    if (success) {
+      alert('✅ Connexion directe réussie !');
+    } else {
+      alert('❌ Connexion directe échouée. Vérifiez la console.');
+    }
+  };
+
+  const handleCheckBackend = async () => {
+    console.log('🏥 Vérification du backend...');
+    const healthy = await checkBackendHealth();
+    alert(healthy ? '✅ Backend accessible' : '❌ Backend inaccessible');
   };
 
   const handleSave = async () => {
@@ -189,22 +258,63 @@ export default function CJConfigPage() {
               </label>
             </div>
 
-            <div className="flex gap-4">
-              <Button
-                onClick={handleTestConnection}
-                disabled={testing || !formData.email || !formData.apiKey}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {testing ? 'Test en cours...' : 'Tester la connexion'}
-              </Button>
+            <div className="space-y-4">
+              {/* Boutons de diagnostic */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Button
+                  onClick={handleCheckAuth}
+                  className="bg-purple-600 hover:bg-purple-700 text-sm"
+                >
+                  🔍 Vérifier Auth
+                </Button>
+                
+                <Button
+                  onClick={handleForceLogout}
+                  className="bg-red-600 hover:bg-red-700 text-sm"
+                >
+                  🚪 Déconnexion
+                </Button>
+                
+                <Button
+                  onClick={handleTestDirectLogin}
+                  className="bg-green-600 hover:bg-green-700 text-sm"
+                >
+                  🔐 Connexion Directe
+                </Button>
+                
+                <Button
+                  onClick={handleCheckBackend}
+                  className="bg-blue-600 hover:bg-blue-700 text-sm"
+                >
+                  🏥 Backend
+                </Button>
+              </div>
               
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-              </Button>
+              {/* Boutons principaux */}
+              <div className="flex gap-4">
+                <Button
+                  onClick={handleTestAuth}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  🔐 Tester l'authentification
+                </Button>
+                
+                <Button
+                  onClick={handleTestConnection}
+                  disabled={testing || !formData.email || !formData.apiKey}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {testing ? 'Test en cours...' : 'Tester la connexion'}
+                </Button>
+                
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                </Button>
+              </div>
             </div>
           </div>
         </Card>

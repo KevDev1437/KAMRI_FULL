@@ -47,8 +47,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Tester la connexion CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Test de connexion effectué' })
   async testConnection() {
-    const success = await this.cjService.testConnection();
-    return { success, message: success ? 'Connexion réussie' : 'Connexion échouée' };
+    return this.cjService.testConnection();
   }
 
   // ===== PRODUITS =====

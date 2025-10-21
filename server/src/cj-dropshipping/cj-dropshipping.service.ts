@@ -35,7 +35,7 @@ export class CJDropshippingService {
     this.cjApiClient.setConfig({
       email: config.email,
       apiKey: config.apiKey,
-      tier: config.tier as any,
+      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
       platformToken: config.platformToken,
       debug: process.env.CJ_DEBUG === 'true',
     });
@@ -52,13 +52,13 @@ export class CJDropshippingService {
     let config = await this.prisma.cJConfig.findFirst();
     
     if (!config) {
-      // Créer une configuration par défaut
+      // Créer une configuration par défaut vide
       config = await this.prisma.cJConfig.create({
         data: {
-          email: process.env.CJ_EMAIL || '',
-          apiKey: process.env.CJ_API_KEY || '',
-          tier: process.env.CJ_TIER || 'free',
-          platformToken: process.env.CJ_PLATFORM_TOKEN || null,
+          email: '',
+          apiKey: '',
+          tier: 'free',
+          platformToken: null,
           enabled: false,
         },
       });
@@ -120,15 +120,23 @@ export class CJDropshippingService {
   /**
    * Tester la connexion CJ
    */
-  async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
+      this.logger.log('Initialisation du client CJ...');
       const client = await this.initializeClient();
-      const settings = await client.getSettings();
+      this.logger.log('Client CJ initialisé, test de connexion...');
+      
+      // Tester avec une recherche simple de produits
+      const result = await client.searchProducts('test', { pageNum: 1, pageSize: 1 });
       this.logger.log('Test de connexion CJ réussi');
-      return true;
+      return { success: true, message: 'Connexion CJ Dropshipping réussie' };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Test de connexion CJ échoué:', error);
-      return false;
+      return { 
+        success: false, 
+        message: `Connexion CJ Dropshipping échouée: ${errorMessage}` 
+      };
     }
   }
 
@@ -643,11 +651,27 @@ export class CJDropshippingService {
       },
     });
 
+    const syncedProducts = await this.prisma.cJProductMapping.count({
+      where: { lastSyncAt: { not: null } },
+    });
+
+    const activeOrders = await this.prisma.cJOrderMapping.count({
+      where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+    });
+
     return {
-      productMappings,
-      orderMappings,
-      webhookLogs,
-      recentWebhooks,
+      products: {
+        total: productMappings,
+        synced: syncedProducts,
+      },
+      orders: {
+        total: orderMappings,
+        active: activeOrders,
+      },
+      webhooks: {
+        total: webhookLogs,
+        recent: recentWebhooks,
+      },
     };
   }
 

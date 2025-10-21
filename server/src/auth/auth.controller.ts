@@ -10,11 +10,11 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  @ApiOperation({ summary: 'Connexion utilisateur (email seulement)' })
+  @ApiOperation({ summary: 'Connexion utilisateur (email + mot de passe pour admin)' })
   @ApiResponse({ status: 200, description: 'Connexion réussie' })
-  @ApiResponse({ status: 401, description: 'Email invalide' })
-  async login(@Body() body: { email: string }) {
-    return this.authService.login(body.email);
+  @ApiResponse({ status: 401, description: 'Email ou mot de passe invalide' })
+  async login(@Body() body: { email: string; password?: string }) {
+    return this.authService.login(body.email, body.password);
   }
 
   @Post('register')
@@ -43,6 +43,13 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Non autorisé' })
   async updateProfile(@GetUser() user: any, @Body() body: { name?: string; email?: string }) {
     return this.authService.updateProfile(user.userId, body);
+  }
+
+  @Post('create-admin')
+  @ApiOperation({ summary: 'Créer l\'utilisateur admin (développement seulement)' })
+  @ApiResponse({ status: 201, description: 'Admin créé avec succès' })
+  async createAdmin() {
+    return this.authService.createAdminUser();
   }
 }
 

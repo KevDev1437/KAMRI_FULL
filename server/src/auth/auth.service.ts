@@ -10,35 +10,50 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string) {
+  async validateUser(email: string, password?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    if (user && user.status === 'active') {
-      return user;
+    if (!user || user.status !== 'active') {
+      return null;
     }
 
-    return null;
+    // Si c'est un admin, vérifier le mot de passe
+    if (user.role === 'admin' && password) {
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        console.log('❌ [AuthService] Mot de passe admin incorrect');
+        return null;
+      }
+      console.log('✅ [AuthService] Mot de passe admin correct');
+    }
+
+    return user;
   }
 
-  async login(email: string | any) {
+  async login(email: string | any, password?: string) {
     console.log('🔑 [AuthService] Tentative de connexion pour:', email);
     
-    // Si email est un objet, extraire la vraie valeur email
+    // Si email est un objet, extraire la vraie valeur email et password
     const actualEmail = typeof email === 'string' ? email : email.email;
+    const actualPassword = typeof email === 'string' ? password : email.password;
     console.log('📧 [AuthService] Email extrait:', actualEmail);
+    console.log('🔑 [AuthService] Password fourni:', !!actualPassword);
     
     // Vérifier si l'utilisateur existe
-    let user = await this.validateUser(actualEmail);
+    let user = await this.validateUser(actualEmail, actualPassword);
     
-    // Si l'utilisateur n'existe pas, le créer automatiquement
-    if (!user) {
+    // Si l'utilisateur n'existe pas ET ce n'est pas un admin, le créer automatiquement
+    if (!user && actualEmail !== 'admin@kamri.com') {
       console.log('👤 [AuthService] Utilisateur non trouvé, création automatique...');
       user = await this.createUser(actualEmail, actualEmail.split('@')[0], 'auto-generated');
       console.log('✅ [AuthService] Utilisateur créé:', user.id);
+    } else if (user) {
+      console.log('✅ [AuthService] Utilisateur trouvé:', user.id, 'Role:', user.role);
     } else {
-      console.log('✅ [AuthService] Utilisateur trouvé:', user.id);
+      console.log('❌ [AuthService] Connexion échouée - utilisateur non trouvé ou mot de passe incorrect');
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
     const payload = { 
@@ -161,6 +176,69 @@ export class AuthService {
 
     console.log('✅ [AuthService] Profil mis à jour:', user.id);
     return user;
+  }
+
+  async createAdminUser() {
+    console.log('🔐 [AuthService] Création de l\'utilisateur admin...');
+    
+    try {
+      // Vérifier si l'admin existe déjà
+      const existingAdmin = await this.prisma.user.findUnique({
+        where: { email: 'admin@kamri.com' }
+      });
+
+      if (existingAdmin) {
+        console.log('✅ [AuthService] Admin existe déjà, mise à jour du mot de passe...');
+        
+        // Mettre à jour le mot de passe
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const updatedAdmin = await this.prisma.user.update({
+          where: { email: 'admin@kamri.com' },
+          data: { 
+            password: hashedPassword,
+            role: 'admin',
+            status: 'active'
+          }
+        });
+        
+        return {
+          message: 'Admin mis à jour avec succès',
+          user: {
+            id: updatedAdmin.id,
+            email: updatedAdmin.email,
+            name: updatedAdmin.name,
+            role: updatedAdmin.role
+          }
+        };
+      } else {
+        console.log('👤 [AuthService] Création de l\'admin...');
+        
+        // Créer l'admin avec mot de passe hashé
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const admin = await this.prisma.user.create({
+          data: {
+            email: 'admin@kamri.com',
+            name: 'Admin KAMRI',
+            password: hashedPassword,
+            role: 'admin',
+            status: 'active',
+          },
+        });
+        
+        return {
+          message: 'Admin créé avec succès',
+          user: {
+            id: admin.id,
+            email: admin.email,
+            name: admin.name,
+            role: admin.role
+          }
+        };
+      }
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur lors de la création de l\'admin:', error);
+      throw error;
+    }
   }
 }
 

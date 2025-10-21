@@ -12,7 +12,7 @@ export class ApiClient {
   constructor() {
     // Récupérer le token depuis le localStorage au démarrage
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = localStorage.getItem('token') || localStorage.getItem('auth_token');
     }
   }
 
@@ -32,7 +32,8 @@ export class ApiClient {
       if (response.ok) {
         this.token = data.access_token;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('auth_token', data.access_token);
+          localStorage.setItem('token', data.access_token);
+          localStorage.setItem('user', JSON.stringify(data.user));
         }
         return { data };
       } else {
@@ -72,6 +73,8 @@ export class ApiClient {
   logout() {
     this.token = null;
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       localStorage.removeItem('auth_token');
     }
   }

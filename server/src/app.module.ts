@@ -6,6 +6,7 @@ import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CJDropshippingModule } from './cj-dropshipping/cj-dropshipping.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -36,6 +37,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     UserSettingsModule,
     UsersModule,
     CJDropshippingModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
