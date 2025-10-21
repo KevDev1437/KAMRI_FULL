@@ -382,9 +382,18 @@ export class CJAPIClient {
     this.logger.log('🌐 URL complète: GET /product/list');
     
     try {
-      const response = await this.makeRequest('GET', '/product/list', { 
-        params: requestParams
+      // Construire l'URL avec les paramètres de requête
+      const queryString = new URLSearchParams();
+      Object.entries(requestParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryString.append(key, String(value));
+        }
       });
+      
+      const endpoint = `/product/list?${queryString.toString()}`;
+      this.logger.log('🌐 Endpoint final:', endpoint);
+      
+      const response = await this.makeRequest('GET', endpoint);
       
       this.logger.log('✅ Réponse API CJ reçue');
       this.logger.log('📊 Structure de la réponse:', {
