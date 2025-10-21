@@ -5,12 +5,13 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJProduct, CJProductSearchFilters } from '@/types/cj.types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function CJProductsPage() {
   const {
     loading,
     error,
+    getDefaultProducts,
     searchProducts,
     importProduct,
     syncProducts,
@@ -29,6 +30,70 @@ export default function CJProductsPage() {
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [loadingDefault, setLoadingDefault] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+
+  // Charger les produits par défaut au montage du composant
+  useEffect(() => {
+    const loadDefaultProducts = async () => {
+      setLoadingDefault(true);
+      try {
+        const defaultProducts = await getDefaultProducts({
+          pageNum: 1,
+          pageSize: 50, // Augmenter à 50 produits
+          countryCode: 'US'
+        });
+        setProducts(defaultProducts);
+        setCurrentPage(1); // Initialiser la page courante
+        setHasMoreProducts(defaultProducts.length === 50); // S'il y a 50 produits, il peut y en avoir plus
+        console.log('Produits par défaut chargés:', defaultProducts.length);
+      } catch (err) {
+        console.error('Erreur lors du chargement des produits par défaut:', err);
+      } finally {
+        setLoadingDefault(false);
+      }
+    };
+
+    loadDefaultProducts();
+  }, []); // Supprimer getDefaultProducts de la dépendance
+
+  const loadMoreProducts = async () => {
+    if (loadingDefault || !hasMoreProducts) return;
+    
+    setLoadingDefault(true);
+    try {
+      const nextPage = currentPage + 1;
+      console.log(`🔄 Chargement page ${nextPage} (page courante: ${currentPage})`);
+      
+      const moreProducts = await getDefaultProducts({
+        pageNum: nextPage,
+        pageSize: 50,
+        countryCode: 'US'
+      });
+      
+      console.log(`📦 ${moreProducts.length} nouveaux produits reçus pour la page ${nextPage}`);
+      
+      if (moreProducts.length === 0) {
+        console.log('❌ Aucun nouveau produit, fin de pagination');
+        setHasMoreProducts(false);
+      } else {
+        console.log(`✅ Ajout de ${moreProducts.length} produits (total: ${products.length + moreProducts.length})`);
+        setProducts(prev => [...prev, ...moreProducts]);
+        setCurrentPage(nextPage);
+        
+        // Si on a moins de 50 produits, on a probablement atteint la fin
+        if (moreProducts.length < 50) {
+          console.log('⚠️ Moins de 50 produits reçus, probablement la fin');
+          setHasMoreProducts(false);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement de plus de produits:', err);
+    } finally {
+      setLoadingDefault(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!filters.keyword?.trim()) {
@@ -197,7 +262,7 @@ export default function CJProductsPage() {
       {products.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-4">
-            Résultats ({products.length} produits trouvés)
+            Résultats ({products.length} produits trouvés) - Page {currentPage}
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -272,16 +337,41 @@ export default function CJProductsPage() {
               </Card>
             ))}
           </div>
+          
+          {/* Bouton Charger plus */}
+          {hasMoreProducts && (
+            <div className="flex justify-center mt-8">
+              <Button
+                onClick={loadMoreProducts}
+                disabled={loadingDefault}
+                variant="outline"
+                className="px-8 py-2"
+              >
+                {loadingDefault ? 'Chargement...' : 'Charger plus de produits'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Message si aucun résultat */}
-      {products.length === 0 && !searching && (
+      {products.length === 0 && !searching && !loadingDefault && (
         <Card className="p-8 text-center">
           <div className="text-gray-500">
             <div className="text-4xl mb-4">🔍</div>
             <h3 className="text-lg font-medium mb-2">Aucun produit trouvé</h3>
             <p>Utilisez les filtres ci-dessus pour rechercher des produits CJ Dropshipping</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Indicateur de chargement des produits par défaut */}
+      {loadingDefault && (
+        <Card className="p-8 text-center">
+          <div className="text-gray-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-medium mb-2">Chargement des produits CJ...</h3>
+            <p>Récupération des produits populaires depuis CJ Dropshipping</p>
           </div>
         </Card>
       )}

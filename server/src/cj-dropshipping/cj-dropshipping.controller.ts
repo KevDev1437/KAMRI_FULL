@@ -55,6 +55,35 @@ export class CJDropshippingController {
 
   // ===== PRODUITS =====
 
+  @Get('products/default')
+  @ApiOperation({ summary: 'Obtenir les produits CJ par défaut' })
+  @ApiResponse({ status: 200, description: 'Liste des produits par défaut' })
+  async getDefaultProducts(@Query() query: { pageNum?: number; pageSize?: number; countryCode?: string }) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER getDefaultProducts ===');
+    this.logger.log('📝 Query reçue:', JSON.stringify(query, null, 2));
+    
+    try {
+      const result = await this.cjService.getDefaultProducts(query);
+      this.logger.log('✅ Controller getDefaultProducts terminé avec succès');
+      this.logger.log('📊 Nombre de produits retournés:', result.length);
+      this.logger.log('🔍 === FIN CONTROLLER getDefaultProducts ===');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER getDefaultProducts ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER getDefaultProducts ===');
+      
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erreur inconnue',
+        details: error
+      };
+    }
+  }
+
   @Get('products/search')
   @ApiOperation({ summary: 'Rechercher des produits CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Liste des produits trouvés' })

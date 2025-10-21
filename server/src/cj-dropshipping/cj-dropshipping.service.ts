@@ -140,6 +140,70 @@ export class CJDropshippingService {
     }
   }
 
+  // Cache simple pour éviter les requêtes répétées
+  private defaultProductsCache: { data: CJProduct[]; timestamp: number } | null = null;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  /**
+   * Obtenir les produits par défaut (sans filtre)
+   */
+  async getDefaultProducts(query: { pageNum?: number; pageSize?: number; countryCode?: string }): Promise<CJProduct[]> {
+    this.logger.log('🔍 === DÉBUT getDefaultProducts ===');
+    this.logger.log('📝 Paramètres:', JSON.stringify(query, null, 2));
+    
+    // Vérifier le cache pour la première page
+    if (query.pageNum === 1 && this.defaultProductsCache && 
+        (Date.now() - this.defaultProductsCache.timestamp) < this.CACHE_DURATION) {
+      this.logger.log('📦 Utilisation du cache pour les produits par défaut');
+      return this.defaultProductsCache.data;
+    }
+    
+    try {
+      this.logger.log('🚀 Initialisation du client CJ...');
+      const client = await this.initializeClient();
+      this.logger.log('✅ Client CJ initialisé avec succès');
+
+      this.logger.log('📡 Appel API CJ getDefaultProducts...');
+      const result = await client.searchProducts(undefined, {
+        pageNum: query.pageNum || 1,
+        pageSize: query.pageSize || 30, // 30 produits par défaut
+        countryCode: query.countryCode || 'US',
+        sortBy: 'relevance',
+      });
+
+      this.logger.log('📊 Résultat API CJ brut:', JSON.stringify({
+        total: result.total,
+        pageNum: result.pageNum,
+        pageSize: result.pageSize,
+        listLength: result.list?.length || 0
+      }, null, 2));
+
+      const products = result.list || [];
+      
+      // Mettre en cache pour la première page
+      if (query.pageNum === 1) {
+        this.defaultProductsCache = {
+          data: products,
+          timestamp: Date.now()
+        };
+        this.logger.log('📦 Produits mis en cache pour 5 minutes');
+      }
+      
+      this.logger.log(`🎉 getDefaultProducts terminé avec succès: ${products.length} produits`);
+      this.logger.log('🔍 === FIN getDefaultProducts ===');
+      
+      return products;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR getDefaultProducts ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 === FIN ERREUR getDefaultProducts ===');
+      throw error;
+    }
+  }
+
   /**
    * Rechercher des produits
    */

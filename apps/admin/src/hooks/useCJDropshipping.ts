@@ -152,6 +152,20 @@ export const useCJDropshipping = () => {
 
   // ===== PRODUITS =====
 
+  const getDefaultProducts = async (params?: { pageNum?: number; pageSize?: number; countryCode?: string }): Promise<CJProduct[]> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/products/default', { params: params || {} });
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors du chargement des produits par défaut');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const searchProducts = async (query: any): Promise<CJProduct[]> => {
     setLoading(true);
     setError(null);
@@ -367,6 +381,7 @@ export const useCJDropshipping = () => {
     getConfig,
     updateConfig,
     testConnection,
+    getDefaultProducts,
     searchProducts,
     getProductDetails,
     importProduct,

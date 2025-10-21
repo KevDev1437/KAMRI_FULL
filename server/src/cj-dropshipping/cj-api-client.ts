@@ -201,12 +201,12 @@ export class CJAPIClient {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
-    // Rate limits selon le tier
+    // Rate limits selon le tier - AUGMENTÉ pour éviter les erreurs
     const rateLimits = {
-      free: { requests: 1, window: 1000 }, // 1 req/s
-      plus: { requests: 2, window: 1000 }, // 2 req/s
-      prime: { requests: 4, window: 1000 }, // 4 req/s
-      advanced: { requests: 6, window: 1000 }, // 6 req/s
+      free: { requests: 1, window: 2000 }, // 1 req/2s pour être sûr
+      plus: { requests: 2, window: 2000 }, // 2 req/2s
+      prime: { requests: 4, window: 2000 }, // 4 req/2s
+      advanced: { requests: 6, window: 2000 }, // 6 req/2s
     };
 
     const limit = rateLimits[this.config.tier || 'free'];
@@ -214,7 +214,7 @@ export class CJAPIClient {
 
     if (timeSinceLastRequest < minInterval) {
       const waitTime = minInterval - timeSinceLastRequest;
-      this.logger.debug(`Rate limiting: attente de ${waitTime}ms`);
+      this.logger.log(`⏳ Rate limiting: attente de ${waitTime}ms`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
@@ -276,6 +276,30 @@ export class CJAPIClient {
       this.logger.error('💥 Erreur détaillée:', error);
       this.logger.error('📊 Type d\'erreur:', typeof error);
       this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      
+      // Gérer l'erreur 429 (Too Many Requests) avec retry
+      if (error instanceof CJAPIError && error.code === 429) {
+        this.logger.warn('⏳ Rate limit atteint, attente de 5 secondes avant retry...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Attendre 5 secondes
+        
+        this.logger.log('🔄 Retry après rate limit...');
+        try {
+          const retryResponse = await this.axiosInstance.request({
+            method,
+            url: endpoint,
+            data,
+            headers: {
+              'CJ-Access-Token': this.accessToken,
+              ...(this.config.platformToken && { platformToken: this.config.platformToken }),
+            },
+          });
+          this.logger.log('✅ Retry réussi après rate limit');
+          return retryResponse.data;
+        } catch (retryError) {
+          this.logger.error('❌ Retry échoué après rate limit:', retryError);
+          throw retryError;
+        }
+      }
       
       if (error instanceof CJAPIError && error.code === 401) {
         // Token expiré, essayer de rafraîchir
