@@ -17,12 +17,45 @@ export class SuppliersService {
   }
 
   async findAll() {
-    return this.prisma.supplier.findMany({
+    // Récupérer les fournisseurs normaux
+    const normalSuppliers = await this.prisma.supplier.findMany({
       include: {
         products: true,
         categoryMappings: true,
       },
     });
+
+    // Vérifier si CJ Dropshipping est configuré
+    const cjConfig = await this.prisma.cJConfig.findFirst();
+    
+    if (cjConfig && cjConfig.enabled) {
+      // Récupérer les statistiques CJ
+      const cjProductMappings = await this.prisma.cJProductMapping.count();
+      const cjLastSync = await this.prisma.cJProductMapping.findFirst({
+        orderBy: { lastSyncAt: 'desc' },
+        select: { lastSyncAt: true }
+      });
+
+      // Créer un fournisseur virtuel CJ
+      const cjSupplier = {
+        id: 'cj-dropshipping',
+        name: 'CJ Dropshipping',
+        description: 'Dropshipping depuis CJ',
+        apiUrl: 'https://developers.cjdropshipping.com',
+        apiKey: cjConfig.apiKey ? '***' : '',
+        status: cjConfig.enabled ? 'connected' : 'disconnected',
+        lastSync: cjLastSync?.lastSyncAt || null,
+        products: Array(cjProductMappings).fill(null), // Simuler les produits
+        categoryMappings: [],
+        isVirtual: true, // Marquer comme fournisseur virtuel
+        cjConfig: cjConfig
+      };
+
+      // Ajouter CJ à la liste des fournisseurs
+      return [...normalSuppliers, cjSupplier];
+    }
+
+    return normalSuppliers;
   }
 
   async findOne(id: string) {
@@ -49,6 +82,28 @@ export class SuppliersService {
   }
 
   async testConnection(id: string) {
+    // Gestion spéciale pour CJ Dropshipping
+    if (id === 'cj-dropshipping') {
+      const cjConfig = await this.prisma.cJConfig.findFirst();
+      if (!cjConfig) {
+        return { success: false, message: 'CJ Dropshipping non configuré' };
+      }
+
+      // Tester la connexion CJ via le service CJ
+      try {
+        // Import du service CJ (éviter la dépendance circulaire)
+        const { CJDropshippingService } = await import('../cj-dropshipping/cj-dropshipping.service');
+        const { CJAPIClient } = await import('../cj-dropshipping/cj-api-client');
+        const cjApiClient = new CJAPIClient({} as any);
+        const cjService = new CJDropshippingService(this.prisma, cjApiClient);
+        const result = await cjService.testConnection();
+        
+        return result;
+      } catch (error) {
+        return { success: false, message: `Erreur CJ: ${error instanceof Error ? error.message : String(error)}` };
+      }
+    }
+
     const supplier = await this.prisma.supplier.findUnique({
       where: { id },
     });
@@ -98,6 +153,26 @@ export class SuppliersService {
   async importProducts(supplierId: string) {
     console.log('🚀 === DÉBUT IMPORT PRODUITS ===');
     console.log('🔍 Supplier ID:', supplierId);
+    
+    // Gestion spéciale pour CJ Dropshipping
+    if (supplierId === 'cj-dropshipping') {
+      try {
+        // Import du service CJ
+        const { CJDropshippingService } = await import('../cj-dropshipping/cj-dropshipping.service');
+        const { CJAPIClient } = await import('../cj-dropshipping/cj-api-client');
+        const cjApiClient = new CJAPIClient({} as any);
+        const cjService = new CJDropshippingService(this.prisma, cjApiClient);
+        
+        // Rediriger vers la page CJ pour l'import
+        return {
+          message: 'CJ Dropshipping détecté - Redirection vers la page d\'import CJ',
+          redirect: '/admin/cj-dropshipping/products',
+          cjDetected: true
+        };
+      } catch (error) {
+        throw new Error(`Erreur CJ: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: supplierId },

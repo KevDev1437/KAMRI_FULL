@@ -127,11 +127,17 @@ export default function CJProductsPage() {
     try {
       const result = await importProduct(pid);
       if (result.success) {
-        alert('✅ Produit importé avec succès !');
+        alert('✅ Produit importé avec succès !\n\n📊 Les statistiques des fournisseurs ont été mises à jour.');
+        
         // Marquer le produit comme importé visuellement
         setProducts(prev => prev.map(p => 
           p.pid === pid ? { ...p, imported: true } : p
         ));
+
+        // Déclencher un événement personnalisé pour notifier la mise à jour
+        window.dispatchEvent(new CustomEvent('cjProductImported', {
+          detail: { pid, product: result.product }
+        }));
       } else {
         alert(`❌ ${result.message}`);
       }

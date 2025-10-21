@@ -423,8 +423,36 @@ export class CJAPIClient {
    * Obtenir les détails d'un produit
    */
   async getProductDetails(pid: string): Promise<CJProduct> {
-    const response = await this.makeRequest('GET', `/product/query`, { params: { pid } });
-    return response.data as any;
+    this.logger.log('🔍 === DÉBUT getProductDetails ===');
+    this.logger.log('📝 PID:', pid);
+    
+    try {
+      // Construire l'URL avec les paramètres de requête
+      const endpoint = `/product/query?pid=${pid}`;
+      this.logger.log('🌐 Endpoint final:', endpoint);
+      
+      const response = await this.makeRequest('GET', endpoint);
+      
+      this.logger.log('✅ Réponse API CJ reçue');
+      this.logger.log('📊 Structure de la réponse:', {
+        hasData: !!response.data,
+        dataType: typeof response.data,
+        hasProduct: !!(response.data as any)?.productNameEn
+      });
+      
+      const result = response.data as any;
+      this.logger.log('🎉 getProductDetails terminé avec succès');
+      this.logger.log('🔍 === FIN getProductDetails ===');
+      
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR getProductDetails ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('🔍 === FIN ERREUR getProductDetails ===');
+      throw error;
+    }
   }
 
   /**

@@ -5,7 +5,7 @@ import { UpdateCJConfigDto } from './dto/cj-config.dto';
 import { CJOrderCreateDto } from './dto/cj-order-create.dto';
 import { CJProductSearchDto } from './dto/cj-product-search.dto';
 import { CJOrder, CJOrderCreateResult } from './interfaces/cj-order.interface';
-import { CJProduct, CJProductImportResult } from './interfaces/cj-product.interface';
+import { CJProduct } from './interfaces/cj-product.interface';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 
 @Injectable()
@@ -288,72 +288,6 @@ export class CJDropshippingService {
     }
   }
 
-  /**
-   * Obtenir les détails d'un produit
-   */
-  async getProductDetails(pid: string): Promise<CJProduct> {
-    try {
-      const client = await this.initializeClient();
-      return await client.getProductWithStock(pid);
-    } catch (error) {
-      this.logger.error(`Erreur lors de la récupération du produit ${pid}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Importer un produit CJ vers KAMRI
-   */
-  async importProduct(pid: string, categoryId?: string, margin?: number): Promise<CJProductImportResult> {
-    try {
-      const client = await this.initializeClient();
-      const cjProduct = await client.getProductWithStock(pid);
-
-      // Vérifier si le produit existe déjà
-      const existingMapping = await this.prisma.cJProductMapping.findFirst({
-        where: { cjProductId: pid },
-      });
-
-      if (existingMapping) {
-        return {
-          productId: existingMapping.productId,
-          cjProductId: pid,
-          success: false,
-          message: 'Produit déjà importé',
-        };
-      }
-
-      // Mapper le produit CJ vers le modèle KAMRI
-      const mappedProduct = await this.mapCJProduct(cjProduct, categoryId, margin);
-
-      // Créer le produit dans KAMRI
-      const product = await this.prisma.product.create({
-        data: mappedProduct,
-      });
-
-      // Créer le mapping CJ
-      await this.prisma.cJProductMapping.create({
-        data: {
-          productId: product.id,
-          cjProductId: pid,
-          cjSku: cjProduct.productSku,
-          lastSyncAt: new Date(),
-        },
-      });
-
-      this.logger.log(`Produit ${pid} importé avec succès vers KAMRI`);
-
-      return {
-        productId: product.id,
-        cjProductId: pid,
-        success: true,
-        message: 'Produit importé avec succès',
-      };
-    } catch (error) {
-      this.logger.error(`Erreur lors de l'import du produit ${pid}:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Mapper un produit CJ vers le modèle KAMRI
@@ -845,6 +779,122 @@ export class CJDropshippingService {
         },
       }),
     };
+  }
+
+  /**
+   * Obtenir les détails d'un produit CJ
+   */
+  async getProductDetails(pid: string): Promise<any> {
+    try {
+      const client = await this.initializeClient();
+      return await client.getProductDetails(pid);
+    } catch (error) {
+      this.logger.error(`Erreur lors de la récupération des détails du produit ${pid}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Importer un produit CJ vers KAMRI
+   */
+  async importProduct(pid: string, categoryId?: string, margin: number = 2.5): Promise<any> {
+    this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
+    this.logger.log('📝 Paramètres:', { pid, categoryId, margin });
+    
+    try {
+      const client = await this.initializeClient();
+      const cjProduct = await client.getProductDetails(pid);
+      
+      this.logger.log('📦 Produit CJ récupéré:', cjProduct.productNameEn);
+      
+        // Créer le produit KAMRI
+        const originalPrice = Number(cjProduct.sellPrice) || 0; // Prix original avec fallback
+        const sellingPrice = originalPrice * margin; // Prix de vente avec marge
+        
+        this.logger.log('💰 Prix calculés:', {
+          originalPrice,
+          margin,
+          sellingPrice
+        });
+        
+        // MAPPING DES CATÉGORIES CJ → KAMRI
+        let kamriCategoryId = categoryId; // Utiliser la catégorie fournie si disponible
+        
+        if (!kamriCategoryId && cjProduct.categoryName) {
+          this.logger.log('🔍 Recherche de catégorie CJ:', cjProduct.categoryName);
+          
+          // Chercher une catégorie existante avec le même nom
+          const existingCategory = await this.prisma.category.findFirst({
+            where: {
+              name: {
+                contains: cjProduct.categoryName
+              }
+            }
+          });
+          
+          if (existingCategory) {
+            kamriCategoryId = existingCategory.id;
+            this.logger.log('✅ Catégorie existante trouvée:', existingCategory.name);
+          } else {
+            // Créer une nouvelle catégorie
+            const newCategory = await this.prisma.category.create({
+              data: {
+                name: cjProduct.categoryName,
+                description: `Catégorie importée depuis CJ Dropshipping`,
+              }
+            });
+            kamriCategoryId = newCategory.id;
+            this.logger.log('✅ Nouvelle catégorie créée:', newCategory.name);
+          }
+        }
+        
+        this.logger.log('🏷️ Catégorie finale:', kamriCategoryId);
+        
+        const kamriProduct = await this.prisma.product.create({
+          data: {
+            name: cjProduct.productNameEn || cjProduct.productName,
+            description: cjProduct.description,
+            price: sellingPrice, // Prix de vente
+            originalPrice: originalPrice, // Prix original
+            image: cjProduct.productImage,
+            categoryId: kamriCategoryId, // Catégorie mappée
+            status: 'active',
+            stock: cjProduct.variants?.[0]?.stock || 0,
+            badge: 'nouveau',
+          },
+        });
+
+      this.logger.log('✅ Produit KAMRI créé:', kamriProduct.id);
+
+      // Créer le mapping CJ
+      const mapping = await this.prisma.cJProductMapping.create({
+        data: {
+          productId: kamriProduct.id,
+          cjProductId: pid,
+          cjSku: cjProduct.productSku,
+          lastSyncAt: new Date(),
+        },
+      });
+
+      this.logger.log('✅ Mapping CJ créé:', mapping.id);
+      this.logger.log('🎉 Import terminé avec succès');
+      this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
+
+      return {
+        success: true,
+        message: 'Produit importé avec succès',
+        product: kamriProduct,
+        mapping: mapping,
+      };
+    } catch (error) {
+      this.logger.error('❌ === ERREUR IMPORT PRODUIT CJ ===');
+      this.logger.error('💥 Erreur détaillée:', error);
+      this.logger.error('📊 Type d\'erreur:', typeof error);
+      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 === FIN ERREUR IMPORT PRODUIT CJ ===');
+      throw error;
+    }
   }
 
   /**

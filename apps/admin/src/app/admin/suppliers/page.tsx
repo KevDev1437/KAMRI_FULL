@@ -10,6 +10,7 @@ import {
     CheckCircle,
     Download,
     Edit,
+    Globe,
     Plus,
     TestTube,
     Trash2,
@@ -52,6 +53,20 @@ export default function SuppliersPage() {
       setShowLogin(true)
     }
   }, [isAuthenticated])
+
+  // Écouter les événements d'import CJ
+  useEffect(() => {
+    const handleCJProductImported = () => {
+      console.log('🔄 Produit CJ importé, mise à jour des fournisseurs...')
+      loadSuppliers() // Recharger les fournisseurs pour mettre à jour les statistiques
+    }
+
+    window.addEventListener('cjProductImported', handleCJProductImported)
+    
+    return () => {
+      window.removeEventListener('cjProductImported', handleCJProductImported)
+    }
+  }, [])
 
   const loadSuppliers = async () => {
     try {
@@ -149,6 +164,14 @@ export default function SuppliersPage() {
       console.log('📦 Réponse de l\'import:', response)
       
       if (response.data) {
+        // Gestion spéciale pour CJ Dropshipping
+        if (response.data.cjDetected) {
+          alert(`🌐 ${response.data.message}\n\nRedirection vers la page CJ Dropshipping...`)
+          // Rediriger vers la page CJ
+          window.location.href = response.data.redirect
+          return
+        }
+        
         alert(`✅ ${response.data.message}\n\n${response.data.products.length} produits importés et en attente de catégorisation.\n\nRegardez la console du backend pour voir les logs détaillés.`)
         // Recharger la liste des fournisseurs
         loadSuppliers()
@@ -224,7 +247,11 @@ export default function SuppliersPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                    <Truck className="w-5 h-5 text-primary-600" />
+                    {supplier.name === 'CJ Dropshipping' ? (
+                      <Globe className="w-5 h-5 text-primary-600" />
+                    ) : (
+                      <Truck className="w-5 h-5 text-primary-600" />
+                    )}
                   </div>
                   <div>
                     <CardTitle className="text-lg">{supplier.name}</CardTitle>
