@@ -7,6 +7,60 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  // ✅ Fonction utilitaire pour traiter les images
+  private processProductImages(product: any) {
+    let imageUrls: string[] = [];
+    let mainImage: string | null = null;
+
+    if (product.images && product.images.length > 0) {
+      // Images depuis la relation Prisma
+      imageUrls = product.images.map(img => img.url);
+      mainImage = imageUrls[0];
+    } else if (product.image) {
+      // Image stockée comme chaîne JSON ou URL simple
+      try {
+        if (typeof product.image === 'string' && product.image.startsWith('[')) {
+          // Chaîne JSON
+          const parsed = JSON.parse(product.image);
+          if (Array.isArray(parsed)) {
+            imageUrls = parsed;
+            mainImage = parsed[0];
+          }
+        } else {
+          // URL simple
+          mainImage = product.image;
+          imageUrls = [product.image];
+        }
+      } catch (e) {
+        // Si le parsing échoue, utiliser l'image telle quelle
+        mainImage = product.image;
+        imageUrls = [product.image];
+      }
+    }
+
+    // ✅ Nettoyer la description de TOUTES les balises HTML
+    let cleanDescription = product.description;
+    if (cleanDescription) {
+      // Supprimer toutes les balises HTML
+      cleanDescription = cleanDescription.replace(/<[^>]*>/g, '');
+      // Remplacer les entités HTML communes
+      cleanDescription = cleanDescription.replace(/&nbsp;/g, ' ');
+      cleanDescription = cleanDescription.replace(/&amp;/g, '&');
+      cleanDescription = cleanDescription.replace(/&lt;/g, '<');
+      cleanDescription = cleanDescription.replace(/&gt;/g, '>');
+      cleanDescription = cleanDescription.replace(/&quot;/g, '"');
+      // Nettoyer les espaces multiples et les retours à la ligne
+      cleanDescription = cleanDescription.replace(/\s+/g, ' ').trim();
+    }
+
+    return {
+      ...product,
+      image: mainImage,
+      images: imageUrls,
+      description: cleanDescription
+    };
+  }
+
   async create(createProductDto: CreateProductDto) {
     return this.prisma.product.create({
       data: createProductDto,
@@ -18,7 +72,7 @@ export class ProductsService {
   }
 
   async findAll() {
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         status: 'active' // Seuls les produits validés
       },
@@ -31,10 +85,13 @@ export class ProductsService {
         createdAt: 'desc',
       },
     });
+
+    // ✅ Transformer les données pour le frontend
+    return products.map(product => this.processProductImages(product));
   }
 
   async findAllForAdmin() {
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       include: {
         category: true,
         supplier: true, // ✅ Ajouter la relation supplier
@@ -44,10 +101,13 @@ export class ProductsService {
         createdAt: 'desc',
       },
     });
+
+    // ✅ Transformer les données pour le frontend
+    return products.map(product => this.processProductImages(product));
   }
 
   async findOne(id: string) {
-    return this.prisma.product.findUnique({
+    const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
         category: true,
@@ -65,6 +125,11 @@ export class ProductsService {
         },
       },
     });
+
+    if (!product) return null;
+
+    // ✅ Transformer les données pour le frontend
+    return this.processProductImages(product);
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
@@ -193,18 +258,14 @@ export class ProductsService {
 
   // ✅ Nouvelle méthode pour obtenir les statistiques de validation
   async getValidationStats() {
-    const [pending, draft, cjProducts, dummyProducts] = await Promise.all([
+    const [pending, draft] = await Promise.all([
       this.prisma.product.count({ where: { status: 'pending' } }),
       this.prisma.product.count({ where: { status: 'draft' } }),
-      this.prisma.product.count({ where: { source: 'cj-dropshipping' } }),
-      this.prisma.product.count({ where: { source: 'dummy-json' } }),
     ]);
 
     return {
       pending,
       draft,
-      cjProducts,
-      dummyProducts,
       total: pending + draft,
     };
   }

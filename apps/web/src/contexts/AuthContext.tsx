@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { apiClient } from '../lib/api';
 
 interface User {
   id: string;
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (storedToken) {
           console.log('🔑 [AuthProvider] Token trouvé, récupération du profil...');
           setToken(storedToken);
+          apiClient.setToken(storedToken); // ✅ Mettre à jour l'ApiClient
           
           // Récupérer le profil utilisateur
           const response = await fetch('http://localhost:3001/api/users/profile', {
@@ -69,6 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('❌ [AuthProvider] Token invalide, déconnexion...');
             localStorage.removeItem('auth_token');
             setToken(null);
+            apiClient.setToken(null); // ✅ Mettre à jour l'ApiClient
           }
         } else {
           console.log('ℹ️ [AuthProvider] Aucun token trouvé');
@@ -77,6 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('❌ [AuthProvider] Erreur lors de l\'initialisation:', error);
         localStorage.removeItem('auth_token');
         setToken(null);
+        apiClient.setToken(null); // ✅ Mettre à jour l'ApiClient
       } finally {
         setIsLoading(false);
       }
@@ -106,6 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Stocker le token
         localStorage.setItem('auth_token', data.access_token);
         setToken(data.access_token);
+        apiClient.setToken(data.access_token); // ✅ Mettre à jour l'ApiClient
         setUser(data.user);
         
         return { success: true };
@@ -125,6 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('🚪 [AuthProvider] Déconnexion...');
     localStorage.removeItem('auth_token');
     setToken(null);
+    apiClient.setToken(null); // ✅ Mettre à jour l'ApiClient
     setUser(null);
   };
 

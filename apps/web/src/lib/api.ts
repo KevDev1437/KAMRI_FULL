@@ -57,6 +57,16 @@ export class ApiClient {
     }
   }
 
+  // ✅ Méthode pour mettre à jour le token
+  setToken(token: string | null) {
+    this.token = token;
+  }
+
+  // ✅ Méthode pour récupérer le token actuel
+  getToken(): string | null {
+    return this.token;
+  }
+
   // Authentification
   async login(email: string, password: string): Promise<ApiResponse> {
     try {

@@ -43,6 +43,28 @@ interface Supplier {
   name: string
 }
 
+// Fonction utilitaire pour nettoyer les URLs d'images
+const getCleanImageUrl = (image: string | string[] | undefined): string | null => {
+  if (!image) return null;
+  
+  if (typeof image === 'string') {
+    // Si c'est une string, vérifier si c'est un JSON
+    try {
+      const parsed = JSON.parse(image);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      return image;
+    } catch {
+      return image;
+    }
+  } else if (Array.isArray(image) && image.length > 0) {
+    return image[0];
+  }
+  
+  return null;
+};
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -287,8 +309,23 @@ export default function ProductsPage() {
           <Card key={product.id} className="kamri-card group">
             <CardContent className="p-0">
               {/* Product Image */}
-              <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative">
-                <Package className="h-12 w-12 text-gray-400" />
+              <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
+                {(() => {
+                  const imageUrl = getCleanImageUrl(product.image);
+                  return imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log('❌ Erreur de chargement d\'image:', e.currentTarget.src);
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null;
+                })()}
+                <Package className={`h-12 w-12 text-gray-400 ${getCleanImageUrl(product.image) ? 'hidden' : ''}`} />
                 
                 {/* Badge */}
                 {product.badge && (

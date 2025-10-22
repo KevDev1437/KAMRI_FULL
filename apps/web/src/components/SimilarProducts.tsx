@@ -3,6 +3,28 @@
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
 import Link from 'next/link';
 
+// Fonction utilitaire pour nettoyer les URLs d'images
+const getCleanImageUrl = (image: string | string[] | null | undefined): string | null => {
+  if (!image) return null;
+  
+  if (typeof image === 'string') {
+    // Si c'est une string, vérifier si c'est un JSON
+    try {
+      const parsed = JSON.parse(image);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      return image;
+    } catch {
+      return image;
+    }
+  } else if (Array.isArray(image) && image.length > 0) {
+    return image[0];
+  }
+  
+  return null;
+};
+
 interface Product {
   id: string;
   name: string;
@@ -52,11 +74,26 @@ export default function SimilarProducts({ products }: SimilarProductsProps) {
               <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
                 {/* Image */}
                 <div className="h-48 bg-gradient-to-br from-[#F8F9FA] to-[#E9ECEF] flex items-center justify-center relative">
-                  <img
-                    src={product.image || '/images/modelo.png'}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
+                  {(() => {
+                    const imageUrl = getCleanImageUrl(product.image);
+                    return imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log('❌ Erreur de chargement d\'image:', e.currentTarget.src);
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null;
+                  })()}
+                  <div className={`${getCleanImageUrl(product.image) ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
+                    <svg className="h-12 w-12 text-[#81C784]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
                   
                   {/* Badge */}
                   {product.badge && (

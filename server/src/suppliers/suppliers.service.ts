@@ -360,19 +360,28 @@ export class SuppliersService {
             console.log(`🏷️ Catégorie: ${cjStoreProduct.category}`);
             console.log(`💰 Prix: ${cjStoreProduct.price}`);
             
+            // ✅ Nettoyer les données du produit CJ
+            const cleanedData = this.cleanCJProductData(cjStoreProduct);
+            console.log(`🧹 Données nettoyées:`, {
+              name: cleanedData.name,
+              description: cleanedData.description.substring(0, 100) + '...',
+              image: cleanedData.image,
+              price: cleanedData.price
+            });
+            
             // Mapper les catégories externes vers nos catégories
-            const categoryId = await this.mapExternalCategory(cjStoreProduct.category || '', 'cj-dropshipping');
+            const categoryId = await this.mapExternalCategory(cleanedData.category || '', 'cj-dropshipping');
             console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
             
-            // Créer le produit KAMRI
+            // Créer le produit KAMRI avec les données nettoyées
             const productData: any = {
-              name: cjStoreProduct.name,
-              description: cjStoreProduct.description,
-              price: cjStoreProduct.price,
-              originalPrice: cjStoreProduct.originalPrice,
-              image: cjStoreProduct.image,
+              name: cleanedData.name,
+              description: cleanedData.description,
+              price: cleanedData.price,
+              originalPrice: cleanedData.originalPrice,
+              image: cleanedData.image,
               supplierId: supplier.id,
-              externalCategory: cjStoreProduct.category,
+              externalCategory: cleanedData.category,
               source: 'cj-dropshipping',
               status: 'pending',
               badge: this.generateBadge(),
@@ -610,10 +619,6 @@ export class SuppliersService {
     return null;
   }
 
-  private generateBadge(): string | null {
-    const badges = ['promo', 'nouveau', 'tendances', 'top-ventes', null];
-    return badges[Math.floor(Math.random() * badges.length)];
-  }
 
   /**
    * Fonction générique pour extraire l'URL d'image de n'importe quel fournisseur
@@ -756,5 +761,65 @@ export class SuppliersService {
       message: `Magasin CJ réinitialisé - ${updated.count} produits remis en statut 'available'`,
       stats: await this.getCJStoreStats()
     };
+  }
+
+  /**
+   * Nettoyer les données des produits CJ
+   */
+  private cleanCJProductData(cjStoreProduct: any) {
+    // Nettoyer la description (supprimer les balises HTML)
+    let cleanDescription = cjStoreProduct.description || '';
+    if (typeof cleanDescription === 'string') {
+      // Supprimer les balises HTML mais garder le contenu
+      cleanDescription = cleanDescription
+        .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+        .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+        .replace(/&amp;/g, '&') // Remplacer &amp; par &
+        .replace(/&lt;/g, '<') // Remplacer &lt; par <
+        .replace(/&gt;/g, '>') // Remplacer &gt; par >
+        .replace(/&quot;/g, '"') // Remplacer &quot; par "
+        .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+        .trim();
+    }
+
+    // Nettoyer l'image (s'assurer que c'est une URL valide)
+    let cleanImage = cjStoreProduct.image || '';
+    if (typeof cleanImage === 'string') {
+      try {
+        // Si c'est un JSON string, le parser
+        const parsed = JSON.parse(cleanImage);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cleanImage = parsed[0]; // Prendre la première image
+        }
+      } catch {
+        // Si ce n'est pas du JSON, garder tel quel
+        cleanImage = cleanImage;
+      }
+    } else if (Array.isArray(cleanImage) && cleanImage.length > 0) {
+      cleanImage = cleanImage[0]; // Prendre la première image
+    }
+
+    // Nettoyer le nom (supprimer les caractères spéciaux)
+    let cleanName = cjStoreProduct.name || '';
+    if (typeof cleanName === 'string') {
+      cleanName = cleanName
+        .replace(/[^\w\s\-.,]/g, '') // Supprimer les caractères spéciaux
+        .replace(/\s+/g, ' ') // Remplacer les espaces multiples
+        .trim();
+    }
+
+    return {
+      name: cleanName,
+      description: cleanDescription,
+      image: cleanImage,
+      price: Number(cjStoreProduct.price) || 0,
+      originalPrice: Number(cjStoreProduct.originalPrice) || 0,
+      category: cjStoreProduct.category || '',
+    };
+  }
+
+  private generateBadge(): string {
+    const badges = ['nouveau', 'promo', 'tendance', 'top vente'];
+    return badges[Math.floor(Math.random() * badges.length)];
   }
 }

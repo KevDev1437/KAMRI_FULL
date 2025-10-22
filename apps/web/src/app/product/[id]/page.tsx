@@ -144,7 +144,7 @@ export default function ProductDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Galerie d'images */}
           <ProductImageGallery 
-            images={product.images?.map((img: any) => img.url) || [product.image || '/images/modelo.png']}
+            images={product.images || [product.image || '/images/modelo.png']}
             mainImage={product.image || '/images/modelo.png'}
             productName={product.name}
           />
