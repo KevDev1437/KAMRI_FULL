@@ -103,7 +103,12 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
         {/* Description */}
         {product.description && (
-          <p className="text-[#424242] leading-relaxed mb-6">{product.description}</p>
+          <div className="text-[#424242] leading-relaxed mb-6">
+            <h3 className="text-lg font-semibold text-[#424242] mb-3">Description</h3>
+            <div className="whitespace-pre-line text-sm">
+              {product.description}
+            </div>
+          </div>
         )}
       </div>
 

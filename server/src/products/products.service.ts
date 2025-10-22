@@ -7,7 +7,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  // ✅ Fonction utilitaire pour traiter les images
+  // ✅ Fonction utilitaire pour traiter les images et formater la description
   private processProductImages(product: any) {
     let imageUrls: string[] = [];
     let mainImage: string | null = null;
@@ -38,26 +38,40 @@ export class ProductsService {
       }
     }
 
-    // ✅ Nettoyer la description de TOUTES les balises HTML
-    let cleanDescription = product.description;
-    if (cleanDescription) {
+    // ✅ Formater la description avec une structure claire
+    let formattedDescription = product.description;
+    if (formattedDescription) {
       // Supprimer toutes les balises HTML
-      cleanDescription = cleanDescription.replace(/<[^>]*>/g, '');
+      formattedDescription = formattedDescription.replace(/<[^>]*>/g, '');
       // Remplacer les entités HTML communes
-      cleanDescription = cleanDescription.replace(/&nbsp;/g, ' ');
-      cleanDescription = cleanDescription.replace(/&amp;/g, '&');
-      cleanDescription = cleanDescription.replace(/&lt;/g, '<');
-      cleanDescription = cleanDescription.replace(/&gt;/g, '>');
-      cleanDescription = cleanDescription.replace(/&quot;/g, '"');
-      // Nettoyer les espaces multiples et les retours à la ligne
-      cleanDescription = cleanDescription.replace(/\s+/g, ' ').trim();
+      formattedDescription = formattedDescription.replace(/&nbsp;/g, ' ');
+      formattedDescription = formattedDescription.replace(/&amp;/g, '&');
+      formattedDescription = formattedDescription.replace(/&lt;/g, '<');
+      formattedDescription = formattedDescription.replace(/&gt;/g, '>');
+      formattedDescription = formattedDescription.replace(/&quot;/g, '"');
+      
+      // ✅ Structurer la description avec des sauts de ligne
+      // Remplacer les parenthèses ouvrantes par des sauts de ligne
+      formattedDescription = formattedDescription.replace(/\(/g, '\n\n• ');
+      // Remplacer les crochets chinois par des sauts de ligne
+      formattedDescription = formattedDescription.replace(/【/g, '\n\n🌸 ');
+      formattedDescription = formattedDescription.replace(/】/g, '');
+      
+      // Nettoyer les espaces multiples
+      formattedDescription = formattedDescription.replace(/\s+/g, ' ');
+      // Nettoyer les sauts de ligne multiples
+      formattedDescription = formattedDescription.replace(/\n\s*\n/g, '\n\n');
+      // Supprimer les espaces en début et fin de ligne
+      formattedDescription = formattedDescription.split('\n').map(line => line.trim()).join('\n');
+      // Supprimer les lignes vides en début et fin
+      formattedDescription = formattedDescription.trim();
     }
 
     return {
       ...product,
       image: mainImage,
       images: imageUrls,
-      description: cleanDescription
+      description: formattedDescription
     };
   }
 
