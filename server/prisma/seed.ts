@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -68,13 +69,14 @@ async function main() {
   console.log('✅ Categories created');
 
   // Create admin user only
+  const hashedPassword = await bcrypt.hash('admin123', 10);
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@kamri.com' },
     update: {},
     create: {
       email: 'admin@kamri.com',
       name: 'Admin KAMRI',
-      password: 'admin123', // Mot de passe par défaut (à hasher en production)
+      password: hashedPassword, // ✅ Mot de passe hashé
       role: 'admin',
       status: 'active',
     },
