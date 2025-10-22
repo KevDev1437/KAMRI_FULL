@@ -293,5 +293,230 @@ export class ProductsService {
       },
     });
   }
+
+  // ✅ MÉTHODES CJ DROPSHIPPING
+  private readonly CJ_API_BASE = 'https://api.cjdropshipping.com/api2.0/v1';
+  private readonly CJ_API_KEY = process.env.CJ_API_KEY;
+
+  async searchCJProducts(params: any) {
+    try {
+      // Construire les paramètres de recherche pour l'API CJ
+      const searchParams = {
+        productName: params.productName || '',
+        categoryId: params.categoryId || '',
+        minPrice: params.minPrice || 0,
+        maxPrice: params.maxPrice || 999999,
+        pageNum: params.pageNum || 1,
+        pageSize: params.pageSize || 50,
+        countryCode: params.countryCode || 'US',
+        sort: params.sort || 'DESC',
+        orderBy: params.orderBy || 'listedNum'
+      };
+
+      // Appel à l'API CJ Dropshipping
+      const response = await fetch(`${this.CJ_API_BASE}/product/list`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.CJ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchParams),
+      });
+
+      if (!response.ok) {
+        throw new Error(`CJ API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Transformer les données pour le frontend
+      return {
+        success: true,
+        data: {
+          list: data.data?.list || [],
+          total: data.data?.total || 0,
+          pageNum: data.data?.pageNum || 1,
+          pageSize: data.data?.pageSize || 50
+        }
+      };
+    } catch (error) {
+      console.error('Erreur recherche CJ:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        data: { list: [], total: 0 }
+      };
+    }
+  }
+
+  async getCJCategories() {
+    try {
+      const response = await fetch(`${this.CJ_API_BASE}/product/getCategory`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.CJ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        throw new Error(`CJ API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data.data || []
+      };
+    } catch (error) {
+      console.error('Erreur récupération catégories CJ:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        data: []
+      };
+    }
+  }
+
+  async getCJProductDetails(pid: string) {
+    try {
+      const response = await fetch(`${this.CJ_API_BASE}/product/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.CJ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pid }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`CJ API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data.data
+      };
+    } catch (error) {
+      console.error('Erreur détails produit CJ:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        data: null
+      };
+    }
+  }
+
+  async importCJProduct(importData: any) {
+    try {
+      const { pid, variantSku, categoryId, supplierId } = importData;
+
+      // Vérifier si le produit existe déjà
+      const existingProduct = await this.prisma.product.findFirst({
+        where: {
+          cjMapping: {
+            cjProductId: pid,
+            cjSku: variantSku
+          }
+        }
+      });
+
+      if (existingProduct) {
+        return {
+          success: false,
+          error: 'Ce produit CJ est déjà importé',
+          data: existingProduct
+        };
+      }
+
+      // Récupérer les détails du produit depuis CJ
+      const cjDetails = await this.getCJProductDetails(pid);
+      if (!cjDetails.success) {
+        throw new Error('Impossible de récupérer les détails du produit CJ');
+      }
+
+      const cjProduct = cjDetails.data;
+      const variant = cjProduct.variants?.find(v => v.variantSku === variantSku);
+
+      if (!variant) {
+        throw new Error('Variante non trouvée');
+      }
+
+      // Créer le produit dans la base locale avec statut 'draft'
+      const product = await this.prisma.product.create({
+        data: {
+          name: cjProduct.productNameEn || cjProduct.productName,
+          description: cjProduct.productDescriptionEn || cjProduct.productDescription,
+          price: parseFloat(variant.sellPrice) || 0,
+          originalPrice: parseFloat(variant.originalPrice) || 0,
+          image: JSON.stringify(cjProduct.productImage || []),
+          categoryId,
+          supplierId,
+          externalCategory: cjProduct.categoryName,
+          source: 'cj-dropshipping',
+          status: 'draft',
+          stock: variant.stock || 0,
+          cjMapping: {
+            create: {
+              cjProductId: pid,
+              cjSku: variantSku
+            }
+          }
+        },
+        include: {
+          category: true,
+          supplier: true,
+          cjMapping: true
+        }
+      });
+
+      return {
+        success: true,
+        data: product
+      };
+    } catch (error) {
+      console.error('Erreur import produit CJ:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        data: null
+      };
+    }
+  }
+
+  async getCJProductStock(pid: string, countryCode: string = 'US') {
+    try {
+      const response = await fetch(`${this.CJ_API_BASE}/product/stock/getInventoryByPid`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.CJ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          pid,
+          countryCode 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`CJ API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data.data || []
+      };
+    } catch (error) {
+      console.error('Erreur stock produit CJ:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        data: []
+      };
+    }
+  }
 }
 

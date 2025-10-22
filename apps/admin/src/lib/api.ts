@@ -313,6 +313,94 @@ export class ApiClient {
     
     return this.fetchWithAuth(url);
   }
+
+  // ✅ MÉTHODES CJ DROPSHIPPING
+  async searchCJProducts(params: {
+    productName?: string;
+    categoryId?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    pageNum?: number;
+    pageSize?: number;
+    countryCode?: string;
+    sort?: string;
+    orderBy?: string;
+  }) {
+    // Construire l'URL avec les paramètres de recherche
+    const searchParams = new URLSearchParams();
+    if (params.productName) searchParams.append('productName', params.productName);
+    if (params.categoryId) searchParams.append('categoryId', params.categoryId);
+    if (params.minPrice) searchParams.append('minPrice', params.minPrice.toString());
+    if (params.maxPrice) searchParams.append('maxPrice', params.maxPrice.toString());
+    if (params.pageNum) searchParams.append('pageNum', params.pageNum.toString());
+    if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+    if (params.countryCode) searchParams.append('countryCode', params.countryCode);
+    if (params.sort) searchParams.append('sort', params.sort);
+    if (params.orderBy) searchParams.append('orderBy', params.orderBy);
+
+    const queryString = searchParams.toString();
+    const url = `/cj-dropshipping/products/search${queryString ? `?${queryString}` : ''}`;
+    
+    return this.fetchWithAuth(url, {
+      method: 'GET',
+    });
+  }
+
+  async getCJProductDetails(pid: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}`);
+  }
+
+  async getCJCategories() {
+    return this.fetchWithAuth('/cj-dropshipping/categories');
+  }
+
+  async getCJDefaultProducts() {
+    return this.fetchWithAuth('/cj-dropshipping/products/default');
+  }
+
+  async importCJProduct(pid: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}/import`, {
+      method: 'POST',
+    });
+  }
+
+  async getCJConfig() {
+    return this.fetchWithAuth('/cj-dropshipping/config');
+  }
+
+  async updateCJConfig(configData: any) {
+    return this.fetchWithAuth('/cj-dropshipping/config', {
+      method: 'PUT',
+      body: JSON.stringify(configData),
+    });
+  }
+
+  async testCJConnection() {
+    return this.fetchWithAuth('/cj-dropshipping/config/test', {
+      method: 'POST',
+    });
+  }
+
+  // ✅ NOUVELLES MÉTHODES CJ DROPSHIPPING
+  async getCJProductDetails(pid: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}/details`);
+  }
+
+  async getCJCategories() {
+    return this.fetchWithAuth('/cj-dropshipping/categories');
+  }
+
+  async importCJProduct(productData: any) {
+    return this.fetchWithAuth('/cj-dropshipping/products/import', {
+      method: 'POST',
+      body: JSON.stringify(productData),
+    });
+  }
+
+  async getCJProductStock(pid: string, countryCode?: string) {
+    const url = `/cj-dropshipping/products/${pid}/stock?countryCode=${countryCode || 'US'}`;
+    return this.fetchWithAuth(url);
+  }
 }
 
 // Instance globale
