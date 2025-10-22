@@ -31,13 +31,30 @@ export class SuppliersService {
     if (cjConfig && cjConfig.enabled) {
       // Récupérer les statistiques du magasin CJ
       const cjStoreStats = await this.getCJStoreStats();
+      
+      // ✅ Récupérer les produits RÉELLEMENT importés dans KAMRI (pas dans le magasin)
+      const cjSupplierInDb = await this.prisma.supplier.findFirst({
+        where: { name: 'CJ Dropshipping' }
+      });
+
+      const importedProducts = cjSupplierInDb ? await this.prisma.product.findMany({
+        where: { 
+          source: 'cj-dropshipping',
+          supplierId: cjSupplierInDb.id // ✅ Vrai fournisseur CJ
+        },
+        include: {
+          category: true,
+          supplier: true
+        }
+      }) : [];
+      
       const cjLastSync = await this.prisma.cJProductStore.findFirst({
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true }
       });
 
       // Créer un fournisseur virtuel CJ
-      const cjSupplier = {
+      const cjSupplierVirtual = {
         id: 'cj-dropshipping',
         name: 'CJ Dropshipping',
         description: 'Dropshipping depuis CJ',
@@ -45,15 +62,15 @@ export class SuppliersService {
         apiKey: cjConfig.apiKey ? '***' : '',
         status: cjConfig.enabled ? 'connected' : 'disconnected',
         lastSync: cjLastSync?.createdAt || null,
-        products: Array(cjStoreStats.available).fill(null), // Produits disponibles dans le magasin
+        products: importedProducts, // ✅ Vrais produits importés dans KAMRI
         categoryMappings: [],
         isVirtual: true, // Marquer comme fournisseur virtuel
         cjConfig: cjConfig,
-        storeStats: cjStoreStats // ✅ Ajouter les statistiques du magasin
+        storeStats: cjStoreStats // ✅ Statistiques du magasin (pour info)
       };
 
       // Ajouter CJ à la liste des fournisseurs
-      return [...normalSuppliers, cjSupplier];
+      return [...normalSuppliers, cjSupplierVirtual];
     }
 
     return normalSuppliers;
@@ -166,13 +183,47 @@ export class SuppliersService {
           orderBy: { createdAt: 'desc' }
         });
 
+        // ✅ DEBUG : Vérifier tous les produits du magasin
+        const allCJProducts = await this.prisma.cJProductStore.findMany({
+          orderBy: { createdAt: 'desc' }
+        });
+        console.log(`🔍 DEBUG - Tous les produits du magasin CJ:`, allCJProducts.map(p => ({ 
+          id: p.id, 
+          name: p.name, 
+          status: p.status 
+        })));
+
         if (cjStoreProducts.length === 0) {
-          return {
-            message: 'Aucun produit disponible dans le magasin CJ',
-            products: [],
-            supplier: 'CJ Dropshipping',
-            workflow: 'Magasin vide - Importez d\'abord des produits depuis /admin/cj-dropshipping/products'
-          };
+          // ✅ Si aucun produit disponible, mais qu'il y a des produits importés, les remettre en disponible
+          const importedProducts = allCJProducts.filter(p => p.status === 'imported');
+          if (importedProducts.length > 0) {
+            console.log(`🔄 Remise en statut 'available' de ${importedProducts.length} produits importés`);
+            await this.prisma.cJProductStore.updateMany({
+              where: { status: 'imported' },
+              data: { status: 'available' }
+            });
+            
+            // Récupérer à nouveau les produits maintenant disponibles
+            const newCJStoreProducts = await this.prisma.cJProductStore.findMany({
+              where: { status: 'available' },
+              orderBy: { createdAt: 'desc' }
+            });
+            
+            if (newCJStoreProducts.length > 0) {
+              console.log(`✅ ${newCJStoreProducts.length} produits remis en statut 'available'`);
+              // Continuer avec l'import
+              cjStoreProducts.push(...newCJStoreProducts);
+            }
+          }
+          
+          if (cjStoreProducts.length === 0) {
+            return {
+              message: `Aucun produit disponible dans le magasin CJ (${allCJProducts.length} produits au total, statuts: ${allCJProducts.map(p => p.status).join(', ')})`,
+              products: [],
+              supplier: 'CJ Dropshipping',
+              workflow: 'Magasin vide - Importez d\'abord des produits depuis /admin/cj-dropshipping/products'
+            };
+          }
         }
 
         console.log(`📦 ${cjStoreProducts.length} produits trouvés dans le magasin CJ`);
@@ -190,6 +241,26 @@ export class SuppliersService {
             const categoryId = await this.mapExternalCategory(cjProduct.category || '', 'cj-dropshipping');
             console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
             
+            // ✅ Créer un vrai fournisseur CJ s'il n'existe pas
+            let cjSupplier = await this.prisma.supplier.findFirst({
+              where: { name: 'CJ Dropshipping' }
+            });
+
+            if (!cjSupplier) {
+              console.log('🏢 Création du fournisseur CJ Dropshipping...');
+              cjSupplier = await this.prisma.supplier.create({
+                data: {
+                  name: 'CJ Dropshipping',
+                  description: 'Fournisseur CJ Dropshipping pour vente réelle',
+                  apiUrl: 'https://developers.cjdropshipping.com',
+                  apiKey: 'cj-api-key',
+                  status: 'connected',
+                  lastSync: new Date(),
+                }
+              });
+              console.log(`✅ Fournisseur CJ créé avec ID: ${cjSupplier.id}`);
+            }
+
             // Créer le produit KAMRI (comme les produits statiques)
             const productData: any = {
               name: cjProduct.name,
@@ -197,7 +268,7 @@ export class SuppliersService {
               price: cjProduct.price,
               originalPrice: cjProduct.originalPrice,
               image: cjProduct.image,
-              supplierId: 'cj-dropshipping',
+              supplierId: cjSupplier.id, // ✅ Vrai fournisseur CJ
               externalCategory: cjProduct.category,
               source: 'cj-dropshipping',
               status: 'pending', // En attente de validation
@@ -415,27 +486,39 @@ export class SuppliersService {
     // Si pas de mapping, enregistrer comme catégorie non mappée
     console.log(`📝 Enregistrement catégorie non mappée...`);
     try {
-      await this.prisma.unmappedExternalCategory.upsert({
-        where: {
-          supplierId_externalCategory: {
-            supplierId: supplierId,
-            externalCategory: fakeCategory
+      // ✅ Pour CJ, utiliser le vrai supplierId
+      let actualSupplierId = supplierId;
+      if (supplierId === 'cj-dropshipping') {
+        const cjSupplier = await this.prisma.supplier.findFirst({
+          where: { name: 'CJ Dropshipping' }
+        });
+        actualSupplierId = cjSupplier?.id || null;
+      }
+      
+      if (actualSupplierId) {
+        await this.prisma.unmappedExternalCategory.upsert({
+          where: {
+            supplierId_externalCategory: {
+              supplierId: actualSupplierId,
+              externalCategory: fakeCategory
+            }
+          },
+          update: {
+            productCount: {
+              increment: 1
+            }
+          },
+          create: {
+            externalCategory: fakeCategory,
+            supplierId: actualSupplierId,
+            productCount: 1
           }
-        },
-        update: {
-          productCount: {
-            increment: 1
-          }
-        },
-        create: {
-          externalCategory: fakeCategory,
-          supplierId: supplierId,
-          productCount: 1
-        }
-      });
-      console.log(`✅ Catégorie non mappée enregistrée: ${fakeCategory}`);
+        });
+        console.log(`✅ Catégorie non mappée enregistrée: ${fakeCategory}`);
+      }
     } catch (error) {
       console.log(`❌ Erreur enregistrement catégorie non mappée:`, error);
+      // ✅ Continuer même si l'enregistrement échoue
     }
     
     // Vérifier ce qui a été enregistré
@@ -590,13 +673,15 @@ export class SuppliersService {
   // ✅ Nouvelle méthode pour réinitialiser le magasin CJ
   async resetCJStore() {
     // Remettre tous les produits importés en statut available
-    await this.prisma.cJProductStore.updateMany({
+    const updated = await this.prisma.cJProductStore.updateMany({
       where: { status: 'imported' },
       data: { status: 'available' }
     });
 
+    console.log(`🔄 ${updated.count} produits remis en statut 'available'`);
+
     return {
-      message: 'Magasin CJ réinitialisé - Tous les produits sont à nouveau disponibles',
+      message: `Magasin CJ réinitialisé - ${updated.count} produits remis en statut 'available'`,
       stats: await this.getCJStoreStats()
     };
   }

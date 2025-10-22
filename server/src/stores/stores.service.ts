@@ -43,7 +43,26 @@ export class StoresService {
     limit?: number;
   }) {
     if (storeId === 'cj-dropshipping') {
-      return this.getCJStoreProducts(filters);
+      const result = await this.getCJStoreProducts(filters);
+      
+      // Récupérer les catégories uniques pour le filtre
+      const uniqueCategories = await this.prisma.cJProductStore.findMany({
+        distinct: ['category'],
+        select: { category: true },
+        where: {
+          AND: [
+            { category: { not: null } },
+            { category: { not: '' } }
+          ]
+        },
+      });
+      const categories = uniqueCategories.map(c => c.category!).filter(Boolean) as string[];
+
+      return { 
+        products: result.products, 
+        pagination: result.pagination,
+        categories 
+      };
     }
 
     throw new Error(`Magasin ${storeId} non trouvé`);
