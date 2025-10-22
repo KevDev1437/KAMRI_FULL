@@ -1,12 +1,12 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -75,5 +75,40 @@ export class SuppliersController {
   @ApiResponse({ status: 200, description: 'Import de produits effectué' })
   importProducts(@Param('id') id: string) {
     return this.suppliersService.importProducts(id);
+  }
+
+  @Get(':id/category-mappings')
+  @ApiOperation({ summary: 'Obtenir les mappings de catégories pour un fournisseur' })
+  @ApiResponse({ status: 200, description: 'Mappings de catégories récupérés' })
+  getCategoryMappings(@Param('id') id: string) {
+    return this.suppliersService.getCategoryMappings(id);
+  }
+
+  @Get('cj/external-categories')
+  @ApiOperation({ summary: 'Obtenir les catégories externes de CJ Dropshipping' })
+  @ApiResponse({ status: 200, description: 'Catégories externes CJ récupérées' })
+  getCJExternalCategories() {
+    return this.suppliersService.getCJExternalCategories();
+  }
+
+  @Get('cj/store-products')
+  @ApiOperation({ summary: 'Obtenir les produits du magasin CJ' })
+  @ApiResponse({ status: 200, description: 'Produits du magasin CJ récupérés' })
+  getCJStoreProducts() {
+    return this.suppliersService.getCJStoreProducts();
+  }
+
+  @Get('cj/store-stats')
+  @ApiOperation({ summary: 'Obtenir les statistiques du magasin CJ' })
+  @ApiResponse({ status: 200, description: 'Statistiques du magasin CJ récupérées' })
+  getCJStoreStats() {
+    return this.suppliersService.getCJStoreStats();
+  }
+
+  @Post('cj/reset-store')
+  @ApiOperation({ summary: 'Réinitialiser le magasin CJ' })
+  @ApiResponse({ status: 200, description: 'Magasin CJ réinitialisé' })
+  resetCJStore() {
+    return this.suppliersService.resetCJStore();
   }
 }

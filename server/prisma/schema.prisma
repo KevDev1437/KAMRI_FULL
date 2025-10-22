@@ -61,6 +61,7 @@ model Product {
   categoryId       String?
   supplierId       String?
   externalCategory String?  // Catégorie externe du fournisseur
+  source           String?  // Source du produit: dummy-json, cj-dropshipping, manual
   status           String   @default("pending") // pending, active, inactive, rejected
   badge            String? // promo, tendances, nouveau, top-ventes
   stock            Int      @default(0)
@@ -299,6 +300,23 @@ model CJConfig {
   updatedAt     DateTime @updatedAt
 
   @@map("cj_configs")
+}
+
+// Magasin CJ Dropshipping
+model CJProductStore {
+  id            String   @id @default(cuid())
+  cjProductId   String   @unique
+  name          String
+  description   String?
+  price         Float
+  originalPrice Float?
+  image         String?
+  category      String?
+  status        String   @default("available") // available, selected, imported
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("cj_product_store")
 }
 
 // Mapping produits CJ

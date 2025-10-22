@@ -13,6 +13,7 @@ import {
     Package,
     Settings,
     ShoppingCart,
+    Store,
     Truck,
     Users
 } from 'lucide-react'
@@ -45,6 +46,11 @@ const navigation = [
     name: 'Fournisseurs',
     href: '/admin/suppliers',
     icon: Truck,
+  },
+  {
+    name: 'Magasins',
+    href: '/admin/stores',
+    icon: Store,
   },
   {
     name: 'CJ Dropshipping',

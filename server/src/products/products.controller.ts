@@ -90,5 +90,19 @@ export class ProductsController {
   getProductsReadyForValidation(@Query('categoryId') categoryId?: string) {
     return this.productsService.getProductsReadyForValidation(categoryId);
   }
+
+  @Get('admin/by-source')
+  @ApiOperation({ summary: 'Get products by source (dummy-json, cj-dropshipping)' })
+  @ApiResponse({ status: 200, description: 'Products by source retrieved successfully' })
+  getProductsBySource(@Query('source') source?: string) {
+    return this.productsService.getProductsBySource(source);
+  }
+
+  @Get('admin/validation-stats')
+  @ApiOperation({ summary: 'Get validation statistics' })
+  @ApiResponse({ status: 200, description: 'Validation statistics retrieved successfully' })
+  getValidationStats() {
+    return this.productsService.getValidationStats();
+  }
 }
 

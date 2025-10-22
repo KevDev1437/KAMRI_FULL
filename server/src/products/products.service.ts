@@ -100,10 +100,13 @@ export class ProductsService {
 
   async getPendingProducts() {
     return this.prisma.product.findMany({
-      where: { status: 'pending' },
+      where: { 
+        status: { in: ['pending', 'draft'] } // ✅ Inclure les produits draft (CJ)
+      },
       include: {
         category: true,
         supplier: true,
+        cjMapping: true, // ✅ Inclure le mapping CJ
       },
       orderBy: {
         createdAt: 'desc',
@@ -112,10 +115,10 @@ export class ProductsService {
   }
 
   async getProductsReadyForValidation(categoryId?: string) {
-    // Récupérer tous les produits pending
+    // Récupérer tous les produits pending et draft
     const products = await this.prisma.product.findMany({
       where: { 
-        status: 'pending'
+        status: { in: ['pending', 'draft'] } // ✅ Inclure les produits draft (CJ)
       },
       include: {
         category: true,
@@ -124,6 +127,7 @@ export class ProductsService {
             categoryMappings: true
           }
         },
+        cjMapping: true, // ✅ Inclure le mapping CJ
       },
       orderBy: {
         createdAt: 'desc',
@@ -162,6 +166,47 @@ export class ProductsService {
     }
 
     return filteredProducts;
+  }
+
+  // ✅ Nouvelle méthode pour obtenir les produits par source
+  async getProductsBySource(source?: string) {
+    const whereClause: any = {
+      status: { in: ['pending', 'draft'] }
+    };
+
+    if (source) {
+      whereClause.source = source;
+    }
+
+    return this.prisma.product.findMany({
+      where: whereClause,
+      include: {
+        category: true,
+        supplier: true,
+        cjMapping: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  // ✅ Nouvelle méthode pour obtenir les statistiques de validation
+  async getValidationStats() {
+    const [pending, draft, cjProducts, dummyProducts] = await Promise.all([
+      this.prisma.product.count({ where: { status: 'pending' } }),
+      this.prisma.product.count({ where: { status: 'draft' } }),
+      this.prisma.product.count({ where: { source: 'cj-dropshipping' } }),
+      this.prisma.product.count({ where: { source: 'dummy-json' } }),
+    ]);
+
+    return {
+      pending,
+      draft,
+      cjProducts,
+      dummyProducts,
+      total: pending + draft,
+    };
   }
 
   async findByCategory(categoryId: string) {

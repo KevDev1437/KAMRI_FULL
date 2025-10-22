@@ -12,6 +12,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { SettingsModule } from './settings/settings.module';
+import { StoresModule } from './stores/stores.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
 import { UsersModule } from './users/users.module';
@@ -38,6 +39,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     UsersModule,
     CJDropshippingModule,
     HealthModule,
+    StoresModule,
   ],
 })
 export class AppModule {}

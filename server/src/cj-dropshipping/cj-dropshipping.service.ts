@@ -817,75 +817,42 @@ export class CJDropshippingService {
           sellingPrice
         });
         
-        // MAPPING DES CATÉGORIES CJ → KAMRI
-        let kamriCategoryId = categoryId; // Utiliser la catégorie fournie si disponible
+        // ✅ SAUVEGARDER SEULEMENT LA CATÉGORIE EXTERNE (comme les produits statiques)
+        this.logger.log('🔍 Catégorie externe CJ:', cjProduct.categoryName);
         
-        if (!kamriCategoryId && cjProduct.categoryName) {
-          this.logger.log('🔍 Recherche de catégorie CJ:', cjProduct.categoryName);
-          
-          // Chercher une catégorie existante avec le même nom
-          const existingCategory = await this.prisma.category.findFirst({
-            where: {
-              name: {
-                contains: cjProduct.categoryName
-              }
-            }
-          });
-          
-          if (existingCategory) {
-            kamriCategoryId = existingCategory.id;
-            this.logger.log('✅ Catégorie existante trouvée:', existingCategory.name);
-          } else {
-            // Créer une nouvelle catégorie
-            const newCategory = await this.prisma.category.create({
-              data: {
-                name: cjProduct.categoryName,
-                description: `Catégorie importée depuis CJ Dropshipping`,
-              }
-            });
-            kamriCategoryId = newCategory.id;
-            this.logger.log('✅ Nouvelle catégorie créée:', newCategory.name);
-          }
-        }
-        
-        this.logger.log('🏷️ Catégorie finale:', kamriCategoryId);
-        
-        const kamriProduct = await this.prisma.product.create({
-          data: {
+        // ✅ NOUVELLE APPROCHE : STOCKER DANS LE MAGASIN CJ (upsert pour éviter les doublons)
+        const cjStoreProduct = await this.prisma.cJProductStore.upsert({
+          where: { cjProductId: pid },
+          update: {
             name: cjProduct.productNameEn || cjProduct.productName,
             description: cjProduct.description,
-            price: sellingPrice, // Prix de vente
-            originalPrice: originalPrice, // Prix original
+            price: sellingPrice,
+            originalPrice: originalPrice,
             image: cjProduct.productImage,
-            categoryId: kamriCategoryId, // Catégorie mappée
-            status: 'active',
-            stock: cjProduct.variants?.[0]?.stock || 0,
-            badge: 'nouveau',
+            category: cjProduct.categoryName,
+            status: 'available', // Remettre en disponible si déjà importé
+          },
+          create: {
+            cjProductId: pid,
+            name: cjProduct.productNameEn || cjProduct.productName,
+            description: cjProduct.description,
+            price: sellingPrice,
+            originalPrice: originalPrice,
+            image: cjProduct.productImage,
+            category: cjProduct.categoryName,
+            status: 'available',
           },
         });
 
-      this.logger.log('✅ Produit KAMRI créé:', kamriProduct.id);
+        this.logger.log('✅ Produit ajouté au magasin CJ:', cjStoreProduct.id);
+        this.logger.log('🎉 Import terminé avec succès');
+        this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
 
-      // Créer le mapping CJ
-      const mapping = await this.prisma.cJProductMapping.create({
-        data: {
-          productId: kamriProduct.id,
-          cjProductId: pid,
-          cjSku: cjProduct.productSku,
-          lastSyncAt: new Date(),
-        },
-      });
-
-      this.logger.log('✅ Mapping CJ créé:', mapping.id);
-      this.logger.log('🎉 Import terminé avec succès');
-      this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
-
-      return {
-        success: true,
-        message: 'Produit importé avec succès',
-        product: kamriProduct,
-        mapping: mapping,
-      };
+        return {
+          success: true,
+          message: 'Produit ajouté au magasin CJ',
+          product: cjStoreProduct,
+        };
     } catch (error) {
       this.logger.error('❌ === ERREUR IMPORT PRODUIT CJ ===');
       this.logger.error('💥 Erreur détaillée:', error);
