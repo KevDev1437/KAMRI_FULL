@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { CJDropshippingService } from '../cj-dropshipping/cj-dropshipping.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 @Injectable()
 export class SuppliersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cjDropshippingService: CJDropshippingService
+  ) {}
 
   async create(createSupplierDto: CreateSupplierDto) {
     return this.prisma.supplier.create({
@@ -17,63 +21,45 @@ export class SuppliersService {
   }
 
   async findAll() {
-    // Récupérer les fournisseurs normaux
-    const normalSuppliers = await this.prisma.supplier.findMany({
+    // ✅ Récupérer TOUS les fournisseurs de la base de données
+    const suppliers = await this.prisma.supplier.findMany({
       include: {
-        products: true,
+        products: {
+          include: {
+            category: true,
+            supplier: true
+          }
+        },
         categoryMappings: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
-    // Vérifier si CJ Dropshipping est configuré
-    const cjConfig = await this.prisma.cJConfig.findFirst();
-    
-    if (cjConfig && cjConfig.enabled) {
-      // Récupérer les statistiques du magasin CJ
-      const cjStoreStats = await this.getCJStoreStats();
-      
-      // ✅ Récupérer les produits RÉELLEMENT importés dans KAMRI (pas dans le magasin)
-      const cjSupplierInDb = await this.prisma.supplier.findFirst({
-        where: { name: 'CJ Dropshipping' }
-      });
+    // ✅ Enrichir les données pour l'affichage
+    const enrichedSuppliers = await Promise.all(
+      suppliers.map(async (supplier) => {
+        // Pour CJ Dropshipping, récupérer les stats du magasin
+        if (supplier.name === 'CJ Dropshipping') {
+          const cjStoreStats = await this.getCJStoreStats();
+          const cjLastSync = await this.prisma.cJProductStore.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true }
+          });
 
-      const importedProducts = cjSupplierInDb ? await this.prisma.product.findMany({
-        where: { 
-          source: 'cj-dropshipping',
-          supplierId: cjSupplierInDb.id // ✅ Vrai fournisseur CJ
-        },
-        include: {
-          category: true,
-          supplier: true
+          return {
+            ...supplier,
+            lastSync: cjLastSync?.createdAt || supplier.lastSync,
+            storeStats: cjStoreStats
+          };
         }
-      }) : [];
-      
-      const cjLastSync = await this.prisma.cJProductStore.findFirst({
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true }
-      });
 
-      // Créer un fournisseur virtuel CJ
-      const cjSupplierVirtual = {
-        id: 'cj-dropshipping',
-        name: 'CJ Dropshipping',
-        description: 'Dropshipping depuis CJ',
-        apiUrl: 'https://developers.cjdropshipping.com',
-        apiKey: cjConfig.apiKey ? '***' : '',
-        status: cjConfig.enabled ? 'connected' : 'disconnected',
-        lastSync: cjLastSync?.createdAt || null,
-        products: importedProducts, // ✅ Vrais produits importés dans KAMRI
-        categoryMappings: [],
-        isVirtual: true, // Marquer comme fournisseur virtuel
-        cjConfig: cjConfig,
-        storeStats: cjStoreStats // ✅ Statistiques du magasin (pour info)
-      };
+        return supplier;
+      })
+    );
 
-      // Ajouter CJ à la liste des fournisseurs
-      return [...normalSuppliers, cjSupplierVirtual];
-    }
-
-    return normalSuppliers;
+    return enrichedSuppliers;
   }
 
   async findOne(id: string) {
@@ -228,6 +214,28 @@ export class SuppliersService {
 
         console.log(`📦 ${cjStoreProducts.length} produits trouvés dans le magasin CJ`);
         
+        // ✅ Créer le fournisseur CJ UNE SEULE FOIS avant la boucle
+        let cjSupplier = await this.prisma.supplier.findFirst({
+          where: { name: 'CJ Dropshipping' }
+        });
+
+        if (!cjSupplier) {
+          console.log('🏢 Création du fournisseur CJ Dropshipping...');
+          cjSupplier = await this.prisma.supplier.create({
+            data: {
+              name: 'CJ Dropshipping',
+              description: 'Fournisseur CJ Dropshipping pour vente réelle',
+              apiUrl: 'https://developers.cjdropshipping.com',
+              apiKey: 'cj-api-key',
+              status: 'connected',
+              lastSync: new Date(),
+            }
+          });
+          console.log(`✅ Fournisseur CJ créé avec ID: ${cjSupplier.id}`);
+        } else {
+          console.log(`✅ Fournisseur CJ existant trouvé: ${cjSupplier.id}`);
+        }
+        
         const importedProducts = [];
         
         for (const cjProduct of cjStoreProducts) {
@@ -240,26 +248,6 @@ export class SuppliersService {
             // Mapper les catégories externes vers nos catégories
             const categoryId = await this.mapExternalCategory(cjProduct.category || '', 'cj-dropshipping');
             console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
-            
-            // ✅ Créer un vrai fournisseur CJ s'il n'existe pas
-            let cjSupplier = await this.prisma.supplier.findFirst({
-              where: { name: 'CJ Dropshipping' }
-            });
-
-            if (!cjSupplier) {
-              console.log('🏢 Création du fournisseur CJ Dropshipping...');
-              cjSupplier = await this.prisma.supplier.create({
-                data: {
-                  name: 'CJ Dropshipping',
-                  description: 'Fournisseur CJ Dropshipping pour vente réelle',
-                  apiUrl: 'https://developers.cjdropshipping.com',
-                  apiKey: 'cj-api-key',
-                  status: 'connected',
-                  lastSync: new Date(),
-                }
-              });
-              console.log(`✅ Fournisseur CJ créé avec ID: ${cjSupplier.id}`);
-            }
 
             // Créer le produit KAMRI (comme les produits statiques)
             const productData: any = {
@@ -343,9 +331,93 @@ export class SuppliersService {
     console.log('✅ Fournisseur trouvé:', supplier.name);
 
     try {
-      // Utiliser les données stockées dans la base de données
+      // ✅ Vérifier si c'est un fournisseur CJ
+      if (supplier.name === 'CJ Dropshipping') {
+        console.log('🔄 Import depuis le MAGASIN CJ (CJProductStore)...');
+        
+        // ✅ Récupérer les produits du MAGASIN CJ (pas de l'API)
+        const cjStoreProducts = await this.prisma.cJProductStore.findMany({
+          where: { status: 'available' },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        console.log(`📦 ${cjStoreProducts.length} produits trouvés dans le magasin CJ`);
+        
+        if (cjStoreProducts.length === 0) {
+          return {
+            message: 'Aucun produit disponible dans le magasin CJ. Importez d\'abord des produits depuis /admin/cj-dropshipping/products',
+            products: [],
+            supplier: 'CJ Dropshipping',
+          };
+        }
+        
+        const importedProducts = [];
+        
+        for (const cjStoreProduct of cjStoreProducts) {
+          try {
+            console.log(`\n🔄 === TRAITEMENT PRODUIT MAGASIN ===`);
+            console.log(`📝 Nom: ${cjStoreProduct.name}`);
+            console.log(`🏷️ Catégorie: ${cjStoreProduct.category}`);
+            console.log(`💰 Prix: ${cjStoreProduct.price}`);
+            
+            // Mapper les catégories externes vers nos catégories
+            const categoryId = await this.mapExternalCategory(cjStoreProduct.category || '', 'cj-dropshipping');
+            console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
+            
+            // Créer le produit KAMRI
+            const productData: any = {
+              name: cjStoreProduct.name,
+              description: cjStoreProduct.description,
+              price: cjStoreProduct.price,
+              originalPrice: cjStoreProduct.originalPrice,
+              image: cjStoreProduct.image,
+              supplierId: supplier.id,
+              externalCategory: cjStoreProduct.category,
+              source: 'cj-dropshipping',
+              status: 'pending',
+              badge: this.generateBadge(),
+              stock: Math.floor(Math.random() * 50) + 10,
+            };
+
+            if (categoryId) {
+              productData.categoryId = categoryId;
+            }
+
+            const product = await this.prisma.product.create({
+              data: productData,
+              include: {
+                category: true,
+                supplier: true,
+              },
+            });
+
+            // Marquer le produit comme importé dans le magasin
+            await this.prisma.cJProductStore.update({
+              where: { id: cjStoreProduct.id },
+              data: { status: 'imported' }
+            });
+
+            console.log(`✅ Produit KAMRI créé: ${product.name}`);
+            importedProducts.push(product);
+          } catch (error) {
+            console.error(`❌ Erreur lors de la création du produit ${cjStoreProduct.name}:`, error);
+          }
+        }
+
+        console.log(`\n🎉 === IMPORT MAGASIN CJ TERMINÉ ===`);
+        console.log(`📊 Total produits importés: ${importedProducts.length}`);
+        console.log(`🏢 Fournisseur: CJ Dropshipping`);
+
+        return {
+          message: `${importedProducts.length} produits importés depuis le magasin CJ`,
+          products: importedProducts,
+          supplier: 'CJ Dropshipping',
+        };
+      }
+
+      // ✅ Pour les autres fournisseurs (Dummy, Fake Store, etc.)
       const apiUrl = supplier.apiUrl;
-      const apiName = supplier.name; // Ou un champ apiName si tu en ajoutes un
+      const apiName = supplier.name;
       
       console.log(`🔄 Début de l'import depuis ${apiName}...`);
       console.log(`🌐 URL: ${apiUrl}`);

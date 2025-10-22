@@ -97,6 +97,8 @@ export class CJAPIClient {
   private requestCount = 0;
   private rateLimitResetTime = 0;
   private config: CJConfig | null = null;
+  private requestQueue: Array<() => Promise<void>> = [];
+  private isProcessingQueue: boolean = false;
 
   constructor(
     private configService: ConfigService
@@ -195,18 +197,40 @@ export class CJAPIClient {
   }
 
   /**
+   * Gérer la queue des requêtes pour éviter les requêtes simultanées
+   */
+  private async processRequestQueue(): Promise<void> {
+    if (this.isProcessingQueue) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    while (this.requestQueue.length > 0) {
+      const request = this.requestQueue.shift();
+      if (request) {
+        await request();
+        // Attendre entre chaque requête
+        await new Promise(resolve => setTimeout(resolve, 1200));
+      }
+    }
+    
+    this.isProcessingQueue = false;
+  }
+
+  /**
    * Gérer le rate limiting selon le tier
    */
   private async handleRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
-    // Rate limits selon le tier - AUGMENTÉ pour éviter les erreurs
+    // Rate limits selon le tier - STRICT pour respecter l'API CJ
     const rateLimits = {
-      free: { requests: 1, window: 2000 }, // 1 req/2s pour être sûr
-      plus: { requests: 2, window: 2000 }, // 2 req/2s
-      prime: { requests: 4, window: 2000 }, // 4 req/2s
-      advanced: { requests: 6, window: 2000 }, // 6 req/2s
+      free: { requests: 1, window: 1500 }, // 1 req/1.5s pour être sûr
+      plus: { requests: 1, window: 1200 }, // 1 req/1.2s
+      prime: { requests: 1, window: 1000 }, // 1 req/1s
+      advanced: { requests: 1, window: 800 }, // 1 req/0.8s
     };
 
     const limit = rateLimits[this.config.tier || 'free'];
@@ -231,6 +255,11 @@ export class CJAPIClient {
   ): Promise<CJResponse<T>> {
     this.logger.log('🔍 === DÉBUT makeRequest ===');
     this.logger.log('📝 Paramètres:', { method, endpoint, hasData: !!data });
+    
+    // Attendre que la queue soit vide avant de faire une nouvelle requête
+    while (this.isProcessingQueue) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     
     // Gérer le rate limiting
     await this.handleRateLimit();
@@ -270,6 +299,11 @@ export class CJAPIClient {
         dataType: typeof response.data
       });
       this.logger.log('🔍 === FIN makeRequest ===');
+      
+      // ✅ PAUSE OBLIGATOIRE après chaque requête pour respecter le rate limit
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      this.logger.log('⏳ Pause de 1.2s respectée');
+      
       return response.data;
     } catch (error) {
       this.logger.error('❌ === ERREUR makeRequest ===');
