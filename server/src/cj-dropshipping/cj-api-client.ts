@@ -150,9 +150,13 @@ export class CJAPIClient {
       this.logger.log('Authentification avec CJ Dropshipping...');
       this.logger.log('Config:', JSON.stringify(this.config, null, 2));
       
-      const response = await this.axiosInstance.post('/authentication/getAccessToken', {
+      const response = await this.axiosInstance.post('/auth', {
         email: this.config!.email,
         apiKey: this.config!.apiKey,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        }
       });
 
       this.logger.log('Response:', JSON.stringify(response.data, null, 2));
@@ -179,7 +183,7 @@ export class CJAPIClient {
     try {
       this.logger.log('Rafraîchissement du token...');
       
-      const response = await this.axiosInstance.post('/user/refresh', {
+      const response = await this.axiosInstance.post('/authentication/refreshAccessToken', {
         refreshToken: this.refreshToken,
       });
 

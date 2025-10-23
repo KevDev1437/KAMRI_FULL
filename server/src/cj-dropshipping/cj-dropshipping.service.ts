@@ -22,27 +22,37 @@ export class CJDropshippingService {
    * Initialiser le client CJ avec la configuration
    */
   private async initializeClient(): Promise<CJAPIClient> {
-    if (this.cjClient && this.cjClient.isConnected()) {
-      return this.cjClient;
+    this.logger.log('🚀 Initialisation du client CJ...');
+    
+    // Vérifier si on a un token valide
+    const hasToken = this.cjApiClient['accessToken'];
+    const tokenExpiry = this.cjApiClient['tokenExpiry'];
+    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    
+    if (!isTokenValid) {
+      this.logger.log('🔑 Pas de token valide - Login CJ requis');
+      
+      const config = await this.getConfig();
+      if (!config.enabled) {
+        throw new BadRequestException('L\'intégration CJ Dropshipping est désactivée');
+      }
+
+      // Initialiser la configuration du client injecté
+      this.cjApiClient.setConfig({
+        email: config.email,
+        apiKey: config.apiKey,
+        tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
+        platformToken: config.platformToken,
+        debug: process.env.CJ_DEBUG === 'true',
+      });
+
+      await this.cjApiClient.login();
+      this.logger.log('✅ Login CJ réussi');
+    } else {
+      this.logger.log('✅ Token CJ déjà valide');
     }
-
-    const config = await this.getConfig();
-    if (!config.enabled) {
-      throw new BadRequestException('L\'intégration CJ Dropshipping est désactivée');
-    }
-
-    // Initialiser la configuration du client injecté
-    this.cjApiClient.setConfig({
-      email: config.email,
-      apiKey: config.apiKey,
-      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
-      platformToken: config.platformToken,
-      debug: process.env.CJ_DEBUG === 'true',
-    });
-
-    await this.cjApiClient.login();
-    this.cjClient = this.cjApiClient;
-    return this.cjClient;
+    
+    return this.cjApiClient;
   }
 
   /**
