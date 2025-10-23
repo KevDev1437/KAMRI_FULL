@@ -83,12 +83,53 @@ export default function StoresPage() {
       const data = await apiClient<Store[]>('/stores');
       console.log('📦 Données reçues du serveur (Magasins):', data);
 
+      let stores = [];
       if (Array.isArray(data)) {
-        setStores(data);
+        stores = data;
       } else {
         console.error('❌ Les données des magasins ne sont pas un tableau:', data);
-        setStores([]);
+        stores = [];
       }
+
+      // Vérifier si CJ est connecté et ajouter le magasin CJ automatiquement
+      try {
+        const cjStatus = await apiClient('/cj-dropshipping/config/status');
+        if (cjStatus.connected) {
+          // Récupérer les statistiques CJ
+          const cjStats = await apiClient('/cj-dropshipping/stats');
+          const cjProducts = await apiClient('/cj-dropshipping/products/imported');
+          
+          // Créer le magasin CJ automatiquement
+          const cjStore: Store = {
+            id: 'cj-dropshipping',
+            name: 'CJ Dropshipping',
+            description: 'Magasin CJ Dropshipping - Produits importés et disponibles',
+            type: 'cj-dropshipping',
+            status: 'active',
+            stats: {
+              total: cjProducts.length || 0,
+              available: cjProducts.filter((p: any) => p.status === 'available').length || 0,
+              imported: cjProducts.filter((p: any) => p.status === 'imported').length || 0,
+              selected: cjProducts.filter((p: any) => p.status === 'selected').length || 0,
+              pending: cjProducts.filter((p: any) => p.status === 'pending').length || 0,
+            },
+            lastSync: new Date().toISOString(),
+            config: {
+              email: cjStatus.email || '',
+              tier: cjStatus.tier || 'free',
+              enabled: cjStatus.connected || false,
+            }
+          };
+          
+          // Ajouter le magasin CJ en premier
+          stores.unshift(cjStore);
+          console.log('✅ Magasin CJ ajouté automatiquement:', cjStore);
+        }
+      } catch (cjError) {
+        console.log('ℹ️ CJ non connecté ou erreur:', cjError);
+      }
+
+      setStores(stores);
     } catch (error) {
       console.error('Erreur lors du chargement des magasins:', error);
       setStores([]);
@@ -100,8 +141,14 @@ export default function StoresPage() {
   // Récupérer les produits d'un magasin
   const fetchStoreProducts = useCallback(async (storeId: string) => {
     try {
-      if (storeId === 'cj-favorites') {
-        // Récupérer les produits CJ importés
+      if (storeId === 'cj-dropshipping') {
+        // Récupérer les produits CJ importés (magasin principal)
+        const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
+        console.log('📦 Données reçues du serveur (Magasin CJ):', data);
+        setProducts(Array.isArray(data) ? data : []);
+        setCategories([]);
+      } else if (storeId === 'cj-favorites') {
+        // Récupérer les produits CJ importés (favoris)
         const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
         console.log('📦 Données reçues du serveur (Favoris CJ):', data);
         setProducts(Array.isArray(data) ? data : []);
@@ -362,43 +409,6 @@ export default function StoresPage() {
               </Card>
             ))}
 
-            {/* Magasin Favoris CJ */}
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 border-purple-200">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl font-bold flex items-center text-purple-600">
-                    <StoreIcon className="mr-2 h-5 w-5" /> Favoris CJ Dropshipping
-                  </CardTitle>
-                  <Badge className="bg-purple-500">
-                    Favoris
-                  </Badge>
-                </div>
-                <CardDescription>
-                  Vos produits favoris importés depuis CJ Dropshipping
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center">
-                    <Package className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Produits importés
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Prêts à vendre
-                  </div>
-                  <div className="flex items-center col-span-2">
-                    <span className="mr-2 text-muted-foreground">Source:</span> CJ Dropshipping
-                  </div>
-                </div>
-                <Button 
-                  className="w-full mt-4 bg-purple-600 hover:bg-purple-700" 
-                  onClick={() => handleViewProducts('cj-favorites')}
-                >
-                  Voir mes favoris CJ
-                </Button>
-              </CardContent>
-            </Card>
 
             {Array.isArray(stores) && stores.length === 0 && (
               <div className="col-span-full text-center py-8">

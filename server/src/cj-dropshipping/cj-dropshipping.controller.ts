@@ -36,6 +36,29 @@ export class CJDropshippingController {
     return this.cjService.getConfig();
   }
 
+  @Get('config/status')
+  @ApiOperation({ summary: 'Obtenir le statut de connexion CJ' })
+  @ApiResponse({ status: 200, description: 'Statut de connexion récupéré' })
+  async getConnectionStatus() {
+    try {
+      const status = await this.cjService.getConnectionStatus();
+      return status;
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération statut: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      return {
+        connected: false,
+        tier: 'free',
+        lastSync: null,
+        apiLimits: {
+          qps: '1 req/s',
+          loginPer5min: 1,
+          refreshPerMin: 5
+        },
+        tips: ['CJ non configuré']
+      };
+    }
+  }
+
   @Put('config')
   @ApiOperation({ summary: 'Mettre à jour la configuration CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Configuration mise à jour avec succès' })
@@ -51,10 +74,11 @@ export class CJDropshippingController {
     return this.cjService.testConnection();
   }
 
+
   @Get('status')
   @ApiOperation({ summary: 'Obtenir le statut de connexion CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Statut récupéré avec succès' })
-  async getConnectionStatus() {
+  async getStatus() {
     return this.cjService.getConnectionStatus();
   }
 

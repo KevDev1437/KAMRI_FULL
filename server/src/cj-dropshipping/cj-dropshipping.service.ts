@@ -1038,12 +1038,17 @@ export class CJDropshippingService {
     try {
       this.logger.log('📦 Récupération des produits CJ importés...');
       
+      // Vérifier d'abord si la table existe et a des données
+      const tableExists = await this.prisma.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='CJProductStore'`;
+      this.logger.log('🔍 Tables disponibles:', tableExists);
+      
       // Récupérer les produits du magasin CJ
       const cjProducts = await this.prisma.cJProductStore.findMany({
         orderBy: { createdAt: 'desc' }
       });
       
       this.logger.log(`✅ ${cjProducts.length} produits CJ importés trouvés`);
+      this.logger.log('📋 Premiers produits:', cjProducts.slice(0, 3));
       
       // Transformer les données pour l'interface
       return cjProducts.map(product => ({
@@ -1061,6 +1066,7 @@ export class CJDropshippingService {
       }));
     } catch (error) {
       this.logger.error(`❌ Erreur récupération produits importés: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('🔍 Détails de l\'erreur:', error);
       return [];
     }
   }
