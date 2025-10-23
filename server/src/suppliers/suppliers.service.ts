@@ -97,10 +97,8 @@ export class SuppliersService {
       try {
         // Import du service CJ (éviter la dépendance circulaire)
         const { CJDropshippingService } = await import('../cj-dropshipping/cj-dropshipping.service');
-        const { CJAPIClient } = await import('../cj-dropshipping/cj-api-client');
-        const cjApiClient = new CJAPIClient({} as any);
-        const cjService = new CJDropshippingService(this.prisma, cjApiClient);
-        const result = await cjService.testConnection();
+        const cjService = new CJDropshippingService(this.prisma);
+        const result = await cjService.testCJConnection();
         
         return result;
       } catch (error) {

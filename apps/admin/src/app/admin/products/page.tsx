@@ -11,16 +11,13 @@ import {
     Eye,
     EyeOff,
     Filter,
+    Globe,
     MoreHorizontal,
     Package,
-    Plus,
     Search,
-    Trash2,
-    ExternalLink,
-    Download,
-    Globe
+    Trash2
 } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 
 interface Product {
   id: string
@@ -46,29 +43,6 @@ interface Supplier {
   name: string
 }
 
-interface CJProduct {
-  pid: string
-  productName: string
-  productNameEn: string
-  productSku: string
-  productImage: string
-  sellPrice: number
-  originalPrice: number
-  categoryName: string
-  variants: CJVariant[]
-  stock: number
-  deliveryTime: string
-  freeShipping: boolean
-}
-
-interface CJVariant {
-  variantId: string
-  variantSku: string
-  sellPrice: number
-  originalPrice: number
-  stock: number
-  variantName: string
-}
 
 // Fonction utilitaire pour nettoyer les URLs d'images
 const getCleanImageUrl = (image: string | string[] | undefined): string | null => {
@@ -104,18 +78,6 @@ export default function ProductsPage() {
   const [showLogin, setShowLogin] = useState(false)
   const { isAuthenticated } = useAuth()
 
-  // ✅ États pour la recherche CJ Dropshipping
-  const [activeTab, setActiveTab] = useState<'local' | 'cj'>('local')
-  const [cjProducts, setCJProducts] = useState<CJProduct[]>([])
-  const [cjCategories, setCJCategories] = useState<any[]>([])
-  const [cjSearchQuery, setCJSearchQuery] = useState('')
-  const [cjSelectedCategory, setCJSelectedCategory] = useState('Toutes')
-  const [cjMinPrice, setCJMinPrice] = useState<number>(0)
-  const [cjMaxPrice, setCJMaxPrice] = useState<number>(1000)
-  const [cjCountryCode, setCJCountryCode] = useState('US')
-  const [isCJLoading, setIsCJLoading] = useState(false)
-  const [cjPageNum, setCJPageNum] = useState(1)
-  const [cjTotal, setCJTotal] = useState(0)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -164,91 +126,6 @@ export default function ProductsPage() {
     }
   }
 
-  // ✅ Fonctions pour la recherche CJ Dropshipping
-  const loadCJCategories = async () => {
-    try {
-      const response = await apiClient.getCJCategories()
-      if (response.data) {
-        setCJCategories(response.data.data || [])
-      }
-    } catch (error) {
-      console.error('Erreur chargement catégories CJ:', error)
-    }
-  }
-
-  const searchCJProducts = async () => {
-    try {
-      setIsCJLoading(true)
-      const response = await apiClient.searchCJProducts({
-        productName: cjSearchQuery,
-        categoryId: cjSelectedCategory !== 'Toutes' ? cjSelectedCategory : undefined,
-        minPrice: cjMinPrice,
-        maxPrice: cjMaxPrice,
-        pageNum: cjPageNum,
-        pageSize: 50,
-        countryCode: cjCountryCode,
-        sort: 'DESC',
-        orderBy: 'listedNum'
-      })
-      
-      if (response.data) {
-        setCJProducts(response.data.data?.list || [])
-        setCJTotal(response.data.data?.total || 0)
-      }
-    } catch (error) {
-      console.error('Erreur recherche CJ:', error)
-    } finally {
-      setIsCJLoading(false)
-    }
-  }
-
-  const importCJProduct = async (cjProduct: CJProduct, variant: CJVariant) => {
-    try {
-      const response = await apiClient.importCJProduct({
-        pid: cjProduct.pid,
-        variantSku: variant.variantSku,
-        categoryId: categories[0]?.id, // Utiliser la première catégorie disponible
-        supplierId: suppliers.find(s => s.name === 'CJ Dropshipping')?.id || suppliers[0]?.id
-      })
-      
-      if (response.data?.success) {
-        alert('Produit importé avec succès !')
-        // Recharger les produits locaux
-        loadData()
-      } else {
-        alert('Erreur lors de l\'import: ' + (response.data?.error || 'Erreur inconnue'))
-      }
-    } catch (error) {
-      console.error('Erreur import produit CJ:', error)
-      alert('Erreur lors de l\'import du produit')
-    }
-  }
-
-  // Charger les catégories CJ quand on passe à l'onglet CJ
-  useEffect(() => {
-    if (activeTab === 'cj' && cjCategories.length === 0) {
-      loadCJCategories()
-    }
-  }, [activeTab])
-
-  // ✅ Debounce pour la recherche CJ en temps réel
-  const debouncedSearchCJ = useCallback(() => {
-    const timeoutId = setTimeout(() => {
-      if (cjSearchQuery.length > 2) {
-        searchCJProducts()
-      }
-    }, 500) // 500ms de délai
-
-    return () => clearTimeout(timeoutId)
-  }, [cjSearchQuery])
-
-  // Déclencher la recherche automatique quand la requête change
-  useEffect(() => {
-    if (activeTab === 'cj' && cjSearchQuery.length > 2) {
-      const cleanup = debouncedSearchCJ()
-      return cleanup
-    }
-  }, [cjSearchQuery, activeTab, debouncedSearchCJ])
 
   if (!isAuthenticated) {
     return (
@@ -335,251 +212,107 @@ export default function ProductsPage() {
   console.log('📂 [ADMIN-PRODUCTS] Catégories disponibles:', categories?.length || 0)
   console.log('📂 [ADMIN-PRODUCTS] Options de catégories:', categoryOptions)
 
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Produits</h1>
-          <p className="text-gray-600 mt-2">
-            {activeTab === 'local' ? 'Gérez vos produits importés' : 'Recherchez et importez depuis CJ Dropshipping'}
-          </p>
+              <p className="text-gray-600 mt-2">
+                Gérez vos produits importés
+              </p>
         </div>
-        {activeTab === 'local' && (
-          <Button 
-            className="kamri-button"
-            onClick={() => setActiveTab('cj')}
-          >
-            <Globe className="w-4 h-4 mr-2" />
-            Rechercher CJ
-          </Button>
-        )}
+        <Button 
+          className="kamri-button"
+          onClick={() => window.location.href = '/admin/cj-dropshipping/products'}
+        >
+          <Globe className="w-4 h-4 mr-2" />
+          Recherche CJ Avancée
+        </Button>
       </div>
 
-      {/* ✅ Onglets */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('local')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'local'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <Package className="w-4 h-4 inline mr-2" />
-          Mes Produits ({products.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('cj')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'cj'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <Globe className="w-4 h-4 inline mr-2" />
-          Recherche CJ ({cjTotal})
-        </button>
-      </div>
 
       {/* Filters */}
       <Card className="kamri-card">
         <CardContent className="p-6">
-          {activeTab === 'local' ? (
-            // ✅ Filtres pour les produits locaux
-            <div className="flex flex-col lg:flex-row gap-6 items-end">
-              {/* Search */}
-              <div className="flex-1">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Recherche</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher un produit..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Category Filter */}
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Catégorie</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    console.log('📂 [ADMIN-PRODUCTS] Catégorie sélectionnée:', e.target.value)
-                    setSelectedCategory(e.target.value)
-                  }}
-                  className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
-                >
-                  {categoryOptions.map(category => (
-                    <option key={category} value={category}>
-                      {category} {category !== 'Toutes' && `(${products.filter(p => p.category?.name === category).length})`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Supplier Filter */}
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Fournisseur</label>
-                <select
-                  value={selectedSupplier}
-                  onChange={(e) => setSelectedSupplier(e.target.value)}
-                  className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
-                >
-                  {supplierOptions.map(supplier => (
-                    <option key={supplier} value={supplier}>
-                      {supplier} {supplier !== 'Tous' && `(${products.filter(p => p.supplier?.name === supplier).length})`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="lg:hidden"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filtres
-              </Button>
-            </div>
-          ) : (
-            // ✅ Filtres pour la recherche CJ Dropshipping
-            <div className="flex flex-col lg:flex-row gap-6 items-end">
-              {/* Search CJ */}
-              <div className="flex-1">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Recherche CJ</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher dans le catalogue CJ... (recherche en temps réel)"
-                    value={cjSearchQuery}
-                    onChange={(e) => setCJSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                  {cjSearchQuery.length > 0 && cjSearchQuery.length <= 2 && (
-                    <p className="text-xs text-gray-500 mt-1">Tapez au moins 3 caractères pour rechercher</p>
-                  )}
-                </div>
-              </div>
-
-              {/* CJ Category Filter */}
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Catégorie CJ</label>
-                <select
-                  value={cjSelectedCategory}
-                  onChange={(e) => setCJSelectedCategory(e.target.value)}
-                  className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
-                >
-                  <option value="Toutes">Toutes les catégories</option>
-                  {cjCategories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Price Range */}
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[120px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Prix min</label>
+          <div className="flex flex-col lg:flex-row gap-6 items-end">
+            {/* Search */}
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Recherche</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  type="number"
-                  placeholder="0"
-                  value={cjMinPrice}
-                  onChange={(e) => setCJMinPrice(Number(e.target.value))}
-                  className="h-10"
+                  placeholder="Rechercher un produit..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
                 />
               </div>
-
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[120px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Prix max</label>
-                <Input
-                  type="number"
-                  placeholder="1000"
-                  value={cjMaxPrice}
-                  onChange={(e) => setCJMaxPrice(Number(e.target.value))}
-                  className="h-10"
-                />
-              </div>
-
-              {/* Country */}
-              <div className="flex flex-col w-full lg:w-auto lg:min-w-[120px]">
-                <label className="text-sm font-medium text-gray-700 mb-2">Pays</label>
-                <select
-                  value={cjCountryCode}
-                  onChange={(e) => setCJCountryCode(e.target.value)}
-                  className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
-                >
-                  <option value="US">🇺🇸 États-Unis</option>
-                  <option value="FR">🇫🇷 France</option>
-                  <option value="DE">🇩🇪 Allemagne</option>
-                  <option value="GB">🇬🇧 Royaume-Uni</option>
-                </select>
-              </div>
-
-              {/* Search Button */}
-              <Button
-                onClick={searchCJProducts}
-                disabled={isCJLoading}
-                className="kamri-button"
-              >
-                {isCJLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                ) : (
-                  <Search className="w-4 h-4 mr-2" />
-                )}
-                {isCJLoading ? 'Recherche...' : 'Rechercher'}
-              </Button>
             </div>
-          )}
+
+            {/* Category Filter */}
+            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
+              <label className="text-sm font-medium text-gray-700 mb-2">Catégorie</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  console.log('📂 [ADMIN-PRODUCTS] Catégorie sélectionnée:', e.target.value)
+                  setSelectedCategory(e.target.value)
+                }}
+                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
+              >
+                {categoryOptions.map(category => (
+                  <option key={category} value={category}>
+                    {category} {category !== 'Toutes' && `(${products.filter(p => p.category?.name === category).length})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Supplier Filter */}
+            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px]">
+              <label className="text-sm font-medium text-gray-700 mb-2">Fournisseur</label>
+              <select
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 h-10"
+              >
+                {supplierOptions.map(supplier => (
+                  <option key={supplier} value={supplier}>
+                    {supplier} {supplier !== 'Tous' && `(${products.filter(p => p.supplier?.name === supplier).length})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="lg:hidden"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filtres
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Results Info */}
       <div className="flex justify-between items-center text-sm text-gray-600">
         <div>
-          {activeTab === 'local' ? (
-            <>
-              {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
-              {selectedCategory !== 'Toutes' && ` dans la catégorie "${selectedCategory}"`}
-              {selectedSupplier !== 'Tous' && ` du fournisseur "${selectedSupplier}"`}
-            </>
-          ) : (
-            <>
-              {cjProducts.length} produit{cjProducts.length > 1 ? 's' : ''} CJ trouvé{cjProducts.length > 1 ? 's' : ''}
-              {cjSearchQuery && ` pour "${cjSearchQuery}"`}
-            </>
-          )}
+          {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
+          {selectedCategory !== 'Toutes' && ` dans la catégorie "${selectedCategory}"`}
+          {selectedSupplier !== 'Tous' && ` du fournisseur "${selectedSupplier}"`}
         </div>
         <div>
-          {activeTab === 'local' ? (
-            <>Total: {products.length} produit{products.length > 1 ? 's' : ''}</>
-          ) : (
-            <>Total CJ: {cjTotal} produit{cjTotal > 1 ? 's' : ''}</>
-          )}
+          Total: {products.length} produit{products.length > 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Loading State for CJ */}
-      {activeTab === 'cj' && isCJLoading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Recherche dans le catalogue CJ Dropshipping...</p>
-          </div>
-        </div>
-      )}
-
       {/* Products Grid */}
-      {!isCJLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {activeTab === 'local' ? (
-          // ✅ Affichage des produits locaux
-          filteredProducts.map((product) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredProducts.map((product) => (
           <Card key={product.id} className="kamri-card group">
             <CardContent className="p-0">
               {/* Product Image */}
@@ -670,126 +403,11 @@ export default function ProductsPage() {
               </div>
             </CardContent>
           </Card>
-        )) : (
-          // ✅ Affichage des produits CJ Dropshipping
-          cjProducts.map((cjProduct) => (
-            <Card key={cjProduct.pid} className="kamri-card group">
-              <CardContent className="p-0">
-                {/* CJ Product Image */}
-                <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                  {cjProduct.productImage ? (
-                    <img 
-                      src={cjProduct.productImage} 
-                      alt={cjProduct.productName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.log('❌ Erreur de chargement d\'image CJ:', e.currentTarget.src);
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <Package className={`h-12 w-12 text-gray-400 ${cjProduct.productImage ? 'hidden' : ''}`} />
-                  
-                  {/* CJ Badge */}
-                  <div className="absolute top-3 left-3 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
-                    CJ DROPSHIPPING
-                  </div>
-                </div>
-
-                {/* CJ Product Info */}
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-gray-900 line-clamp-2">{cjProduct.productNameEn || cjProduct.productName}</h3>
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Catégorie:</span>
-                      <span className="text-sm font-medium">{cjProduct.categoryName}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Stock:</span>
-                      <span className="text-sm font-medium">{cjProduct.stock}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Livraison:</span>
-                      <span className="text-sm font-medium">{cjProduct.deliveryTime}</span>
-                    </div>
-                    {cjProduct.freeShipping && (
-                      <div className="flex items-center justify-center">
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                          🚚 Livraison gratuite
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CJ Price */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <span className="text-lg font-bold text-primary-600">{cjProduct.sellPrice}€</span>
-                      {cjProduct.originalPrice && cjProduct.originalPrice !== cjProduct.sellPrice && (
-                        <span className="text-sm text-gray-400 line-through ml-2">{cjProduct.originalPrice}€</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CJ Variants */}
-                  {cjProduct.variants && cjProduct.variants.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-2">{cjProduct.variants.length} variante{cjProduct.variants.length > 1 ? 's' : ''}</p>
-                      <div className="max-h-20 overflow-y-auto">
-                        {cjProduct.variants.slice(0, 3).map((variant) => (
-                          <div key={variant.variantId} className="text-xs text-gray-600 mb-1">
-                            {variant.variantName}: {variant.sellPrice}€
-                          </div>
-                        ))}
-                        {cjProduct.variants.length > 3 && (
-                          <div className="text-xs text-gray-400">+{cjProduct.variants.length - 3} autres...</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CJ Actions */}
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => {
-                        if (cjProduct.variants && cjProduct.variants.length > 0) {
-                          // Si plusieurs variantes, importer la première
-                          importCJProduct(cjProduct, cjProduct.variants[0])
-                        } else {
-                          alert('Aucune variante disponible pour ce produit')
-                        }
-                      }}
-                    >
-                      <Download className="w-3 h-3 mr-1" />
-                      Importer
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => alert('Détails du produit - Fonctionnalité à venir')}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+        ))}
       </div>
 
       {/* Empty State */}
-      {activeTab === 'local' && filteredProducts.length === 0 && (
+      {filteredProducts.length === 0 && (
         <Card className="kamri-card">
           <CardContent className="text-center py-12">
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -797,27 +415,10 @@ export default function ProductsPage() {
             <p className="text-gray-500 mb-4">Essayez de modifier vos critères de recherche</p>
             <Button 
               className="kamri-button"
-              onClick={() => setActiveTab('cj')}
+              onClick={() => window.location.href = '/admin/cj-dropshipping/products'}
             >
               <Globe className="w-4 h-4 mr-2" />
-              Rechercher sur CJ
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === 'cj' && cjProducts.length === 0 && !isCJLoading && (
-        <Card className="kamri-card">
-          <CardContent className="text-center py-12">
-            <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Recherchez des produits CJ</h3>
-            <p className="text-gray-500 mb-4">Utilisez les filtres ci-dessus pour rechercher dans le catalogue CJ Dropshipping</p>
-            <Button 
-              className="kamri-button"
-              onClick={searchCJProducts}
-            >
-              <Search className="w-4 h-4 mr-2" />
-              Rechercher maintenant
+              Recherche CJ Avancée
             </Button>
           </CardContent>
         </Card>

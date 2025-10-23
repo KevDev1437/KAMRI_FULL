@@ -29,8 +29,10 @@ export default function CJDropshippingPage() {
         getConfig(),
         getStats(),
       ]);
-      setConfig(configData);
-      setStats(statsData);
+      console.log('🔧 [CJ-DASHBOARD] Config reçue:', configData);
+      console.log('📊 [CJ-DASHBOARD] Stats reçues:', statsData);
+      setConfig(configData.data || configData);
+      setStats(statsData.data || statsData);
     } catch (err) {
       console.error('Erreur lors du chargement des données:', err);
     }
@@ -88,13 +90,13 @@ export default function CJDropshippingPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Statut</p>
               <p className={`text-2xl font-bold ${
-                config?.connected ? 'text-green-600' : 'text-red-600'
+                stats?.status === 'connected' ? 'text-green-600' : 'text-red-600'
               }`}>
-                {config?.connected ? 'Connecté' : 'Déconnecté'}
+                {stats?.status === 'connected' ? 'Connecté' : 'Déconnecté'}
               </p>
             </div>
             <div className={`w-3 h-3 rounded-full ${
-              config?.connected ? 'bg-green-500' : 'bg-red-500'
+              stats?.status === 'connected' ? 'bg-green-500' : 'bg-red-500'
             }`}></div>
           </div>
         </Card>
@@ -103,7 +105,7 @@ export default function CJDropshippingPage() {
           <div>
             <p className="text-sm font-medium text-gray-600">Tier</p>
             <p className="text-2xl font-bold text-blue-600 capitalize">
-              {config?.tier || 'Non configuré'}
+              {stats?.tier === 'configured' ? 'Configuré' : 'Non configuré'}
             </p>
           </div>
         </Card>

@@ -1,15 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import { CJAPIClient } from './cj-api-client';
+import { PrismaModule } from '../prisma/prisma.module';
 import { CJDropshippingController } from './cj-dropshipping.controller';
 import { CJDropshippingService } from './cj-dropshipping.service';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [PrismaModule],
   controllers: [CJDropshippingController],
-  providers: [CJDropshippingService, CJAPIClient, PrismaService],
-  exports: [CJDropshippingService, CJAPIClient],
+  providers: [CJDropshippingService],
+  exports: [CJDropshippingService],
 })
 export class CJDropshippingModule {}
-
