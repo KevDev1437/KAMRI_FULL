@@ -136,15 +136,25 @@ export const useCJDropshipping = () => {
     }
   };
 
-  const testConnection = async (): Promise<boolean> => {
+  const testConnection = async (): Promise<{
+    success: boolean;
+    message: string;
+    categories?: any[];
+    products?: any[];
+    categoriesCount?: number;
+    productsCount?: number;
+  }> => {
     setLoading(true);
     setError(null);
     try {
       const { data } = await api.post('/config/test');
-      return data.success;
+      return data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erreur lors du test de connexion');
-      return false;
+      return {
+        success: false,
+        message: err.response?.data?.message || 'Erreur lors du test de connexion'
+      };
     } finally {
       setLoading(false);
     }

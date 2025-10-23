@@ -17,6 +17,7 @@ export default function CJProductsPage() {
     syncProducts,
     getCategories,
     syncCategories,
+    testConnection,
   } = useCJDropshipping();
 
   const [products, setProducts] = useState<CJProduct[]>([]);
@@ -39,47 +40,51 @@ export default function CJProductsPage() {
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Charger les catégories au montage du composant
+  // Charger les catégories et produits lors de la connexion
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadInitialData = async () => {
       setLoadingCategories(true);
-      try {
-        const categoriesData = await getCategories();
-        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-        console.log('Catégories chargées:', Array.isArray(categoriesData) ? categoriesData.length : 0);
-      } catch (error) {
-        console.error('Erreur lors du chargement des catégories:', error);
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
-
-  // Charger les produits par défaut au montage du composant
-  useEffect(() => {
-    const loadDefaultProducts = async () => {
       setLoadingDefault(true);
       try {
-        const defaultProducts = await getDefaultProducts({
-          pageNum: 1,
-          pageSize: 50, // Augmenter à 50 produits
-          countryCode: 'US'
-        });
-        setProducts(defaultProducts);
-        setCurrentPage(1); // Initialiser la page courante
-        setHasMoreProducts(defaultProducts.length === 50); // S'il y a 50 produits, il peut y en avoir plus
-        console.log('Produits par défaut chargés:', defaultProducts.length);
-      } catch (err) {
-        console.error('Erreur lors du chargement des produits par défaut:', err);
+        // Tester la connexion et charger les données simultanément
+        const connectionResult = await testConnection();
+        
+        if (connectionResult.success) {
+          // Utiliser les catégories et produits de la connexion
+          if (connectionResult.categories) {
+            setCategories(Array.isArray(connectionResult.categories) ? connectionResult.categories : []);
+            console.log('Catégories chargées via connexion:', connectionResult.categoriesCount);
+          }
+          
+          if (connectionResult.products) {
+            setProducts(Array.isArray(connectionResult.products) ? connectionResult.products : []);
+            console.log('Produits chargés via connexion:', connectionResult.productsCount);
+          }
+        } else {
+          // En cas d'échec, charger séparément (fallback)
+          console.log('Connexion échouée, chargement séparé...');
+          const categoriesData = await getCategories();
+          setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+          
+          const defaultProducts = await getDefaultProducts({
+            pageNum: 1,
+            pageSize: 50,
+            countryCode: 'US'
+          });
+          setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement initial:', error);
       } finally {
+        setLoadingCategories(false);
         setLoadingDefault(false);
       }
     };
 
-    loadDefaultProducts();
-  }, []); // Supprimer getDefaultProducts de la dépendance
+    loadInitialData();
+  }, []);
+
+  // L'ancien useEffect pour charger les produits par défaut est maintenant intégré dans loadInitialData
 
   const loadMoreProducts = async () => {
     if (loadingDefault || !hasMoreProducts) return;

@@ -128,21 +128,47 @@ export class CJDropshippingService {
   }
 
   /**
-   * Tester la connexion CJ
+   * Tester la connexion CJ et charger les données initiales
    */
-  async testConnection(): Promise<{ success: boolean; message: string }> {
+  async testConnection(): Promise<{ 
+    success: boolean; 
+    message: string; 
+    categories?: any[]; 
+    products?: any[];
+    categoriesCount?: number;
+    productsCount?: number;
+  }> {
     try {
+      this.logger.log('🚀 === DÉBUT CONNEXION ET CHARGEMENT SIMULTANÉ ===');
       this.logger.log('Initialisation du client CJ...');
       const client = await this.initializeClient();
-      this.logger.log('Client CJ initialisé, test de connexion...');
+      this.logger.log('✅ Client CJ initialisé');
       
-      // Tester avec une recherche simple de produits
-      const result = await client.searchProducts('test', { pageNum: 1, pageSize: 1 });
-      this.logger.log('Test de connexion CJ réussi');
-      return { success: true, message: 'Connexion CJ Dropshipping réussie' };
+      // Charger les catégories ET les produits en parallèle
+      this.logger.log('📡 Chargement simultané des catégories et produits...');
+      
+      const [categoriesResult, productsResult] = await Promise.allSettled([
+        client.getCategories(),
+        client.searchProducts('', { pageNum: 1, pageSize: 20 })
+      ]);
+      
+      const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
+      const productsData = productsResult.status === 'fulfilled' ? productsResult.value : { list: [] };
+      const products = Array.isArray(productsData) ? productsData : productsData.list || [];
+      
+      this.logger.log(`✅ Connexion réussie - ${categories.length} catégories, ${products.length} produits chargés`);
+      
+      return { 
+        success: true, 
+        message: `Connexion CJ Dropshipping réussie - ${categories.length} catégories et ${products.length} produits chargés`,
+        categories,
+        products,
+        categoriesCount: categories.length,
+        productsCount: products.length
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error('Test de connexion CJ échoué:', error);
+      this.logger.error('❌ Test de connexion CJ échoué:', error);
       return { 
         success: false, 
         message: `Connexion CJ Dropshipping échouée: ${errorMessage}` 
