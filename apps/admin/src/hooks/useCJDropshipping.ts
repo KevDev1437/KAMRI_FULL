@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useState } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface CJConfig {
   id: string;
@@ -79,7 +79,7 @@ export const useCJDropshipping = () => {
   const [error, setError] = useState<string | null>(null);
 
   const api = axios.create({
-    baseURL: `${API_URL}/api/cj-dropshipping`,
+    baseURL: `${API_URL}/cj-dropshipping`,
   });
 
   // Intercepteur pour ajouter le token à chaque requête
@@ -399,57 +399,48 @@ export const useCJDropshipping = () => {
     }
   };
 
-  // Fonction pour récupérer les catégories
+  // Fonction pour récupérer les catégories CJ Dropshipping
   const getCategories = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/cj-dropshipping/categories');
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des catégories');
-      }
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      const { data } = await api.get('/categories');
+      // Extraire le tableau categories de la réponse { success, categories, total, message }
+      return data.categories || data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération des catégories CJ');
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Fonction pour récupérer l'arbre des catégories
+  // Fonction pour récupérer l'arbre des catégories CJ Dropshipping
   const getCategoriesTree = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/cj-dropshipping/categories/tree');
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération de l\'arbre des catégories');
-      }
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      const { data } = await api.get('/categories/tree');
+      // Extraire le tableau tree de la réponse { success, tree, message }
+      return data.tree || data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération de l\'arbre des catégories CJ');
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Fonction pour synchroniser les catégories
+  // Fonction pour synchroniser les catégories CJ Dropshipping
   const syncCategories = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/cj-dropshipping/categories/sync');
-      if (!response.ok) {
-        throw new Error('Erreur lors de la synchronisation des catégories');
-      }
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      const { data } = await api.post('/categories/sync');
+      // Extraire le tableau categories de la réponse { success, categories, total, message }
+      return data.categories || data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la synchronisation des catégories CJ');
       throw err;
     } finally {
       setLoading(false);

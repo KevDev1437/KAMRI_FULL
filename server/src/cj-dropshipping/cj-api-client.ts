@@ -733,7 +733,7 @@ export class CJAPIClient {
     this.logger.log('🏷️ Récupération des catégories CJ...');
     
     try {
-      const response = await this.makeRequest('GET', '/product/category');
+      const response = await this.makeRequest('GET', '/product/getCategory');
       
       if (response.code === 200) {
         const categories = Array.isArray(response.data) ? response.data : [];
@@ -749,13 +749,14 @@ export class CJAPIClient {
   }
 
   /**
-   * Récupérer l'arbre des catégories
+   * Récupérer l'arbre des catégories (utilise le même endpoint que getCategories)
    */
   async getCategoriesTree(): Promise<any[]> {
     this.logger.log('🌳 Récupération de l\'arbre des catégories CJ...');
     
     try {
-      const response = await this.makeRequest('GET', '/product/category/tree');
+      // L'endpoint /product/getCategory retourne déjà la structure hiérarchique
+      const response = await this.makeRequest('GET', '/product/getCategory');
       
       if (response.code === 200) {
         const tree = Array.isArray(response.data) ? response.data : [];

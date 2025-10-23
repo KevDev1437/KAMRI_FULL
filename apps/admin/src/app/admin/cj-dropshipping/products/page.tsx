@@ -45,8 +45,8 @@ export default function CJProductsPage() {
       setLoadingCategories(true);
       try {
         const categoriesData = await getCategories();
-        setCategories(categoriesData);
-        console.log('Catégories chargées:', categoriesData.length);
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        console.log('Catégories chargées:', Array.isArray(categoriesData) ? categoriesData.length : 0);
       } catch (error) {
         console.error('Erreur lors du chargement des catégories:', error);
       } finally {
@@ -228,8 +228,8 @@ export default function CJProductsPage() {
             >
               <option value="">Toutes les catégories</option>
               {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name || category.nameEn}
+                <option key={category.categoryFirstId || category.id} value={category.categoryFirstId || category.id}>
+                  {category.categoryFirstName || category.name || category.nameEn}
                 </option>
               ))}
             </select>

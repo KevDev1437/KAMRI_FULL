@@ -1,14 +1,14 @@
 import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Logger,
-    Param,
-    Post,
-    Put,
-    Query
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
+  Query
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CJDropshippingService } from './cj-dropshipping.service';
@@ -65,36 +65,9 @@ export class CJDropshippingController {
     return { message: 'Test réussi', timestamp: new Date().toISOString() };
   }
 
-  @Get('categories')
-  @ApiOperation({ summary: 'Récupérer toutes les catégories CJ' })
-  @ApiResponse({ status: 200, description: 'Catégories récupérées avec succès' })
-  async getCategories() {
-    this.logger.log('🏷️ Récupération des catégories CJ');
-    // Retourner des catégories de test pour l'instant
-    return [
-      { id: '1', name: 'Électronique', nameEn: 'Electronics' },
-      { id: '2', name: 'Vêtements', nameEn: 'Clothing' },
-      { id: '3', name: 'Maison', nameEn: 'Home' },
-      { id: '4', name: 'Sport', nameEn: 'Sports' },
-      { id: '5', name: 'Beauté', nameEn: 'Beauty' }
-    ];
-  }
-
-  @Get('categories/tree')
-  @ApiOperation({ summary: 'Récupérer l\'arbre des catégories CJ' })
-  @ApiResponse({ status: 200, description: 'Arbre des catégories récupéré avec succès' })
-  async getCategoriesTree() {
-    this.logger.log('🌳 Récupération de l\'arbre des catégories CJ');
-    return this.cjService.getCategoriesTree();
-  }
-
-  @Get('categories/sync')
-  @ApiOperation({ summary: 'Synchroniser les catégories CJ avec la base de données' })
-  @ApiResponse({ status: 200, description: 'Catégories synchronisées avec succès' })
-  async syncCategories() {
-    this.logger.log('🔄 Synchronisation des catégories CJ');
-    return this.cjService.getCategories();
-  }
+  // ===== CATÉGORIES =====
+  // Les endpoints de catégories sont maintenant gérés par CJCategoriesController
+  // pour une meilleure séparation des responsabilités
 
   // ===== PRODUITS =====
 
