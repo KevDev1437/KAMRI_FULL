@@ -166,11 +166,16 @@ export default function StoresPage() {
   const fetchStoreProducts = useCallback(async (storeId: string) => {
     try {
        if (storeId === 'cj-dropshipping') {
-         // Récupérer les produits CJ importés (magasin principal) - ENDPOINT PRINCIPAL
-         const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
+         // Récupérer les produits CJ via l'endpoint des magasins (workflow original)
+         const params = new URLSearchParams();
+         if (searchTerm) params.append('search', searchTerm);
+         if (statusFilter !== 'all') params.append('status', statusFilter);
+         if (categoryFilter !== 'all') params.append('category', categoryFilter);
+         
+         const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
          console.log('📦 Données reçues du serveur (Magasin CJ):', data);
-         setProducts(Array.isArray(data) ? data : []);
-         setCategories([]);
+         setProducts(data.products || []);
+         setCategories(data.categories || []);
        } else if (storeId === 'cj-favorites') {
          // Récupérer les produits CJ favoris importés
          const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported-favorites');
