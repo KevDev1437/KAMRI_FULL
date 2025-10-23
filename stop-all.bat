@@ -52,3 +52,5 @@ echo    - Redémarrer votre ordinateur
 echo    - Utiliser le Gestionnaire des tâches
 echo.
 pause
+
+
