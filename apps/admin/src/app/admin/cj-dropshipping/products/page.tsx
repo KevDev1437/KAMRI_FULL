@@ -18,6 +18,7 @@ export default function CJProductsPage() {
     getCategories,
     syncCategories,
     testConnection,
+    syncFavorites,
   } = useCJDropshipping();
 
   const [products, setProducts] = useState<CJProduct[]>([]);
@@ -340,6 +341,34 @@ export default function CJProductsPage() {
             className="bg-orange-600 hover:bg-orange-700 text-white"
           >
             {loadingCategories ? 'Synchronisation...' : 'Synchroniser les catégories'}
+          </Button>
+
+          <Button
+            onClick={async () => {
+              try {
+                setSyncing(true);
+                const result = await syncFavorites();
+                alert(`✅ ${result.message}`);
+                if (result.synced > 0) {
+                  // Recharger les produits après synchronisation
+                  const defaultProducts = await getDefaultProducts({
+                    pageNum: 1,
+                    pageSize: 100,
+                    countryCode: 'US'
+                  });
+                  setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
+                }
+              } catch (error) {
+                alert('❌ Erreur lors de la synchronisation des favoris');
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+            variant="outline"
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {syncing ? 'Synchronisation...' : 'Synchroniser les favoris CJ'}
           </Button>
         </div>
       </Card>

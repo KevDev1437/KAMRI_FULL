@@ -248,6 +248,23 @@ export class CJDropshippingController {
     return this.cjService.getStats();
   }
 
+  @Post('sync-favorites')
+  @ApiOperation({ summary: 'Synchroniser les favoris CJ avec KAMRI' })
+  @ApiResponse({ status: 200, description: 'Favoris synchronisés avec succès' })
+  async syncFavorites() {
+    try {
+      const result = await this.cjService.syncFavorites();
+      return result;
+    } catch (error) {
+      this.logger.error(`❌ Erreur synchronisation favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      return {
+        success: false,
+        synced: 0,
+        message: `Erreur lors de la synchronisation des favoris: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
   @Get('stats/products')
   @ApiOperation({ summary: 'Statistiques des produits' })
   @ApiResponse({ status: 200, description: 'Statistiques produits' })

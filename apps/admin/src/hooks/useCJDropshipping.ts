@@ -457,6 +457,20 @@ export const useCJDropshipping = () => {
     }
   };
 
+  const syncFavorites = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.post('/sync-favorites');
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la synchronisation des favoris');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     error,
@@ -482,6 +496,7 @@ export const useCJDropshipping = () => {
     getCategories,
     getCategoriesTree,
     syncCategories,
+    syncFavorites,
   };
 };
 
