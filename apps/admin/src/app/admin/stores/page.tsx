@@ -83,7 +83,7 @@ export default function StoresPage() {
       const data = await apiClient<Store[]>('/stores');
       console.log('📦 Données reçues du serveur (Magasins):', data);
 
-      let stores = [];
+      let stores: Store[] = [];
       if (Array.isArray(data)) {
         stores = data;
       } else {
@@ -93,12 +93,12 @@ export default function StoresPage() {
 
        // Vérifier si CJ est connecté et ajouter les magasins CJ automatiquement
        try {
-         const cjStatus = await apiClient('/cj-dropshipping/config/status');
+         const cjStatus = await apiClient<any>('/cj-dropshipping/config/status');
          if (cjStatus.connected) {
            // Récupérer les statistiques CJ
            const cjStats = await apiClient('/cj-dropshipping/stats');
-           const cjProducts = await apiClient('/cj-dropshipping/products/imported');
-           const cjFavorites = await apiClient('/cj-dropshipping/products/imported-favorites');
+           const cjProducts = await apiClient<any[]>('/cj-dropshipping/products/imported');
+           const cjFavorites = await apiClient<any[]>('/cj-dropshipping/products/imported-favorites');
            
            // Créer le magasin CJ principal
            const cjStore: Store = {
