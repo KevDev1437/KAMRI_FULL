@@ -346,23 +346,6 @@ export class ApiClient {
     });
   }
 
-  async getCJProductDetails(pid: string) {
-    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}`);
-  }
-
-  async getCJCategories() {
-    return this.fetchWithAuth('/cj-dropshipping/categories');
-  }
-
-  async getCJDefaultProducts() {
-    return this.fetchWithAuth('/cj-dropshipping/products/default');
-  }
-
-  async importCJProduct(pid: string) {
-    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}/import`, {
-      method: 'POST',
-    });
-  }
 
   async getCJConfig() {
     return this.fetchWithAuth('/cj-dropshipping/config');

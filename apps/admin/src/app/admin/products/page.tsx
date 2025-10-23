@@ -7,20 +7,19 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 import {
-    Edit,
-    Eye,
-    EyeOff,
-    Filter,
-    MoreHorizontal,
-    Package,
-    Plus,
-    Search,
-    Trash2,
-    ExternalLink,
-    Download,
-    Globe
+  Download,
+  Edit,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Filter,
+  Globe,
+  MoreHorizontal,
+  Package,
+  Search,
+  Trash2
 } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface Product {
   id: string
@@ -73,7 +72,7 @@ interface CJVariant {
 // Fonction utilitaire pour nettoyer les URLs d'images
 const getCleanImageUrl = (image: string | string[] | undefined): string | null => {
   if (!image) return null;
-  
+
   if (typeof image === 'string') {
     // Si c'est une string, vérifier si c'est un JSON
     try {
@@ -88,7 +87,7 @@ const getCleanImageUrl = (image: string | string[] | undefined): string | null =
   } else if (Array.isArray(image) && image.length > 0) {
     return image[0];
   }
-  
+
   return null;
 };
 
@@ -128,7 +127,7 @@ export default function ProductsPage() {
   const loadData = async () => {
     try {
       setIsLoading(true)
-      
+
       // Charger les produits
       const productsResponse = await apiClient.getProducts()
       if (productsResponse.data) {
@@ -190,7 +189,7 @@ export default function ProductsPage() {
         sort: 'DESC',
         orderBy: 'listedNum'
       })
-      
+
       if (response.data) {
         setCJProducts(response.data.data?.list || [])
         setCJTotal(response.data.data?.total || 0)
@@ -210,7 +209,7 @@ export default function ProductsPage() {
         categoryId: categories[0]?.id, // Utiliser la première catégorie disponible
         supplierId: suppliers.find(s => s.name === 'CJ Dropshipping')?.id || suppliers[0]?.id
       })
-      
+
       if (response.data?.success) {
         alert('Produit importé avec succès !')
         // Recharger les produits locaux
@@ -250,6 +249,36 @@ export default function ProductsPage() {
     }
   }, [cjSearchQuery, activeTab, debouncedSearchCJ])
 
+  const getBadgeStyle = (badge: string | null) => {
+    switch (badge) {
+      case 'promo':
+        return 'badge-promo'
+      case 'top-ventes':
+        return 'badge-top-ventes'
+      case 'tendances':
+        return 'badge-tendances'
+      case 'nouveau':
+        return 'badge-nouveau'
+      default:
+        return 'hidden'
+    }
+  }
+
+  const getBadgeText = (badge: string | null) => {
+    switch (badge) {
+      case 'promo':
+        return 'PROMO'
+      case 'top-ventes':
+        return 'TOP VENTES'
+      case 'tendances':
+        return 'TENDANCES'
+      case 'nouveau':
+        return 'NOUVEAU'
+      default:
+        return ''
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <>
@@ -284,53 +313,23 @@ export default function ProductsPage() {
     )
   }
 
-  const getBadgeStyle = (badge: string | null) => {
-    switch (badge) {
-      case 'promo':
-        return 'badge-promo'
-      case 'top-ventes':
-        return 'badge-top-ventes'
-      case 'tendances':
-        return 'badge-tendances'
-      case 'nouveau':
-        return 'badge-nouveau'
-      default:
-        return 'hidden'
-    }
-  }
-
-  const getBadgeText = (badge: string | null) => {
-    switch (badge) {
-      case 'promo':
-        return 'PROMO'
-      case 'top-ventes':
-        return 'TOP VENTES'
-      case 'tendances':
-        return 'TENDANCES'
-      case 'nouveau':
-        return 'NOUVEAU'
-      default:
-        return ''
-    }
-  }
-
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategory === 'Toutes' || product.category?.name === selectedCategory
     const matchesSupplier = selectedSupplier === 'Tous' || product.supplier?.name === selectedSupplier
-    
+
     // Logs de debug pour le filtrage par catégorie
     if (selectedCategory !== 'Toutes') {
       console.log('🔍 [ADMIN-PRODUCTS] Filtrage par catégorie:', selectedCategory)
       console.log('🔍 [ADMIN-PRODUCTS] Produit:', product.name, 'Catégorie:', product.category?.name, 'Match:', matchesCategory)
     }
-    
+
     return matchesSearch && matchesCategory && matchesSupplier
   })
 
   const categoryOptions = ['Toutes', ...(categories || []).map(cat => cat.name)]
   const supplierOptions = ['Tous', ...(suppliers || []).map(sup => sup.name)]
-  
+
   // Logs de debug pour les catégories
   console.log('📂 [ADMIN-PRODUCTS] Catégories disponibles:', categories?.length || 0)
   console.log('📂 [ADMIN-PRODUCTS] Options de catégories:', categoryOptions)
@@ -346,7 +345,7 @@ export default function ProductsPage() {
           </p>
         </div>
         {activeTab === 'local' && (
-          <Button 
+          <Button
             className="kamri-button"
             onClick={() => setActiveTab('cj')}
           >
@@ -360,22 +359,20 @@ export default function ProductsPage() {
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
         <button
           onClick={() => setActiveTab('local')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'local'
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'local'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
-          }`}
+            }`}
         >
           <Package className="w-4 h-4 inline mr-2" />
           Mes Produits ({products.length})
         </button>
         <button
           onClick={() => setActiveTab('cj')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'cj'
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'cj'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
-          }`}
+            }`}
         >
           <Globe className="w-4 h-4 inline mr-2" />
           Recherche CJ ({cjTotal})
@@ -578,215 +575,216 @@ export default function ProductsPage() {
       {!isCJLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {activeTab === 'local' ? (
-          // ✅ Affichage des produits locaux
-          filteredProducts.map((product) => (
-          <Card key={product.id} className="kamri-card group">
-            <CardContent className="p-0">
-              {/* Product Image */}
-              <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                {(() => {
-                  const imageUrl = getCleanImageUrl(product.image);
-                  return imageUrl ? (
-                    <img 
-                      src={imageUrl} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.log('❌ Erreur de chargement d\'image:', e.currentTarget.src);
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null;
-                })()}
-                <Package className={`h-12 w-12 text-gray-400 ${getCleanImageUrl(product.image) ? 'hidden' : ''}`} />
-                
-                {/* Badge */}
-                {product.badge && (
-                  <div className={`absolute top-3 left-3 ${getBadgeStyle(product.badge)}`}>
-                    {getBadgeText(product.badge)}
-                  </div>
-                )}
+            // ✅ Affichage des produits locaux
+            filteredProducts.map((product) => (
+              <Card key={product.id} className="kamri-card group">
+                <CardContent className="p-0">
+                  {/* Product Image */}
+                  <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
+                    {(() => {
+                      const imageUrl = getCleanImageUrl(product.image);
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.log('❌ Erreur de chargement d\'image:', e.currentTarget.src);
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null;
+                    })()}
+                    <Package className={`h-12 w-12 text-gray-400 ${getCleanImageUrl(product.image) ? 'hidden' : ''}`} />
 
-                {/* Status Toggle */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-3 right-3 bg-white/90 hover:bg-white"
-                  onClick={() => alert(`Statut ${product.status === 'active' ? 'désactivé' : 'activé'}`)}
-                >
-                  {product.status === 'active' ? (
-                    <Eye className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  )}
-                </Button>
-              </div>
-
-              {/* Product Info */}
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
-                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Fournisseur:</span>
-                    <span className="text-sm font-medium">{product.supplier?.name || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Stock:</span>
-                    <span className="text-sm font-medium">{product.stock}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Ventes:</span>
-                    <span className="text-sm font-medium">{product.sales}</span>
-                  </div>
-                </div>
-
-                {/* Price */}
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <span className="text-lg font-bold text-primary-600">{product.price}€</span>
-                    {product.originalPrice && (
-                      <span className="text-sm text-gray-400 line-through ml-2">{product.originalPrice}€</span>
+                    {/* Badge */}
+                    {product.badge && (
+                      <div className={`absolute top-3 left-3 ${getBadgeStyle(product.badge)}`}>
+                        {getBadgeText(product.badge)}
+                      </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <Edit className="w-3 h-3 mr-1" />
-                    Modifier
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )) : (
-          // ✅ Affichage des produits CJ Dropshipping
-          cjProducts.map((cjProduct) => (
-            <Card key={cjProduct.pid} className="kamri-card group">
-              <CardContent className="p-0">
-                {/* CJ Product Image */}
-                <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                  {cjProduct.productImage ? (
-                    <img 
-                      src={cjProduct.productImage} 
-                      alt={cjProduct.productName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.log('❌ Erreur de chargement d\'image CJ:', e.currentTarget.src);
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <Package className={`h-12 w-12 text-gray-400 ${cjProduct.productImage ? 'hidden' : ''}`} />
-                  
-                  {/* CJ Badge */}
-                  <div className="absolute top-3 left-3 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
-                    CJ DROPSHIPPING
-                  </div>
-                </div>
-
-                {/* CJ Product Info */}
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-gray-900 line-clamp-2">{cjProduct.productNameEn || cjProduct.productName}</h3>
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ExternalLink className="h-4 w-4" />
+                    {/* Status Toggle */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-3 right-3 bg-white/90 hover:bg-white"
+                      onClick={() => alert(`Statut ${product.status === 'active' ? 'désactivé' : 'activé'}`)}
+                    >
+                      {product.status === 'active' ? (
+                        <Eye className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      )}
                     </Button>
                   </div>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Catégorie:</span>
-                      <span className="text-sm font-medium">{cjProduct.categoryName}</span>
+                  {/* Product Info */}
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Stock:</span>
-                      <span className="text-sm font-medium">{cjProduct.stock}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Livraison:</span>
-                      <span className="text-sm font-medium">{cjProduct.deliveryTime}</span>
-                    </div>
-                    {cjProduct.freeShipping && (
-                      <div className="flex items-center justify-center">
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                          🚚 Livraison gratuite
-                        </span>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">Fournisseur:</span>
+                        <span className="text-sm font-medium">{product.supplier?.name || 'N/A'}</span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* CJ Price */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <span className="text-lg font-bold text-primary-600">{cjProduct.sellPrice}€</span>
-                      {cjProduct.originalPrice && cjProduct.originalPrice !== cjProduct.sellPrice && (
-                        <span className="text-sm text-gray-400 line-through ml-2">{cjProduct.originalPrice}€</span>
-                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">Stock:</span>
+                        <span className="text-sm font-medium">{product.stock}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">Ventes:</span>
+                        <span className="text-sm font-medium">{product.sales}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* CJ Variants */}
-                  {cjProduct.variants && cjProduct.variants.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-2">{cjProduct.variants.length} variante{cjProduct.variants.length > 1 ? 's' : ''}</p>
-                      <div className="max-h-20 overflow-y-auto">
-                        {cjProduct.variants.slice(0, 3).map((variant) => (
-                          <div key={variant.variantId} className="text-xs text-gray-600 mb-1">
-                            {variant.variantName}: {variant.sellPrice}€
-                          </div>
-                        ))}
-                        {cjProduct.variants.length > 3 && (
-                          <div className="text-xs text-gray-400">+{cjProduct.variants.length - 3} autres...</div>
+                    {/* Price */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <span className="text-lg font-bold text-primary-600">{product.price}€</span>
+                        {product.originalPrice && (
+                          <span className="text-sm text-gray-400 line-through ml-2">{product.originalPrice}€</span>
                         )}
                       </div>
                     </div>
-                  )}
 
-                  {/* CJ Actions */}
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => {
-                        if (cjProduct.variants && cjProduct.variants.length > 0) {
-                          // Si plusieurs variantes, importer la première
-                          importCJProduct(cjProduct, cjProduct.variants[0])
-                        } else {
-                          alert('Aucune variante disponible pour ce produit')
-                        }
-                      }}
-                    >
-                      <Download className="w-3 h-3 mr-1" />
-                      Importer
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => alert('Détails du produit - Fonctionnalité à venir')}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
+                    {/* Actions */}
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Edit className="w-3 h-3 mr-1" />
+                        Modifier
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            cjProducts.map((cjProduct) => (
+                <Card key={cjProduct.pid} className="kamri-card group">
+                  <CardContent className="p-0">
+                    {/* CJ Product Image */}
+                    <div className="h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
+                      {cjProduct.productImage ? (
+                        <img
+                          src={cjProduct.productImage}
+                          alt={cjProduct.productName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.log('❌ Erreur de chargement d\'image CJ:', e.currentTarget.src);
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <Package className={`h-12 w-12 text-gray-400 ${cjProduct.productImage ? 'hidden' : ''}`} />
+
+                      {/* CJ Badge */}
+                      <div className="absolute top-3 left-3 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+                        CJ DROPSHIPPING
+                      </div>
+                    </div>
+
+                    {/* CJ Product Info */}
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 line-clamp-2">{cjProduct.productNameEn || cjProduct.productName}</h3>
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">Catégorie:</span>
+                          <span className="text-sm font-medium">{cjProduct.categoryName}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">Stock:</span>
+                          <span className="text-sm font-medium">{cjProduct.stock}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">Livraison:</span>
+                          <span className="text-sm font-medium">{cjProduct.deliveryTime}</span>
+                        </div>
+                        {cjProduct.freeShipping && (
+                          <div className="flex items-center justify-center">
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                              🚚 Livraison gratuite
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CJ Price */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <span className="text-lg font-bold text-primary-600">{cjProduct.sellPrice}€</span>
+                          {cjProduct.originalPrice && cjProduct.originalPrice !== cjProduct.sellPrice && (
+                            <span className="text-sm text-gray-400 line-through ml-2">{cjProduct.originalPrice}€</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* CJ Variants */}
+                      {cjProduct.variants && cjProduct.variants.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs text-gray-500 mb-2">{cjProduct.variants.length} variante{cjProduct.variants.length > 1 ? 's' : ''}</p>
+                          <div className="max-h-20 overflow-y-auto">
+                            {cjProduct.variants.slice(0, 3).map((variant) => (
+                              <div key={variant.variantId} className="text-xs text-gray-600 mb-1">
+                                {variant.variantName}: {variant.sellPrice}€
+                              </div>
+                            ))}
+                            {cjProduct.variants.length > 3 && (
+                              <div className="text-xs text-gray-400">+{cjProduct.variants.length - 3} autres...</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CJ Actions */}
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            if (cjProduct.variants && cjProduct.variants.length > 0) {
+                              // Si plusieurs variantes, importer la première
+                              importCJProduct(cjProduct, cjProduct.variants[0])
+                            } else {
+                              alert('Aucune variante disponible pour ce produit')
+                            }
+                          }}
+                        >
+                          <Download className="w-3 h-3 mr-1" />
+                          Importer
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => alert('Détails du produit - Fonctionnalité à venir')}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+        </div>
+      )}
 
       {/* Empty State */}
       {activeTab === 'local' && filteredProducts.length === 0 && (
@@ -795,7 +793,7 @@ export default function ProductsPage() {
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun produit trouvé</h3>
             <p className="text-gray-500 mb-4">Essayez de modifier vos critères de recherche</p>
-            <Button 
+            <Button
               className="kamri-button"
               onClick={() => setActiveTab('cj')}
             >
@@ -812,7 +810,7 @@ export default function ProductsPage() {
             <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Recherchez des produits CJ</h3>
             <p className="text-gray-500 mb-4">Utilisez les filtres ci-dessus pour rechercher dans le catalogue CJ Dropshipping</p>
-            <Button 
+            <Button
               className="kamri-button"
               onClick={searchCJProducts}
             >

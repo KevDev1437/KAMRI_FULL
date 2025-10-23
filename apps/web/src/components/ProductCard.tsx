@@ -54,7 +54,12 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   
   // Utilisation des couleurs d'étiquettes cohérentes
-  const badgeConfig = getBadgeConfig(product.badge as any);
+  const badgeConfig = getBadgeConfig(product.badge as any) || {
+    backgroundColor: '#6B7280',
+    color: '#FFFFFF',
+    icon: '🏷️',
+    text: 'BADGE'
+  };
   
   // Calcul du pourcentage de réduction pour les promos
   const discountPercentage = product.originalPrice 

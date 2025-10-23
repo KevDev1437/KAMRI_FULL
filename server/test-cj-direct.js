@@ -6,8 +6,8 @@ async function testCJDirect() {
   try {
     // Test direct de l'API CJ avec l'endpoint d'authentification
     const authResponse = await axios.post('https://developers.cjdropshipping.cn/api2.0/v1/auth', {
-      email: 'kamridev2.0@gmail.com',
-      apiKey: 'd86440263e26415f8dad82f0829f3a7d'
+      email: 'projectskevin834@gmail.com',
+      apiKey: '158334f3282c4e3f9b077193903daeca'
     }, {
       headers: {
         'Content-Type': 'application/json',
