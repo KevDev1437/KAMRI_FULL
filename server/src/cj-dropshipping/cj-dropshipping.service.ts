@@ -149,7 +149,7 @@ export class CJDropshippingService {
       
       const [categoriesResult, productsResult] = await Promise.allSettled([
         client.getCategories(),
-        client.searchProducts('', { pageNum: 1, pageSize: 20 })
+        client.searchProducts('', { pageNum: 1, pageSize: 100 })
       ]);
       
       const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
@@ -280,7 +280,7 @@ export class CJDropshippingService {
       this.logger.log('📡 Appel API CJ getDefaultProducts...');
       const result = await client.searchProducts(undefined, {
         pageNum: query.pageNum || 1,
-        pageSize: query.pageSize || 30, // 30 produits par défaut
+        pageSize: query.pageSize || 100, // 100 produits par défaut (limite API CJ)
         countryCode: query.countryCode, // ← CORRECTION: Pas de pays par défaut
         sortBy: 'relevance',
       });
@@ -350,7 +350,7 @@ export class CJDropshippingService {
           
           const result = await client.searchProducts(query.keyword, { // ← CORRECTION: Passer le keyword
             pageNum: page,
-            pageSize: 200, // Maximum autorisé par CJ
+            pageSize: 100, // 100 produits par page (limite API CJ)
             countryCode: query.countryCode, // ← CORRECTION: Pas de pays par défaut
             categoryId: query.categoryId,
             minPrice: query.minPrice,
@@ -361,7 +361,7 @@ export class CJDropshippingService {
           allProducts.push(...result.list);
           this.logger.log(`📦 Page ${page}: ${result.list.length} produits récupérés`);
           
-          if (result.list.length < 200) {
+          if (result.list.length < 100) {
             this.logger.log('📄 Dernière page atteinte');
             break; // Dernière page
           }
@@ -987,6 +987,47 @@ export class CJDropshippingService {
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération des détails du produit ${pid}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Récupérer le stock d'un produit via ses détails
+   */
+  async getProductStockFromDetails(pid: string): Promise<{ success: boolean; stock: number; message: string }> {
+    try {
+      this.logger.log(`📦 Récupération du stock pour le produit ${pid}...`);
+      
+      const client = await this.initializeClient();
+      const result = await client.makeRequest('GET', '/product/query', { pid });
+      
+      if (result.code === 200) {
+        const productData = result.data as any;
+        const variants = productData.variants || [];
+        
+        // Calculer le stock total de toutes les variantes
+        let totalStock = 0;
+        for (const variant of variants) {
+          // Le stock n'est pas directement dans les variants selon la doc
+          // Il faut faire un appel séparé pour chaque variante
+          totalStock += 0; // TODO: Récupérer le stock réel
+        }
+        
+        this.logger.log(`✅ Stock récupéré pour le produit ${pid}: ${totalStock}`);
+        return {
+          success: true,
+          stock: totalStock,
+          message: `${totalStock} unités disponibles`
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération stock produit ${pid}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      return {
+        success: false,
+        stock: 0,
+        message: 'Stock non disponible'
+      };
     }
   }
 

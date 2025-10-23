@@ -25,7 +25,7 @@ export default function CJProductsPage() {
   const [filters, setFilters] = useState<CJProductSearchFilters>({
     keyword: '',
     pageNum: 1,
-    pageSize: 50, // Augmenter le nombre de produits par page
+    pageSize: 100, // 100 produits par page (limite API CJ)
     minPrice: undefined,
     maxPrice: undefined,
     countryCode: 'US',
@@ -374,7 +374,21 @@ export default function CJProductsPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Prix</span>
                       <span className="font-bold text-green-600">
-                        ${isNaN(parseFloat(product.sellPrice)) ? '0.00' : parseFloat(product.sellPrice).toFixed(2)}
+                        ${(() => {
+                          // sellPrice est une string selon la doc CJ
+                          const priceStr = product.sellPrice;
+                          if (!priceStr) return '0.00';
+                          
+                          // Gérer les plages de prix (ex: "11.00 -- 11.87")
+                          if (priceStr.includes('--')) {
+                            const [minPrice] = priceStr.split('--').map(p => parseFloat(p.trim()));
+                            return isNaN(minPrice) ? '0.00' : minPrice.toFixed(2);
+                          }
+                          
+                          // Prix simple
+                          const price = parseFloat(priceStr);
+                          return isNaN(price) ? '0.00' : price.toFixed(2);
+                        })()}
                       </span>
                     </div>
                     
@@ -386,7 +400,10 @@ export default function CJProductsPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Stock</span>
                       <span className="text-sm">
-                        {product.variants?.[0]?.stock || 0} unités
+                        {(() => {
+                          // Le stock n'est disponible qu'après import selon l'API CJ
+                          return 'Stock après import';
+                        })()}
                       </span>
                     </div>
                     
