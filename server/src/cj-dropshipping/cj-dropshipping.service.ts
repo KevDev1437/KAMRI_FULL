@@ -1034,33 +1034,36 @@ export class CJDropshippingService {
   /**
    * Récupérer les produits CJ importés dans KAMRI
    */
-  async getImportedProducts(): Promise<any[]> {
+  async getImportedProducts(filters?: { isFavorite?: boolean }): Promise<any[]> {
     try {
       this.logger.log('📦 Récupération des produits CJ importés...');
       
-      // Vérifier d'abord si la table existe et a des données
-      const tableExists = await this.prisma.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='CJProductStore'`;
-      this.logger.log('🔍 Tables disponibles:', tableExists);
+      // Construire la clause WHERE si des filtres sont fournis
+      const whereClause: any = {};
+      if (filters?.isFavorite !== undefined) {
+        whereClause.isFavorite = filters.isFavorite;
+      }
       
-      // Récupérer les produits du magasin CJ
+      // Récupérer tous les produits du magasin CJ
       const cjProducts = await this.prisma.cJProductStore.findMany({
+        where: whereClause,
         orderBy: { createdAt: 'desc' }
       });
       
       this.logger.log(`✅ ${cjProducts.length} produits CJ importés trouvés`);
-      this.logger.log('📋 Premiers produits:', cjProducts.slice(0, 3));
       
-      // Transformer les données pour l'interface
+      // Transformer les données pour l'interface (format compatible avec StoreProduct)
       return cjProducts.map(product => ({
         id: product.id,
-        cjProductId: product.cjProductId,
         name: product.name,
-        description: product.description,
+        description: product.description || '',
         price: product.price,
         originalPrice: product.originalPrice,
         image: product.image,
         category: product.category,
         status: product.status,
+        isFavorite: product.isFavorite || false,
+        cjProductId: product.cjProductId,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt
       }));
@@ -1074,7 +1077,7 @@ export class CJDropshippingService {
   /**
    * Importer un produit CJ vers KAMRI
    */
-  async importProduct(pid: string, categoryId?: string, margin: number = 2.5): Promise<any> {
+  async importProduct(pid: string, categoryId?: string, margin: number = 2.5, isFavorite: boolean = false): Promise<any> {
     this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
     this.logger.log('📝 Paramètres:', { pid, categoryId, margin });
     
@@ -1108,6 +1111,7 @@ export class CJDropshippingService {
             image: cjProduct.productImage,
             category: cjProduct.categoryName,
             status: 'available', // Remettre en disponible si déjà importé
+            isFavorite: isFavorite, // Marquer comme favori si spécifié
           },
           create: {
             cjProductId: pid,
@@ -1118,6 +1122,7 @@ export class CJDropshippingService {
             image: cjProduct.productImage,
             category: cjProduct.categoryName,
             status: 'available',
+            isFavorite: isFavorite, // Marquer comme favori si spécifié
           },
         });
 
@@ -1253,10 +1258,10 @@ export class CJDropshippingService {
       let synced = 0;
       const errors = [];
 
-      // Importer chaque favori vers KAMRI
+      // Importer chaque favori vers KAMRI (marquer comme favori)
       for (const favorite of favorites.products) {
         try {
-          await this.importProduct(favorite.productId);
+          await this.importProduct(favorite.productId, undefined, 2.5, true); // isFavorite = true
           synced++;
           this.logger.log(`✅ Favori importé: ${favorite.nameEn}`);
         } catch (error) {

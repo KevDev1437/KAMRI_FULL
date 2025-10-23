@@ -91,43 +91,67 @@ export default function StoresPage() {
         stores = [];
       }
 
-      // Vérifier si CJ est connecté et ajouter le magasin CJ automatiquement
-      try {
-        const cjStatus = await apiClient('/cj-dropshipping/config/status');
-        if (cjStatus.connected) {
-          // Récupérer les statistiques CJ
-          const cjStats = await apiClient('/cj-dropshipping/stats');
-          const cjProducts = await apiClient('/cj-dropshipping/products/imported');
-          
-          // Créer le magasin CJ automatiquement
-          const cjStore: Store = {
-            id: 'cj-dropshipping',
-            name: 'CJ Dropshipping',
-            description: 'Magasin CJ Dropshipping - Produits importés et disponibles',
-            type: 'cj-dropshipping',
-            status: 'active',
-            stats: {
-              total: cjProducts.length || 0,
-              available: cjProducts.filter((p: any) => p.status === 'available').length || 0,
-              imported: cjProducts.filter((p: any) => p.status === 'imported').length || 0,
-              selected: cjProducts.filter((p: any) => p.status === 'selected').length || 0,
-              pending: cjProducts.filter((p: any) => p.status === 'pending').length || 0,
-            },
-            lastSync: new Date().toISOString(),
-            config: {
-              email: cjStatus.email || '',
-              tier: cjStatus.tier || 'free',
-              enabled: cjStatus.connected || false,
-            }
-          };
-          
-          // Ajouter le magasin CJ en premier
-          stores.unshift(cjStore);
-          console.log('✅ Magasin CJ ajouté automatiquement:', cjStore);
-        }
-      } catch (cjError) {
-        console.log('ℹ️ CJ non connecté ou erreur:', cjError);
-      }
+       // Vérifier si CJ est connecté et ajouter les magasins CJ automatiquement
+       try {
+         const cjStatus = await apiClient('/cj-dropshipping/config/status');
+         if (cjStatus.connected) {
+           // Récupérer les statistiques CJ
+           const cjStats = await apiClient('/cj-dropshipping/stats');
+           const cjProducts = await apiClient('/cj-dropshipping/products/imported');
+           const cjFavorites = await apiClient('/cj-dropshipping/products/imported-favorites');
+           
+           // Créer le magasin CJ principal
+           const cjStore: Store = {
+             id: 'cj-dropshipping',
+             name: 'CJ Dropshipping',
+             description: 'Magasin CJ Dropshipping - Produits importés et disponibles',
+             type: 'cj-dropshipping',
+             status: 'active',
+             stats: {
+               total: cjProducts.length || 0,
+               available: cjProducts.filter((p: any) => p.status === 'available').length || 0,
+               imported: cjProducts.filter((p: any) => p.status === 'imported').length || 0,
+               selected: cjProducts.filter((p: any) => p.status === 'selected').length || 0,
+               pending: cjProducts.filter((p: any) => p.status === 'pending').length || 0,
+             },
+             lastSync: new Date().toISOString(),
+             config: {
+               email: cjStatus.email || '',
+               tier: cjStatus.tier || 'free',
+               enabled: cjStatus.connected || false,
+             }
+           };
+           
+           // Créer le magasin Favoris CJ
+           const cjFavoritesStore: Store = {
+             id: 'cj-favorites',
+             name: 'Favoris CJ Dropshipping',
+             description: 'Produits favoris CJ Dropshipping - Synchronisés depuis votre compte',
+             type: 'cj-favorites',
+             status: 'active',
+             stats: {
+               total: cjFavorites.length || 0,
+               available: cjFavorites.filter((p: any) => p.status === 'available').length || 0,
+               imported: cjFavorites.filter((p: any) => p.status === 'imported').length || 0,
+               selected: cjFavorites.filter((p: any) => p.status === 'selected').length || 0,
+               pending: cjFavorites.filter((p: any) => p.status === 'pending').length || 0,
+             },
+             lastSync: new Date().toISOString(),
+             config: {
+               email: cjStatus.email || '',
+               tier: cjStatus.tier || 'free',
+               enabled: cjStatus.connected || false,
+             }
+           };
+           
+           // Ajouter les magasins CJ en premier
+           stores.unshift(cjFavoritesStore); // Favoris en premier
+           stores.unshift(cjStore); // Principal en second
+           console.log('✅ Magasins CJ ajoutés automatiquement:', { cjStore, cjFavoritesStore });
+         }
+       } catch (cjError) {
+         console.log('ℹ️ CJ non connecté ou erreur:', cjError);
+       }
 
       setStores(stores);
     } catch (error) {
@@ -141,18 +165,18 @@ export default function StoresPage() {
   // Récupérer les produits d'un magasin
   const fetchStoreProducts = useCallback(async (storeId: string) => {
     try {
-      if (storeId === 'cj-dropshipping') {
-        // Récupérer les produits CJ importés (magasin principal)
-        const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
-        console.log('📦 Données reçues du serveur (Magasin CJ):', data);
-        setProducts(Array.isArray(data) ? data : []);
-        setCategories([]);
-      } else if (storeId === 'cj-favorites') {
-        // Récupérer les produits CJ importés (favoris)
-        const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
-        console.log('📦 Données reçues du serveur (Favoris CJ):', data);
-        setProducts(Array.isArray(data) ? data : []);
-        setCategories([]);
+       if (storeId === 'cj-dropshipping') {
+         // Récupérer les produits CJ importés (magasin principal) - ENDPOINT PRINCIPAL
+         const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
+         console.log('📦 Données reçues du serveur (Magasin CJ):', data);
+         setProducts(Array.isArray(data) ? data : []);
+         setCategories([]);
+       } else if (storeId === 'cj-favorites') {
+         // Récupérer les produits CJ favoris importés
+         const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported-favorites');
+         console.log('📦 Données reçues du serveur (Favoris CJ):', data);
+         setProducts(Array.isArray(data) ? data : []);
+         setCategories([]);
       } else {
         const params = new URLSearchParams();
         if (searchTerm) params.append('search', searchTerm);

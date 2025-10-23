@@ -318,6 +318,7 @@ model CJProductStore {
   image         String?
   category      String?
   status        String   @default("available") // available, selected, imported
+  isFavorite    Boolean  @default(false) // Marquer comme favori CJ
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CJDropshippingService } from './cj-dropshipping.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UpdateCJConfigDto } from './dto/cj-config.dto';
 import { CJOrderCreateDto } from './dto/cj-order-create.dto';
 import { CJProductSearchDto } from './dto/cj-product-search.dto';
@@ -25,7 +26,10 @@ import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 export class CJDropshippingController {
   private readonly logger = new Logger(CJDropshippingController.name);
   
-  constructor(private readonly cjService: CJDropshippingService) {}
+  constructor(
+    private readonly cjService: CJDropshippingService,
+    private readonly prisma: PrismaService
+  ) {}
 
   // ===== CONFIGURATION =====
 
@@ -87,6 +91,82 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Test réussi' })
   async test() {
     return { message: 'Test réussi', timestamp: new Date().toISOString() };
+  }
+
+  @Get('products/test')
+  @ApiOperation({ summary: 'Test direct des produits CJ' })
+  @ApiResponse({ status: 200, description: 'Test des produits' })
+  async testProducts() {
+    try {
+      this.logger.log('🔍 Test direct des produits CJ...');
+      
+      // Récupérer TOUS les produits (pas seulement 5)
+      const products = await this.cjService['prisma'].cJProductStore.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      this.logger.log(`✅ ${products.length} produits trouvés en test direct`);
+      
+      return {
+        success: true,
+        count: products.length,
+        products: products.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description || '',
+          price: p.price,
+          originalPrice: p.originalPrice,
+          image: p.image,
+          category: p.category,
+          status: p.status,
+          isFavorite: p.isFavorite || false,
+          cjProductId: p.cjProductId,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt
+        }))
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erreur test produits: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  @Get('products/imported-working')
+  @ApiOperation({ summary: 'Récupérer les produits CJ importés (version fonctionnelle)' })
+  @ApiResponse({ status: 200, description: 'Produits importés récupérés' })
+  async getImportedProductsWorking() {
+    try {
+      this.logger.log('🔍 ENDPOINT PRINCIPAL FONCTIONNEL - Récupération des produits CJ...');
+      
+      // Utiliser la même logique que l'endpoint de test qui fonctionne
+      const products = await this.cjService['prisma'].cJProductStore.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      this.logger.log(`✅ ${products.length} produits CJ récupérés avec succès`);
+      
+      // Retourner directement les produits (pas dans un objet wrapper)
+      return products.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+        category: product.category,
+        status: product.status,
+        isFavorite: product.isFavorite || false,
+        cjProductId: product.cjProductId,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }));
+    } catch (error) {
+      this.logger.error(`❌ Erreur endpoint principal: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 
   // ===== CATÉGORIES =====
@@ -294,10 +374,45 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Produits importés récupérés' })
   async getImportedProducts() {
     try {
-      const products = await this.cjService.getImportedProducts();
+      this.logger.log('🔍 ENDPOINT PRINCIPAL - Récupération des produits CJ...');
+      
+      // Utiliser la même logique que l'endpoint de test qui fonctionne
+      const products = await this.cjService['prisma'].cJProductStore.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      this.logger.log(`✅ ${products.length} produits CJ récupérés avec succès`);
+      
+      // Retourner directement les produits (pas dans un objet wrapper)
+      return products.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+        category: product.category,
+        status: product.status,
+        isFavorite: product.isFavorite || false,
+        cjProductId: product.cjProductId,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }));
+    } catch (error) {
+      this.logger.error(`❌ Erreur endpoint principal: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
+  }
+
+  @Get('products/imported-favorites')
+  @ApiOperation({ summary: 'Récupérer les produits CJ favoris importés' })
+  @ApiResponse({ status: 200, description: 'Produits favoris importés récupérés' })
+  async getImportedFavorites() {
+    try {
+      const products = await this.cjService.getImportedProducts({ isFavorite: true });
       return products;
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération produits importés: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      this.logger.error(`❌ Erreur récupération produits favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       return [];
     }
   }
