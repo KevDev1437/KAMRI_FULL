@@ -404,8 +404,8 @@ export default function CJProductsPage() {
                       <span className="text-sm text-gray-600">Prix</span>
                       <span className="font-bold text-green-600">
                         ${(() => {
-                          // sellPrice est une string selon la doc CJ
-                          const priceStr = product.sellPrice;
+                          // sellPrice peut être string ou number selon l'API CJ
+                          const priceStr = String(product.sellPrice || '');
                           if (!priceStr) return '0.00';
                           
                           // Gérer les plages de prix (ex: "11.00 -- 11.87")

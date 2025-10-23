@@ -98,7 +98,7 @@ export default function StoresPage() {
            // Récupérer les statistiques CJ
            const cjStats = await apiClient('/cj-dropshipping/stats');
            const cjProducts = await apiClient<any[]>('/cj-dropshipping/products/imported');
-           const cjFavorites = await apiClient<any[]>('/cj-dropshipping/products/imported-favorites');
+           const cjFavorites = await apiClient<any>('/cj-dropshipping/favorites/status');
            
            // Créer le magasin CJ principal
            const cjStore: Store = {
@@ -130,11 +130,11 @@ export default function StoresPage() {
              type: 'cj-favorites',
              status: 'active',
              stats: {
-               total: cjFavorites.length || 0,
-               available: cjFavorites.filter((p: any) => p.status === 'available').length || 0,
-               imported: cjFavorites.filter((p: any) => p.status === 'imported').length || 0,
-               selected: cjFavorites.filter((p: any) => p.status === 'selected').length || 0,
-               pending: cjFavorites.filter((p: any) => p.status === 'pending').length || 0,
+               total: cjFavorites.count || 0,
+               available: cjFavorites.favorites?.filter((p: any) => p.status === 'available').length || 0,
+               imported: cjFavorites.favorites?.filter((p: any) => p.status === 'imported').length || 0,
+               selected: cjFavorites.favorites?.filter((p: any) => p.status === 'selected').length || 0,
+               pending: cjFavorites.favorites?.filter((p: any) => p.status === 'pending').length || 0,
              },
              lastSync: new Date().toISOString(),
              config: {
@@ -177,11 +177,16 @@ export default function StoresPage() {
          setProducts(data.products || []);
          setCategories(data.categories || []);
        } else if (storeId === 'cj-favorites') {
-         // Récupérer les produits CJ favoris importés
-         const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported-favorites');
+         // Récupérer les produits CJ favoris via l'endpoint des magasins (même système que le magasin principal)
+         const params = new URLSearchParams();
+         if (searchTerm) params.append('search', searchTerm);
+         if (statusFilter !== 'all') params.append('status', statusFilter);
+         if (categoryFilter !== 'all') params.append('category', categoryFilter);
+         
+         const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
          console.log('📦 Données reçues du serveur (Favoris CJ):', data);
-         setProducts(Array.isArray(data) ? data : []);
-         setCategories([]);
+         setProducts(data.products || []);
+         setCategories(data.categories || []);
       } else {
         const params = new URLSearchParams();
         if (searchTerm) params.append('search', searchTerm);

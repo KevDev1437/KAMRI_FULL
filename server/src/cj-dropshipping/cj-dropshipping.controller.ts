@@ -287,6 +287,44 @@ export class CJDropshippingController {
     }
   }
 
+  @Get('favorites/status')
+  @ApiOperation({ summary: 'Vérifier le statut des favoris CJ' })
+  @ApiResponse({ status: 200, description: 'Statut des favoris récupéré' })
+  async getFavoritesStatus() {
+    try {
+      this.logger.log('🔍 Vérification du statut des favoris CJ...');
+      
+      // Récupérer les favoris depuis la base de données (requête SQL directe)
+      const favorites = await this.prisma.$queryRaw`
+        SELECT * FROM cj_product_store 
+        WHERE isFavorite = 1 
+        ORDER BY createdAt DESC
+      `;
+      
+      const favoritesArray = favorites as any[];
+      this.logger.log(`✅ ${favoritesArray.length} favoris trouvés en base`);
+      
+      return {
+        success: true,
+        count: favoritesArray.length,
+        favorites: favoritesArray.map(fav => ({
+          id: fav.id,
+          name: fav.name,
+          cjProductId: fav.cjProductId,
+          status: fav.status,
+          createdAt: fav.createdAt
+        }))
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erreur vérification favoris: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        success: false,
+        count: 0,
+        favorites: []
+      };
+    }
+  }
+
 
   @Get('products/imported-favorites')
   @ApiOperation({ summary: 'Récupérer les produits CJ favoris importés' })

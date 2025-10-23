@@ -158,6 +158,16 @@ export class CJDropshippingService {
       
       this.logger.log(`✅ Connexion réussie - ${categories.length} catégories, ${products.length} produits chargés`);
       
+      // 🔄 SYNCHRONISATION AUTOMATIQUE DES FAVORIS LORS DE LA CONNEXION
+      this.logger.log('🔄 Synchronisation automatique des favoris CJ...');
+      try {
+        const syncResult = await this.syncFavorites();
+        this.logger.log(`✅ Favoris synchronisés automatiquement: ${syncResult.synced} favoris`);
+      } catch (syncError) {
+        this.logger.warn('⚠️ Erreur synchronisation automatique favoris:', syncError);
+        // Ne pas faire échouer la connexion si la sync échoue
+      }
+      
       return { 
         success: true, 
         message: `Connexion CJ Dropshipping réussie - ${categories.length} catégories et ${products.length} produits chargés`,
@@ -202,6 +212,16 @@ export class CJDropshippingService {
         if (config.email && config.apiKey) {
           const client = await this.initializeClient();
           connected = true;
+          
+          // 🔄 SYNCHRONISATION AUTOMATIQUE DES FAVORIS LORS DE LA CONNEXION
+          this.logger.log('🔄 Synchronisation automatique des favoris CJ...');
+          try {
+            await this.syncFavorites();
+            this.logger.log('✅ Favoris synchronisés automatiquement');
+          } catch (syncError) {
+            this.logger.warn('⚠️ Erreur synchronisation automatique favoris:', syncError);
+            // Ne pas faire échouer la connexion si la sync échoue
+          }
         }
       } catch (error) {
         connected = false;
@@ -1074,77 +1094,6 @@ export class CJDropshippingService {
     }
   }
 
-  /**
-   * Importer un produit CJ vers KAMRI
-   */
-  async importProduct(pid: string, categoryId?: string, margin: number = 2.5, isFavorite: boolean = false): Promise<any> {
-    this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
-    this.logger.log('📝 Paramètres:', { pid, categoryId, margin });
-    
-    try {
-      const client = await this.initializeClient();
-      const cjProduct = await client.getProductDetails(pid);
-      
-      this.logger.log('📦 Produit CJ récupéré:', cjProduct.productNameEn);
-      
-        // Créer le produit KAMRI
-        const originalPrice = Number(cjProduct.sellPrice) || 0; // Prix original avec fallback
-        const sellingPrice = originalPrice * margin; // Prix de vente avec marge
-        
-        this.logger.log('💰 Prix calculés:', {
-          originalPrice,
-          margin,
-          sellingPrice
-        });
-        
-        // ✅ SAUVEGARDER SEULEMENT LA CATÉGORIE EXTERNE (comme les produits statiques)
-        this.logger.log('🔍 Catégorie externe CJ:', cjProduct.categoryName);
-        
-        // ✅ NOUVELLE APPROCHE : STOCKER DANS LE MAGASIN CJ (upsert pour éviter les doublons)
-        const cjStoreProduct = await this.prisma.cJProductStore.upsert({
-          where: { cjProductId: pid },
-          update: {
-            name: cjProduct.productNameEn || cjProduct.productName,
-            description: cjProduct.description,
-            price: sellingPrice,
-            originalPrice: originalPrice,
-            image: cjProduct.productImage,
-            category: cjProduct.categoryName,
-            status: 'available', // Remettre en disponible si déjà importé
-            isFavorite: isFavorite, // Marquer comme favori si spécifié
-          },
-          create: {
-            cjProductId: pid,
-            name: cjProduct.productNameEn || cjProduct.productName,
-            description: cjProduct.description,
-            price: sellingPrice,
-            originalPrice: originalPrice,
-            image: cjProduct.productImage,
-            category: cjProduct.categoryName,
-            status: 'available',
-            isFavorite: isFavorite, // Marquer comme favori si spécifié
-          },
-        });
-
-        this.logger.log('✅ Produit ajouté au magasin CJ:', cjStoreProduct.id);
-        this.logger.log('🎉 Import terminé avec succès');
-        this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
-
-        return {
-          success: true,
-          message: 'Produit ajouté au magasin CJ',
-          product: cjStoreProduct,
-        };
-    } catch (error) {
-      this.logger.error('❌ === ERREUR IMPORT PRODUIT CJ ===');
-      this.logger.error('💥 Erreur détaillée:', error);
-      this.logger.error('📊 Type d\'erreur:', typeof error);
-      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
-      this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
-      this.logger.error('🔍 === FIN ERREUR IMPORT PRODUIT CJ ===');
-      throw error;
-    }
-  }
 
   /**
    * Mapper une catégorie CJ vers KAMRI
@@ -1213,26 +1162,46 @@ export class CJDropshippingService {
     hasPacked?: number;
     hasVirPacked?: number;
   } = {}): Promise<{ success: boolean; products: any[]; total: number }> {
-    this.logger.log('📦 Récupération de mes produits favoris CJ...');
+    this.logger.log('📦 === DÉBUT RÉCUPÉRATION FAVORIS CJ ===');
+    this.logger.log('📝 Paramètres de recherche:', JSON.stringify(params, null, 2));
     
     try {
       const client = await this.initializeClient();
+      this.logger.log('🔗 Client CJ initialisé, appel API...');
       
       const result = await client.makeRequest('GET', '/product/myProduct/query', params);
       
+      this.logger.log('📊 Réponse API reçue:', {
+        code: result.code,
+        hasData: !!result.data,
+        dataType: typeof result.data
+      });
+      
       if (result.code === 200) {
         const data = result.data as any;
+        this.logger.log('📦 Détails des favoris:', {
+          totalRecords: data.totalRecords,
+          contentLength: data.content?.length || 0,
+          hasContent: !!data.content
+        });
+        
         this.logger.log(`✅ ${data.totalRecords} produits favoris trouvés`);
+        this.logger.log('🔍 === FIN RÉCUPÉRATION FAVORIS CJ ===');
+        
         return {
           success: true,
           products: data.content || [],
           total: data.totalRecords || 0
         };
       } else {
+        this.logger.error('❌ Erreur API CJ:', result.message);
         throw new Error(result.message || 'Erreur lors de la récupération des favoris');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('❌ === ERREUR RÉCUPÉRATION FAVORIS ===');
+      this.logger.error(`💥 Erreur: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`📊 Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
+      this.logger.error('🔍 === FIN ERREUR RÉCUPÉRATION FAVORIS ===');
       throw error;
     }
   }
@@ -1241,13 +1210,30 @@ export class CJDropshippingService {
    * Synchroniser les favoris CJ avec KAMRI
    */
   async syncFavorites(): Promise<{ success: boolean; synced: number; message: string }> {
-    this.logger.log('🔄 Synchronisation des favoris CJ...');
+    this.logger.log('🔄 === DÉBUT SYNCHRONISATION FAVORIS CJ ===');
+    this.logger.log('📝 Étape 1: Récupération des favoris depuis CJ...');
     
     try {
       // Récupérer tous les favoris CJ
       const favorites = await this.getMyProducts();
       
-      if (!favorites.success || favorites.products.length === 0) {
+      this.logger.log('📊 Résultat getMyProducts:', {
+        success: favorites.success,
+        totalProducts: favorites.products?.length || 0,
+        total: favorites.total || 0
+      });
+      
+      if (!favorites.success) {
+        this.logger.error('❌ Échec de la récupération des favoris CJ');
+        return {
+          success: false,
+          synced: 0,
+          message: 'Erreur lors de la récupération des favoris CJ'
+        };
+      }
+      
+      if (favorites.products.length === 0) {
+        this.logger.log('ℹ️ Aucun favori CJ trouvé');
         return {
           success: true,
           synced: 0,
@@ -1255,19 +1241,31 @@ export class CJDropshippingService {
         };
       }
 
+      this.logger.log(`📦 ${favorites.products.length} favoris trouvés, début de l'import...`);
       let synced = 0;
       const errors = [];
 
       // Importer chaque favori vers KAMRI (marquer comme favori)
-      for (const favorite of favorites.products) {
+      for (let i = 0; i < favorites.products.length; i++) {
+        const favorite = favorites.products[i];
+        this.logger.log(`🔄 Traitement favori ${i + 1}/${favorites.products.length}: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
+        
         try {
+          this.logger.log(`📝 Import du favori: PID=${favorite.productId}, SKU=${favorite.sku}`);
           await this.importProduct(favorite.productId, undefined, 2.5, true); // isFavorite = true
           synced++;
-          this.logger.log(`✅ Favori importé: ${favorite.nameEn}`);
+          this.logger.log(`✅ Favori ${i + 1} importé avec succès: ${favorite.nameEn || favorite.productName}`);
         } catch (error) {
-          errors.push(favorite.sku);
-          this.logger.error(`❌ Erreur import favori ${favorite.sku}:`, error);
+          errors.push(favorite.sku || favorite.productId);
+          this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.sku || favorite.productId}):`, error);
         }
+      }
+
+      this.logger.log('📊 === RÉSULTAT SYNCHRONISATION ===');
+      this.logger.log(`✅ Favoris importés: ${synced}`);
+      this.logger.log(`❌ Erreurs: ${errors.length}`);
+      if (errors.length > 0) {
+        this.logger.log('🔍 Erreurs détaillées:', errors);
       }
 
       return {
@@ -1276,7 +1274,11 @@ export class CJDropshippingService {
         message: `${synced} favoris importés avec succès${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur synchronisation favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('❌ === ERREUR CRITIQUE SYNCHRONISATION FAVORIS ===');
+      this.logger.error(`💥 Erreur: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`📊 Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
+      this.logger.error('🔍 === FIN ERREUR SYNCHRONISATION ===');
+      
       return {
         success: false,
         synced: 0,
@@ -1437,6 +1439,85 @@ export class CJDropshippingService {
       }
     } catch (error) {
       this.logger.error(`❌ Erreur récupération catégories: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      throw error;
+    }
+  }
+
+  /**
+   * Importer un produit CJ vers KAMRI
+   */
+  async importProduct(pid: string, categoryId?: string, margin: number = 2.5, isFavorite: boolean = false): Promise<any> {
+    this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
+    this.logger.log('📝 Paramètres:', { pid, categoryId, margin, isFavorite });
+    
+    try {
+      this.logger.log('🔗 Initialisation du client CJ...');
+      const client = await this.initializeClient();
+      
+      this.logger.log('📦 Récupération des détails du produit CJ...');
+      const cjProduct = await client.getProductDetails(pid);
+      
+      this.logger.log('📦 Produit CJ récupéré:', {
+        name: cjProduct.productNameEn || cjProduct.productName,
+        price: cjProduct.sellPrice,
+        category: cjProduct.categoryName,
+        hasImage: !!cjProduct.productImage
+      });
+      
+      // Créer le produit KAMRI
+      const originalPrice = Number(cjProduct.sellPrice) || 0; // Prix original avec fallback
+      const sellingPrice = originalPrice * margin; // Prix de vente avec marge
+      
+      this.logger.log('💰 Prix calculés:', {
+        originalPrice,
+        margin,
+        sellingPrice
+      });
+      
+      // ✅ SAUVEGARDER SEULEMENT LA CATÉGORIE EXTERNE (comme les produits statiques)
+      this.logger.log('🔍 Catégorie externe CJ:', cjProduct.categoryName);
+      
+      this.logger.log('💾 Sauvegarde dans la base de données...');
+      // ✅ NOUVELLE APPROCHE : STOCKER DANS LE MAGASIN CJ (upsert pour éviter les doublons)
+      const cjStoreProduct = await this.prisma.cJProductStore.upsert({
+        where: { cjProductId: pid },
+        update: {
+          name: cjProduct.productNameEn || cjProduct.productName,
+          description: cjProduct.description,
+          price: sellingPrice,
+          originalPrice: originalPrice,
+          image: cjProduct.productImage,
+          category: cjProduct.categoryName,
+          status: 'available', // Remettre en disponible si déjà importé
+          isFavorite: isFavorite, // Marquer comme favori si spécifié
+        },
+        create: {
+          cjProductId: pid,
+          name: cjProduct.productNameEn || cjProduct.productName,
+          description: cjProduct.description,
+          price: sellingPrice,
+          originalPrice: originalPrice,
+          image: cjProduct.productImage,
+          category: cjProduct.categoryName,
+          status: 'available',
+          isFavorite: isFavorite, // Marquer comme favori si spécifié
+        },
+      });
+
+      this.logger.log('✅ Produit ajouté au magasin CJ:', {
+        id: cjStoreProduct.id,
+        name: cjStoreProduct.name,
+        isFavorite: cjStoreProduct.isFavorite,
+        status: cjStoreProduct.status
+      });
+      this.logger.log('🎉 Import terminé avec succès');
+      this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
+      return cjStoreProduct;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR IMPORT PRODUIT ===');
+      this.logger.error(`💥 Erreur import produit ${pid}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`📊 Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
+      this.logger.error('🔍 === FIN ERREUR IMPORT PRODUIT ===');
       throw error;
     }
   }
