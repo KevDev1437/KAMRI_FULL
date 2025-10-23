@@ -229,6 +229,7 @@ export class CJDropshippingService {
 
   // Cache simple pour éviter les requêtes répétées
   private defaultProductsCache: { data: CJProduct[]; timestamp: number } | null = null;
+  private searchCache: Map<string, { data: CJProduct[]; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   /**
@@ -254,7 +255,7 @@ export class CJDropshippingService {
       const result = await client.searchProducts(undefined, {
         pageNum: query.pageNum || 1,
         pageSize: query.pageSize || 30, // 30 produits par défaut
-        countryCode: query.countryCode || 'US',
+        countryCode: query.countryCode, // ← CORRECTION: Pas de pays par défaut
         sortBy: 'relevance',
       });
 
@@ -303,37 +304,90 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('✅ Client CJ initialisé avec succès');
 
-      this.logger.log('📡 Appel API CJ searchProducts...');
-      // Augmenter le nombre de produits pour améliorer les chances de trouver des correspondances
-      const searchPageSize = Math.max(query.pageSize || 20, 100); // Au moins 100 produits
-      const result = await client.searchProducts(query.keyword, {
-        pageNum: query.pageNum,
-        pageSize: searchPageSize,
-        categoryId: query.categoryId,
-        minPrice: query.minPrice,
-        maxPrice: query.maxPrice,
-        countryCode: query.countryCode,
-        sortBy: query.sortBy,
-      });
-
-      this.logger.log('📊 Résultat API CJ brut:', JSON.stringify({
-        total: result.total,
-        pageNum: result.pageNum,
-        pageSize: result.pageSize,
-        listLength: result.list?.length || 0
-      }, null, 2));
-
-      // Retourner tous les produits sans filtrage côté client pour éviter de perdre des résultats
-      let filteredProducts = result.list || [];
-      this.logger.log(`🔍 Produits retournés par l'API CJ: ${filteredProducts.length} produits`);
+      this.logger.log('📡 Récupération de PLUSIEURS pages de l\'API CJ...');
       
-      // Désactiver le filtrage côté client pour permettre plus de résultats
-      this.logger.log('🔍 Filtrage côté client désactivé - retour de tous les produits de l\'API CJ');
-
+      // Récupérer PLUSIEURS pages de l'API CJ UNE SEULE FOIS pour avoir plus de produits à filtrer
+      const allProducts: CJProduct[] = [];
+      const maxPages = 3; // 3 pages = 600 produits max
+      
+      // Vérifier si on a déjà des produits en cache pour cette recherche
+      const cacheKey = `search_${query.keyword}_${query.categoryId}_${query.minPrice}_${query.maxPrice}`;
+      const cachedProducts = this.getCachedProducts(cacheKey);
+      
+      if (cachedProducts && cachedProducts.length > 0) {
+        this.logger.log(`📦 Utilisation du cache: ${cachedProducts.length} produits`);
+        allProducts.push(...cachedProducts);
+      } else {
+        // Récupérer les produits depuis l'API CJ
+        for (let page = 1; page <= maxPages; page++) {
+          this.logger.log(`📄 Récupération page ${page}/${maxPages}...`);
+          
+          const result = await client.searchProducts(query.keyword, { // ← CORRECTION: Passer le keyword
+            pageNum: page,
+            pageSize: 200, // Maximum autorisé par CJ
+            countryCode: query.countryCode, // ← CORRECTION: Pas de pays par défaut
+            categoryId: query.categoryId,
+            minPrice: query.minPrice,
+            maxPrice: query.maxPrice,
+            sortBy: query.sortBy,
+          });
+          
+          allProducts.push(...result.list);
+          this.logger.log(`📦 Page ${page}: ${result.list.length} produits récupérés`);
+          
+          if (result.list.length < 200) {
+            this.logger.log('📄 Dernière page atteinte');
+            break; // Dernière page
+          }
+          
+          // Attendre entre les pages pour éviter le rate limiting
+          if (page < maxPages) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // Mettre en cache les produits récupérés
+        this.setCachedProducts(cacheKey, allProducts);
+      }
+      
+      this.logger.log(`📦 Total reçu : ${allProducts.length} produits de l'API CJ`);
+      
+      // Filtrage côté serveur (VOTRE CODE EXISTANT EST BON)
+      let filteredProducts = allProducts;
+      
+      if (query.keyword && query.keyword.trim()) {
+        this.logger.log(`🔍 Filtrage par mot-clé: "${query.keyword}"`);
+        const keyword = query.keyword.toLowerCase();
+        
+        filteredProducts = allProducts.filter(product => {
+          const name = (product.productName || '').toLowerCase();
+          const nameEn = (product.productNameEn || '').toLowerCase();
+          const sku = (product.productSku || '').toLowerCase();
+          const category = (product.categoryName || '').toLowerCase();
+          
+          return name.includes(keyword) ||
+                 nameEn.includes(keyword) ||
+                 sku.includes(keyword) ||
+                 category.includes(keyword);
+        });
+        
+        this.logger.log(`✅ ${filteredProducts.length} produits après filtrage par mot-clé`);
+      }
+      
+      // Appliquer la pagination sur les résultats filtrés
+      const pageNum = query.pageNum || 1;
+      const pageSize = query.pageSize || 20;
+      const start = (pageNum - 1) * pageSize;
+      const end = start + pageSize;
+      
+      const paginatedProducts = filteredProducts.slice(start, end);
+      
+      this.logger.log(`📄 Pagination: page ${pageNum}, ${pageSize} produits par page`);
+      this.logger.log(`📦 Résultat final: ${paginatedProducts.length} produits retournés`);
       this.logger.log('🎉 Recherche terminée avec succès');
       this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ ===');
       
-      return filteredProducts;
+      return paginatedProducts;
     } catch (error) {
       this.logger.error('❌ === ERREUR RECHERCHE PRODUITS CJ ===');
       this.logger.error('💥 Erreur détaillée:', error);
@@ -341,6 +395,65 @@ export class CJDropshippingService {
       this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
       this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
       this.logger.error('🔍 === FIN ERREUR RECHERCHE PRODUITS CJ ===');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les produits en cache
+   */
+  private getCachedProducts(cacheKey: string): CJProduct[] | null {
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      return cached.data;
+    }
+    return null;
+  }
+
+  /**
+   * Mettre en cache les produits
+   */
+  private setCachedProducts(cacheKey: string, products: CJProduct[]): void {
+    this.searchCache.set(cacheKey, {
+      data: products,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Récupérer toutes les catégories depuis l'API CJ
+   */
+  async getCategories(): Promise<any[]> {
+    this.logger.log('🏷️ === RÉCUPÉRATION DES CATÉGORIES CJ ===');
+    
+    try {
+      const client = await this.initializeClient();
+      const categories = await client.getCategories();
+      
+      this.logger.log(`✅ ${categories.length} catégories récupérées`);
+      
+      return categories;
+    } catch (error) {
+      this.logger.error('❌ Erreur lors de la récupération des catégories:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer l'arbre des catégories
+   */
+  async getCategoriesTree(): Promise<any[]> {
+    this.logger.log('🌳 === RÉCUPÉRATION DE L\'ARBRE DES CATÉGORIES ===');
+    
+    try {
+      const client = await this.initializeClient();
+      const tree = await client.getCategoriesTree();
+      
+      this.logger.log(`✅ Arbre des catégories récupéré`);
+      
+      return tree;
+    } catch (error) {
+      this.logger.error('❌ Erreur lors de la récupération de l\'arbre:', error);
       throw error;
     }
   }
@@ -956,7 +1069,7 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/addToMyProduct', {
+      const result = await client.makeRequest('POST', '/product/addToMyProduct', {
         productId: productId
       });
       
@@ -970,7 +1083,7 @@ export class CJDropshippingService {
         throw new Error(result.message || 'Erreur lors de l\'ajout du produit');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur ajout produit ${productId}: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur ajout produit ${productId}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -993,20 +1106,21 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/myProduct/query', params, 'GET');
+      const result = await client.makeRequest('GET', '/product/myProduct/query', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.totalRecords} produits trouvés dans mes produits`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.totalRecords} produits trouvés dans mes produits`);
         return {
           success: true,
-          products: result.data.content || [],
-          total: result.data.totalRecords || 0
+          products: data.content || [],
+          total: data.totalRecords || 0
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des produits');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération mes produits: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération mes produits: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -1025,19 +1139,20 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/variant/query', params, 'GET');
+      const result = await client.makeRequest('GET', '/product/variant/query', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.length} variantes trouvées`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.length} variantes trouvées`);
         return {
           success: true,
-          variants: result.data || []
+          variants: data || []
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des variantes');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération variantes: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération variantes: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -1051,19 +1166,20 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/stock/queryByVid', { vid }, 'GET');
+      const result = await client.makeRequest('GET', '/product/stock/queryByVid', { vid });
       
       if (result.code === 200) {
-        this.logger.log(`✅ Stock récupéré pour ${result.data.length} entrepôts`);
+        const stockData = Array.isArray(result.data) ? result.data : [];
+        this.logger.log(`✅ Stock récupéré pour ${stockData.length} entrepôts`);
         return {
           success: true,
-          stock: result.data || []
+          stock: stockData
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération du stock');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération stock: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération stock: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -1082,20 +1198,21 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/productComments', params, 'GET');
+      const result = await client.makeRequest('GET', '/product/productComments', params);
       
       if (result.code === 0) {
-        this.logger.log(`✅ ${result.data.total} avis trouvés`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.total} avis trouvés`);
         return {
           success: true,
-          reviews: result.data.list || [],
-          total: parseInt(result.data.total) || 0
+          reviews: data.list || [],
+          total: parseInt(data.total) || 0
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des avis');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération avis: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération avis: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -1118,20 +1235,21 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/sourcing/create', params);
+      const result = await client.makeRequest('POST', '/product/sourcing/create', params);
       
       if (result.code === 0) {
-        this.logger.log(`✅ Demande de sourcing créée: ${result.data.cjSourcingId}`);
+        const data = result.data as any;
+        this.logger.log(`✅ Demande de sourcing créée: ${data.cjSourcingId}`);
         return {
           success: true,
-          cjSourcingId: result.data.cjSourcingId,
+          cjSourcingId: data.cjSourcingId,
           message: 'Demande de sourcing créée avec succès'
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la création de la demande de sourcing');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur création sourcing: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur création sourcing: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -1145,19 +1263,20 @@ export class CJDropshippingService {
     try {
       const client = await this.initializeClient();
       
-      const result = await client.makeRequest('/product/getCategory', {}, 'GET');
+      const result = await client.makeRequest('GET', '/product/getCategory', {});
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.length} catégories trouvées`);
+        const categories = Array.isArray(result.data) ? result.data : [];
+        this.logger.log(`✅ ${categories.length} catégories trouvées`);
         return {
           success: true,
-          categories: result.data || []
+          categories: categories
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des catégories');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération catégories: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération catégories: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

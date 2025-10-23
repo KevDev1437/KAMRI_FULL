@@ -399,6 +399,63 @@ export const useCJDropshipping = () => {
     }
   };
 
+  // Fonction pour récupérer les catégories
+  const getCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/cj-dropshipping/categories');
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération des catégories');
+      }
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour récupérer l'arbre des catégories
+  const getCategoriesTree = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/cj-dropshipping/categories/tree');
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération de l\'arbre des catégories');
+      }
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour synchroniser les catégories
+  const syncCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/cj-dropshipping/categories/sync');
+      if (!response.ok) {
+        throw new Error('Erreur lors de la synchronisation des catégories');
+      }
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     error,
@@ -421,6 +478,9 @@ export const useCJDropshipping = () => {
     configureWebhooks,
     getWebhookLogs,
     getStats,
+    getCategories,
+    getCategoriesTree,
+    syncCategories,
   };
 };
 

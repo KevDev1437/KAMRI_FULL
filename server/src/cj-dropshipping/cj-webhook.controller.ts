@@ -23,7 +23,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook PRODUCT traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook PRODUCT: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook PRODUCT: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -38,7 +38,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook VARIANT traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook VARIANT: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook VARIANT: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -53,7 +53,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook STOCK traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook STOCK: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook STOCK: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -68,7 +68,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook ORDER traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook ORDER: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook ORDER: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -83,7 +83,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook LOGISTIC traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook LOGISTIC: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook LOGISTIC: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -98,7 +98,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook SOURCINGCREATE traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook SOURCINGCREATE: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook SOURCINGCREATE: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -113,7 +113,7 @@ export class CJWebhookController {
       this.logger.log(`✅ Webhook ORDERSPLIT traité avec succès: ${payload.messageId}`);
       return { success: true, messageId: payload.messageId };
     } catch (error) {
-      this.logger.error(`❌ Erreur traitement webhook ORDERSPLIT: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur traitement webhook ORDERSPLIT: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

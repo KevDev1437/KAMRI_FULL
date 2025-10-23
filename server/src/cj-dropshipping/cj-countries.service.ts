@@ -365,37 +365,38 @@ export class CJCountriesService {
     
     try {
       for (const country of this.countries) {
-        await this.prisma.country.upsert({
-          where: { code: country.twoLetterCode },
-          update: {
-            name: country.englishName,
-            chineseName: country.chineseName,
-            code: country.twoLetterCode,
-            iso3Code: country.tripletCode,
-            numericCode: country.numericCode,
-            region: country.region,
-            continent: country.continent,
-            isSupported: this.isCountrySupported(country.twoLetterCode),
-            updatedAt: new Date(),
-          },
-          create: {
-            name: country.englishName,
-            chineseName: country.chineseName,
-            code: country.twoLetterCode,
-            iso3Code: country.tripletCode,
-            numericCode: country.numericCode,
-            region: country.region,
-            continent: country.continent,
-            isSupported: this.isCountrySupported(country.twoLetterCode),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }
-        });
+        // TODO: Ajouter le modèle Country au schéma Prisma
+        // await this.prisma.country.upsert({
+        //   where: { code: country.twoLetterCode },
+        //   update: {
+        //     name: country.englishName,
+        //     chineseName: country.chineseName,
+        //     code: country.twoLetterCode,
+        //     iso3Code: country.tripletCode,
+        //     numericCode: country.numericCode,
+        //     region: country.region,
+        //     continent: country.continent,
+        //     isSupported: this.isCountrySupported(country.twoLetterCode),
+        //     updatedAt: new Date(),
+        //   },
+        //   create: {
+        //     name: country.englishName,
+        //     chineseName: country.chineseName,
+        //     code: country.twoLetterCode,
+        //     iso3Code: country.tripletCode,
+        //     numericCode: country.numericCode,
+        //     region: country.region,
+        //     continent: country.continent,
+        //     isSupported: this.isCountrySupported(country.twoLetterCode),
+        //     createdAt: new Date(),
+        //     updatedAt: new Date(),
+        //   }
+        // });
       }
       
       this.logger.log(`✅ ${this.countries.length} pays synchronisés`);
     } catch (error) {
-      this.logger.error(`❌ Erreur synchronisation pays: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur synchronisation pays: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

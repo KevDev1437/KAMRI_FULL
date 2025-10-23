@@ -48,29 +48,32 @@ export class CJOrdersService {
     this.logger.log(`🛒 Création commande V2: ${orderData.orderNumber}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/createOrderV2', orderData);
+      const result = await client.makeRequest('POST', '/shopping/order/createOrderV2', orderData);
       
       if (result.code === 200) {
-        this.logger.log(`✅ Commande V2 créée: ${result.data.orderId}`);
+        const data = result.data as any;
+        this.logger.log(`✅ Commande V2 créée: ${data.orderId}`);
         return {
           success: true,
-          orderId: result.data.orderId,
+          orderId: data.orderId,
           message: 'Commande V2 créée avec succès',
-          data: result.data
+          data: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la création de la commande V2');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur création commande V2: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur création commande V2: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -113,29 +116,32 @@ export class CJOrdersService {
     this.logger.log(`🛒 Création commande V3: ${orderData.orderNumber}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/createOrderV3', orderData);
+      const result = await client.makeRequest('POST', '/shopping/order/createOrderV3', orderData);
       
       if (result.code === 200) {
-        this.logger.log(`✅ Commande V3 créée: ${result.data.orderId}`);
+        const data = result.data as any;
+        this.logger.log(`✅ Commande V3 créée: ${data.orderId}`);
         return {
           success: true,
-          orderId: result.data.orderId,
+          orderId: data.orderId,
           message: 'Commande V3 créée avec succès',
-          data: result.data
+          data: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la création de la commande V3');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur création commande V3: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur création commande V3: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -147,30 +153,33 @@ export class CJOrdersService {
     this.logger.log(`🛒 Ajout au panier: ${cjOrderIdList.length} commandes`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/addCart', {
+      const result = await client.makeRequest('POST', '/shopping/order/addCart', {
         cjOrderIdList
       });
       
-      if (result.success) {
-        this.logger.log(`✅ ${result.data.successCount} commandes ajoutées au panier`);
+      if (result.code === 200) {
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.successCount} commandes ajoutées au panier`);
         return {
           success: true,
-          message: `${result.data.successCount} commandes ajoutées au panier`,
-          data: result.data
+          message: `${data.successCount} commandes ajoutées au panier`,
+          data: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de l\'ajout au panier');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur ajout panier: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur ajout panier: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -182,30 +191,33 @@ export class CJOrdersService {
     this.logger.log(`✅ Confirmation panier: ${cjOrderIdList.length} commandes`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/addCartConfirm', {
+      const result = await client.makeRequest('POST', '/shopping/order/addCartConfirm', {
         cjOrderIdList
       });
       
-      if (result.success) {
-        this.logger.log(`✅ ${result.data.successCount} commandes confirmées`);
+      if (result.code === 200) {
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.successCount} commandes confirmées`);
         return {
           success: true,
-          message: `${result.data.successCount} commandes confirmées`,
-          data: result.data
+          message: `${data.successCount} commandes confirmées`,
+          data: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la confirmation du panier');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur confirmation panier: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur confirmation panier: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -217,30 +229,33 @@ export class CJOrdersService {
     this.logger.log(`💾 Sauvegarde commande parent: ${shipmentOrderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/saveGenerateParentOrder', {
+      const result = await client.makeRequest('POST', '/shopping/order/saveGenerateParentOrder', {
         shipmentOrderId
       });
       
-      if (result.success) {
-        this.logger.log(`✅ Commande parent sauvegardée: ${result.data.payId}`);
+      if (result.code === 200) {
+        const data = result.data as any;
+        this.logger.log(`✅ Commande parent sauvegardée: ${data.payId}`);
         return {
           success: true,
           message: 'Commande parent sauvegardée avec succès',
-          data: result.data
+          data: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la sauvegarde de la commande parent');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur sauvegarde commande parent: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur sauvegarde commande parent: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -258,28 +273,31 @@ export class CJOrdersService {
     this.logger.log('📋 Récupération des commandes...');
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/list', params, 'GET');
+      const result = await client.makeRequest('GET', '/shopping/order/list', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.total} commandes trouvées`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.total} commandes trouvées`);
         return {
           success: true,
-          orders: result.data.list || [],
-          total: result.data.total || 0
+          orders: data.list || [],
+          total: data.total || 0
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des commandes');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération commandes: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération commandes: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -291,11 +309,13 @@ export class CJOrdersService {
     this.logger.log(`🔍 Récupération détails commande: ${orderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
@@ -306,19 +326,20 @@ export class CJOrdersService {
         });
       }
       
-      const result = await client.makeRequest('/shopping/order/getOrderDetail', params, 'GET');
+      const result = await client.makeRequest('GET', '/shopping/order/getOrderDetail', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ Détails commande récupérés: ${result.data.orderId}`);
+        const data = result.data as any;
+        this.logger.log(`✅ Détails commande récupérés: ${data.orderId}`);
         return {
           success: true,
-          order: result.data
+          order: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des détails de la commande');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération détails commande: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération détails commande: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -330,15 +351,17 @@ export class CJOrdersService {
     this.logger.log(`🗑️ Suppression commande: ${orderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/deleteOrder', { orderId }, 'DELETE');
+      const result = await client.makeRequest('DELETE', '/shopping/order/deleteOrder', { orderId });
       
       if (result.code === 200) {
         this.logger.log(`✅ Commande supprimée: ${result.data}`);
@@ -350,7 +373,7 @@ export class CJOrdersService {
         throw new Error(result.message || 'Erreur lors de la suppression de la commande');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur suppression commande: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur suppression commande: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -362,15 +385,17 @@ export class CJOrdersService {
     this.logger.log(`✅ Confirmation commande: ${orderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/order/confirmOrder', { orderId }, 'PATCH');
+      const result = await client.makeRequest('POST', '/shopping/order/confirmOrder', { orderId });
       
       if (result.code === 200) {
         this.logger.log(`✅ Commande confirmée: ${result.data}`);
@@ -382,7 +407,7 @@ export class CJOrdersService {
         throw new Error(result.message || 'Erreur lors de la confirmation de la commande');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur confirmation commande: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur confirmation commande: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -394,27 +419,30 @@ export class CJOrdersService {
     this.logger.log('💰 Récupération du solde...');
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/pay/getBalance', {}, 'GET');
+      const result = await client.makeRequest('GET', '/shopping/pay/getBalance', {});
       
       if (result.code === 200) {
-        this.logger.log(`✅ Solde récupéré: $${result.data.amount}`);
+        const data = result.data as any;
+        this.logger.log(`✅ Solde récupéré: $${data.amount}`);
         return {
           success: true,
-          balance: result.data
+          balance: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération du solde');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération solde: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération solde: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -426,15 +454,17 @@ export class CJOrdersService {
     this.logger.log(`💳 Paiement avec solde: ${orderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/pay/payBalance', { orderId });
+      const result = await client.makeRequest('POST', '/shopping/pay/payBalance', { orderId });
       
       if (result.code === 200) {
         this.logger.log(`✅ Paiement effectué: ${orderId}`);
@@ -446,7 +476,7 @@ export class CJOrdersService {
         throw new Error(result.message || 'Erreur lors du paiement');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur paiement: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur paiement: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -458,15 +488,17 @@ export class CJOrdersService {
     this.logger.log(`💳 Paiement V2 avec solde: ${shipmentOrderId}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/shopping/pay/payBalanceV2', {
+      const result = await client.makeRequest('POST', '/shopping/pay/payBalanceV2', {
         shipmentOrderId,
         payId
       });
@@ -481,7 +513,7 @@ export class CJOrdersService {
         throw new Error(result.message || 'Erreur lors du paiement V2');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur paiement V2: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur paiement V2: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

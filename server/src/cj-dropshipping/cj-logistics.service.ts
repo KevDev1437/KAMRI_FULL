@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CJAPIClient } from './cj-api-client';
 
 export interface CJLogisticsOption {
   id: number;
@@ -211,38 +212,39 @@ export class CJLogisticsService {
     
     try {
       for (const logistics of this.logisticsOptions) {
-        await this.prisma.logistics.upsert({
-          where: { cjId: logistics.id },
-          update: {
-            name: logistics.englishName,
-            chineseName: logistics.chineseName,
-            arrivalTime: logistics.arrivalTime,
-            minDays: logistics.minDays,
-            maxDays: logistics.maxDays,
-            isExpress: logistics.isExpress,
-            isSensitive: logistics.isSensitive,
-            supportedCountries: logistics.supportedCountries,
-            updatedAt: new Date(),
-          },
-          create: {
-            cjId: logistics.id,
-            name: logistics.englishName,
-            chineseName: logistics.chineseName,
-            arrivalTime: logistics.arrivalTime,
-            minDays: logistics.minDays,
-            maxDays: logistics.maxDays,
-            isExpress: logistics.isExpress,
-            isSensitive: logistics.isSensitive,
-            supportedCountries: logistics.supportedCountries,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }
-        });
+        // TODO: Ajouter le modèle Logistics au schéma Prisma
+        // await this.prisma.logistics.upsert({
+        //   where: { cjId: logistics.id },
+        //   update: {
+        //     name: logistics.englishName,
+        //     chineseName: logistics.chineseName,
+        //     arrivalTime: logistics.arrivalTime,
+        //     minDays: logistics.minDays,
+        //     maxDays: logistics.maxDays,
+        //     isExpress: logistics.isExpress,
+        //     isSensitive: logistics.isSensitive,
+        //     supportedCountries: logistics.supportedCountries,
+        //     updatedAt: new Date(),
+        //   },
+        //   create: {
+        //     cjId: logistics.id,
+        //     name: logistics.englishName,
+        //     chineseName: logistics.chineseName,
+        //     arrivalTime: logistics.arrivalTime,
+        //     minDays: logistics.minDays,
+        //     maxDays: logistics.maxDays,
+        //     isExpress: logistics.isExpress,
+        //     isSensitive: logistics.isSensitive,
+        //     supportedCountries: logistics.supportedCountries,
+        //     createdAt: new Date(),
+        //     updatedAt: new Date(),
+        //   }
+        // });
       }
       
       this.logger.log(`✅ ${this.logisticsOptions.length} logistiques synchronisées`);
     } catch (error) {
-      this.logger.error(`❌ Erreur synchronisation logistiques: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur synchronisation logistiques: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -265,27 +267,30 @@ export class CJLogisticsService {
     this.logger.log(`🚚 Calcul du fret: ${params.startCountryCode} → ${params.endCountryCode}`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/logistic/freightCalculate', params);
+      const result = await client.makeRequest('POST', '/logistic/freightCalculate', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.length} options de fret calculées`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.length} options de fret calculées`);
         return {
           success: true,
-          freightOptions: result.data || []
+          freightOptions: data || []
         };
       } else {
         throw new Error(result.message || 'Erreur lors du calcul du fret');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur calcul fret: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur calcul fret: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -339,27 +344,30 @@ export class CJLogisticsService {
     this.logger.log(`💡 Calcul du fret avancé: ${params.reqDTOS.length} requêtes`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/logistic/freightCalculateTip', params);
+      const result = await client.makeRequest('POST', '/logistic/freightCalculateTip', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.length} conseils de fret calculés`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.length} conseils de fret calculés`);
         return {
           success: true,
-          freightTips: result.data || []
+          freightTips: data || []
         };
       } else {
         throw new Error(result.message || 'Erreur lors du calcul du fret avancé');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur calcul fret avancé: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur calcul fret avancé: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -371,11 +379,13 @@ export class CJLogisticsService {
     this.logger.log(`📦 Suivi des expéditions: ${trackNumbers.length} numéros`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
@@ -384,19 +394,20 @@ export class CJLogisticsService {
         params[`trackNumber`] = trackNumber;
       });
       
-      const result = await client.makeRequest('/logistic/getTrackInfo', params, 'GET');
+      const result = await client.makeRequest('GET', '/logistic/getTrackInfo', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ Informations de suivi récupérées pour ${result.data.length} expéditions`);
+        const data = result.data as any;
+        this.logger.log(`✅ Informations de suivi récupérées pour ${data.length} expéditions`);
         return {
           success: true,
-          trackingInfo: result.data || []
+          trackingInfo: data || []
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération du suivi');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur suivi expéditions: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur suivi expéditions: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -408,11 +419,13 @@ export class CJLogisticsService {
     this.logger.log(`📦 Suivi des expéditions (nouveau): ${trackNumbers.length} numéros`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
@@ -421,19 +434,20 @@ export class CJLogisticsService {
         params[`trackNumber`] = trackNumber;
       });
       
-      const result = await client.makeRequest('/logistic/trackInfo', params, 'GET');
+      const result = await client.makeRequest('GET', '/logistic/trackInfo', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ Informations de suivi récupérées pour ${result.data.length} expéditions`);
+        const data = result.data as any;
+        this.logger.log(`✅ Informations de suivi récupérées pour ${data.length} expéditions`);
         return {
           success: true,
-          trackingInfo: result.data || []
+          trackingInfo: data || []
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération du suivi');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur suivi expéditions: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur suivi expéditions: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

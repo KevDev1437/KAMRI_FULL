@@ -15,9 +15,12 @@ export default function CJProductsPage() {
     searchProducts,
     importProduct,
     syncProducts,
+    getCategories,
+    syncCategories,
   } = useCJDropshipping();
 
   const [products, setProducts] = useState<CJProduct[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CJProductSearchFilters>({
     keyword: '',
     pageNum: 1,
@@ -26,6 +29,7 @@ export default function CJProductsPage() {
     maxPrice: undefined,
     countryCode: 'US',
     sortBy: 'relevance',
+    categoryId: undefined, // Ajouter le filtre de catégorie
   });
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
@@ -33,6 +37,25 @@ export default function CJProductsPage() {
   const [loadingDefault, setLoadingDefault] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Charger les catégories au montage du composant
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const categoriesData = await getCategories();
+        setCategories(categoriesData);
+        console.log('Catégories chargées:', categoriesData.length);
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Charger les produits par défaut au montage du composant
   useEffect(() => {
@@ -177,7 +200,7 @@ export default function CJProductsPage() {
       <Card className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Rechercher des produits</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mot-clé (optionnel)
@@ -189,6 +212,27 @@ export default function CJProductsPage() {
               placeholder="Ex: phone case, watch, bag"
               className="w-full"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Catégorie
+            </label>
+            <select
+              value={filters.categoryId || ''}
+              onChange={(e) => setFilters(prev => ({ 
+                ...prev, 
+                categoryId: e.target.value || undefined 
+              }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Toutes les catégories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name || category.nameEn}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -246,7 +290,7 @@ export default function CJProductsPage() {
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap">
           <Button
             onClick={handleSearch}
             disabled={searching}
@@ -257,7 +301,7 @@ export default function CJProductsPage() {
           
           <Button
             onClick={() => {
-              setFilters(prev => ({ ...prev, keyword: '', minPrice: undefined, maxPrice: undefined }));
+              setFilters(prev => ({ ...prev, keyword: '', minPrice: undefined, maxPrice: undefined, categoryId: undefined }));
               handleSearch();
             }}
             disabled={searching}
@@ -273,6 +317,24 @@ export default function CJProductsPage() {
             variant="outline"
           >
             {syncing ? 'Synchronisation...' : 'Synchroniser les produits'}
+          </Button>
+
+          <Button
+            onClick={async () => {
+              try {
+                await syncCategories();
+                const categoriesData = await getCategories();
+                setCategories(categoriesData);
+                alert('Catégories synchronisées avec succès !');
+              } catch (error) {
+                alert('Erreur lors de la synchronisation des catégories');
+              }
+            }}
+            disabled={loadingCategories}
+            variant="outline"
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            {loadingCategories ? 'Synchronisation...' : 'Synchroniser les catégories'}
           </Button>
         </div>
       </Card>

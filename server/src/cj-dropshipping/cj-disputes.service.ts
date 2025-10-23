@@ -12,27 +12,30 @@ export class CJDisputesService {
     this.logger.log(`🔍 Récupération des produits en litige pour la commande ${orderId}...`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/disputes/disputeProducts', { orderId }, 'GET');
+      const result = await client.makeRequest('GET', '/disputes/disputeProducts', { orderId });
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.productInfoList.length} produits en litige trouvés`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.productInfoList?.length || 0} produits en litige trouvés`);
         return {
           success: true,
-          disputeProducts: result.data
+          disputeProducts: data
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des produits en litige');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération produits litige: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération produits litige: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -51,15 +54,17 @@ export class CJDisputesService {
     this.logger.log(`✅ Confirmation du litige pour la commande ${params.orderId}...`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/disputes/disputeConfirmInfo', params);
+      const result = await client.makeRequest('POST', '/disputes/disputeConfirmInfo', params);
       
       if (result.code === 200) {
         this.logger.log(`✅ Litige confirmé avec succès`);
@@ -71,7 +76,7 @@ export class CJDisputesService {
         throw new Error(result.message || 'Erreur lors de la confirmation du litige');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur confirmation litige: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur confirmation litige: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -97,28 +102,30 @@ export class CJDisputesService {
     this.logger.log(`📝 Création d'un litige pour la commande ${params.orderId}...`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/disputes/create', params);
+      const result = await client.makeRequest('POST', '/disputes/create', params);
       
       if (result.code === 200) {
         this.logger.log(`✅ Litige créé avec succès`);
         return {
           success: true,
-          disputeId: result.redirectUri || 'N/A',
+          disputeId: (result.data as any)?.redirectUri || 'N/A',
           message: 'Litige créé avec succès'
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la création du litige');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur création litige: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur création litige: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -133,15 +140,17 @@ export class CJDisputesService {
     this.logger.log(`❌ Annulation du litige ${params.disputeId} pour la commande ${params.orderId}...`);
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/disputes/cancel', params);
+      const result = await client.makeRequest('POST', '/disputes/cancel', params);
       
       if (result.code === 200) {
         this.logger.log(`✅ Litige annulé avec succès`);
@@ -153,7 +162,7 @@ export class CJDisputesService {
         throw new Error(result.message || 'Erreur lors de l\'annulation du litige');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur annulation litige: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur annulation litige: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -171,28 +180,31 @@ export class CJDisputesService {
     this.logger.log('📋 Récupération de la liste des litiges...');
     
     try {
-      const client = new CJAPIClient(
-        process.env.CJ_EMAIL,
-        process.env.CJ_API_KEY,
-        { tier: 'free', debug: true }
-      );
+      const client = new CJAPIClient(null as any);
+      client.setConfig({
+        email: process.env.CJ_EMAIL || '',
+        apiKey: process.env.CJ_API_KEY || '',
+        tier: 'free',
+        debug: true
+      });
       
       await client.login();
       
-      const result = await client.makeRequest('/disputes/getDisputeList', params, 'GET');
+      const result = await client.makeRequest('GET', '/disputes/getDisputeList', params);
       
       if (result.code === 200) {
-        this.logger.log(`✅ ${result.data.list?.length || 0} litiges trouvés`);
+        const data = result.data as any;
+        this.logger.log(`✅ ${data.list?.length || 0} litiges trouvés`);
         return {
           success: true,
-          disputes: result.data.list || [],
-          total: result.data.total || 0
+          disputes: data.list || [],
+          total: data.total || 0
         };
       } else {
         throw new Error(result.message || 'Erreur lors de la récupération des litiges');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération litiges: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération litiges: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -262,7 +274,7 @@ export class CJDisputesService {
         throw new Error('Erreur lors de la récupération des litiges pour l\'analyse');
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur analytics litiges: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur analytics litiges: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

@@ -38,9 +38,14 @@ model User {
 model Category {
   id          String    @id @default(cuid())
   name        String    @unique
+  nameEn      String?   // Nom en anglais
   description String?
   icon        String?   @default("🛍️")
   color       String?   @default("#4CAF50")
+  externalId  String?   // ID externe (CJ, etc.)
+  parentId    String?   // ID parent pour hiérarchie
+  level       Int?      // Niveau dans la hiérarchie
+  isActive    Boolean   @default(true)
   isDefault   Boolean   @default(false) // ✅ Catégories par défaut non supprimables
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

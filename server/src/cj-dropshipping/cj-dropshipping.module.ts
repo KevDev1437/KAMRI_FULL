@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CJAPIClient } from './cj-api-client';
+import { CJCategoriesController } from './cj-categories.controller';
+import { CJCategoriesService } from './cj-categories.service';
 import { CJCountriesController } from './cj-countries.controller';
 import { CJCountriesService } from './cj-countries.service';
 import { CJDisputesController } from './cj-disputes.controller';
@@ -19,9 +21,9 @@ import { CJWebhookService } from './cj-webhook.service';
 
 @Module({
   imports: [ConfigModule],
-  controllers: [CJDropshippingController, CJWebhookController, CJLogisticsController, CJCountriesController, CJSettingsController, CJOrdersController, CJDisputesController],
-  providers: [CJDropshippingService, CJWebhookService, CJLogisticsService, CJCountriesService, CJSettingsService, CJOrdersService, CJDisputesService, CJAPIClient, PrismaService],
-  exports: [CJDropshippingService, CJWebhookService, CJLogisticsService, CJCountriesService, CJSettingsService, CJOrdersService, CJDisputesService, CJAPIClient],
+  controllers: [CJDropshippingController, CJWebhookController, CJLogisticsController, CJCountriesController, CJSettingsController, CJOrdersController, CJDisputesController, CJCategoriesController],
+  providers: [CJDropshippingService, CJWebhookService, CJLogisticsService, CJCountriesService, CJSettingsService, CJOrdersService, CJDisputesService, CJCategoriesService, CJAPIClient, PrismaService],
+  exports: [CJDropshippingService, CJWebhookService, CJLogisticsService, CJCountriesService, CJSettingsService, CJOrdersService, CJDisputesService, CJCategoriesService, CJAPIClient],
 })
 export class CJDropshippingModule {}
 

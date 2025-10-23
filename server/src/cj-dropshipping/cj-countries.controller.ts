@@ -51,7 +51,7 @@ export class CJCountriesController {
         country: country
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur recherche pays ${code}: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur recherche pays ${code}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -73,7 +73,7 @@ export class CJCountriesController {
         countries: countries
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération pays par région ${region}: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération pays par région ${region}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -95,7 +95,7 @@ export class CJCountriesController {
         countries: countries
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération pays par continent ${continent}: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération pays par continent ${continent}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -117,7 +117,7 @@ export class CJCountriesController {
         countries: countries
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur recherche pays: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur recherche pays: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -138,7 +138,7 @@ export class CJCountriesController {
         countries: countries
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération pays supportés: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération pays supportés: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -158,7 +158,7 @@ export class CJCountriesController {
         message: 'Pays synchronisés avec succès'
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur synchronisation pays: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur synchronisation pays: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }

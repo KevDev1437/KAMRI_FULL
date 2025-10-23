@@ -446,7 +446,7 @@ export class CJAPIClient {
       categoryId: options.categoryId,
       minPrice: options.minPrice,
       maxPrice: options.maxPrice,
-      countryCode: options.countryCode || 'US',
+      countryCode: options.countryCode, // ← CORRECTION: Pas de pays par défaut
       sortBy: options.sortBy || 'relevance',
     };
 
@@ -457,7 +457,7 @@ export class CJAPIClient {
       pageNum: params.pageNum,
       pageSize: params.pageSize,
       sortBy: params.sortBy,
-      keyword: params.keyword,
+      productName: params.keyword, // ← CORRECTION: Utiliser productName au lieu de keyword
       minPrice: params.minPrice,
       maxPrice: params.maxPrice,
       categoryId: params.categoryId,
@@ -572,13 +572,7 @@ export class CJAPIClient {
     return response.data as any;
   }
 
-  /**
-   * Obtenir les catégories
-   */
-  async getCategories(): Promise<any[]> {
-    const response = await this.makeRequest('GET', '/product/category');
-    return response.data as any;
-  }
+ 
 
   /**
    * Créer une commande (V3)
@@ -730,6 +724,50 @@ export class CJAPIClient {
       variants,
       reviews,
     };
+  }
+
+  /**
+   * Récupérer toutes les catégories
+   */
+  async getCategories(): Promise<any[]> {
+    this.logger.log('🏷️ Récupération des catégories CJ...');
+    
+    try {
+      const response = await this.makeRequest('GET', '/product/category');
+      
+      if (response.code === 200) {
+        const categories = Array.isArray(response.data) ? response.data : [];
+        this.logger.log(`✅ ${categories.length} catégories récupérées`);
+        return categories;
+      } else {
+        throw new Error(response.message || 'Erreur lors de la récupération des catégories');
+      }
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération catégories:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer l'arbre des catégories
+   */
+  async getCategoriesTree(): Promise<any[]> {
+    this.logger.log('🌳 Récupération de l\'arbre des catégories CJ...');
+    
+    try {
+      const response = await this.makeRequest('GET', '/product/category/tree');
+      
+      if (response.code === 200) {
+        const tree = Array.isArray(response.data) ? response.data : [];
+        this.logger.log(`✅ Arbre des catégories récupéré`);
+        return tree;
+      } else {
+        throw new Error(response.message || 'Erreur lors de la récupération de l\'arbre');
+      }
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération arbre:', error);
+      throw error;
+    }
   }
 
   /**

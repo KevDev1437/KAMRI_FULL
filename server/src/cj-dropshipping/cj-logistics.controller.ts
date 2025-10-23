@@ -23,7 +23,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -45,7 +45,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques par pays: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques par pays: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -66,7 +66,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques express: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques express: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -87,7 +87,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques sensibles: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques sensibles: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -110,7 +110,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques par délai: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques par délai: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -132,7 +132,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur recherche logistiques: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur recherche logistiques: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -159,7 +159,7 @@ export class CJLogisticsController {
         logistics: logistics
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur récupération logistiques recommandées: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur récupération logistiques recommandées: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -193,7 +193,7 @@ export class CJLogisticsController {
         cost: cost
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur calcul coût livraison: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur calcul coût livraison: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
@@ -213,7 +213,7 @@ export class CJLogisticsController {
         message: 'Logistiques synchronisées avec succès'
       };
     } catch (error) {
-      this.logger.error(`❌ Erreur synchronisation logistiques: ${error.message}`, error.stack);
+      this.logger.error(`❌ Erreur synchronisation logistiques: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
     }
   }
