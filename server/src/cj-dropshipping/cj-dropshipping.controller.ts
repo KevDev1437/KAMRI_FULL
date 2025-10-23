@@ -265,6 +265,19 @@ export class CJDropshippingController {
     }
   }
 
+  @Get('products/imported')
+  @ApiOperation({ summary: 'Récupérer les produits CJ importés' })
+  @ApiResponse({ status: 200, description: 'Produits importés récupérés' })
+  async getImportedProducts() {
+    try {
+      const products = await this.cjService.getImportedProducts();
+      return products;
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération produits importés: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      return [];
+    }
+  }
+
   @Get('stats/products')
   @ApiOperation({ summary: 'Statistiques des produits' })
   @ApiResponse({ status: 200, description: 'Statistiques produits' })

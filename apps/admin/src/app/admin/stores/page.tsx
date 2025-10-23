@@ -100,15 +100,23 @@ export default function StoresPage() {
   // Récupérer les produits d'un magasin
   const fetchStoreProducts = useCallback(async (storeId: string) => {
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (storeId === 'cj-favorites') {
+        // Récupérer les produits CJ importés
+        const data = await apiClient<StoreProduct[]>('/cj-dropshipping/products/imported');
+        console.log('📦 Données reçues du serveur (Favoris CJ):', data);
+        setProducts(Array.isArray(data) ? data : []);
+        setCategories([]);
+      } else {
+        const params = new URLSearchParams();
+        if (searchTerm) params.append('search', searchTerm);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (categoryFilter !== 'all') params.append('category', categoryFilter);
 
-      const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
-      console.log('📦 Données reçues du serveur (Produits):', data);
-      setProducts(data.products || []);
-      setCategories(data.categories || []);
+        const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
+        console.log('📦 Données reçues du serveur (Produits):', data);
+        setProducts(data.products || []);
+        setCategories(data.categories || []);
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des produits:', error);
       setProducts([]);
@@ -354,12 +362,50 @@ export default function StoresPage() {
               </Card>
             ))}
 
+            {/* Magasin Favoris CJ */}
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 border-purple-200">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold flex items-center text-purple-600">
+                    <StoreIcon className="mr-2 h-5 w-5" /> Favoris CJ Dropshipping
+                  </CardTitle>
+                  <Badge className="bg-purple-500">
+                    Favoris
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Vos produits favoris importés depuis CJ Dropshipping
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center">
+                    <Package className="mr-2 h-4 w-4 text-muted-foreground" />
+                    Produits importés
+                  </div>
+                  <div className="flex items-center">
+                    <CheckCircle className="mr-2 h-4 w-4 text-muted-foreground" />
+                    Prêts à vendre
+                  </div>
+                  <div className="flex items-center col-span-2">
+                    <span className="mr-2 text-muted-foreground">Source:</span> CJ Dropshipping
+                  </div>
+                </div>
+                <Button 
+                  className="w-full mt-4 bg-purple-600 hover:bg-purple-700" 
+                  onClick={() => handleViewProducts('cj-favorites')}
+                >
+                  Voir mes favoris CJ
+                </Button>
+              </CardContent>
+            </Card>
+
             {Array.isArray(stores) && stores.length === 0 && (
               <div className="col-span-full text-center py-8">
                 <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Aucun magasin disponible</p>
+                <p className="text-muted-foreground">Aucun autre magasin disponible</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Assurez-vous que CJ Dropshipping est configuré et activé
+                  Vos favoris CJ sont disponibles ci-dessus
                 </p>
               </div>
             )}

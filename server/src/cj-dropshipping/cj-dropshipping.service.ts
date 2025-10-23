@@ -1032,6 +1032,40 @@ export class CJDropshippingService {
   }
 
   /**
+   * Récupérer les produits CJ importés dans KAMRI
+   */
+  async getImportedProducts(): Promise<any[]> {
+    try {
+      this.logger.log('📦 Récupération des produits CJ importés...');
+      
+      // Récupérer les produits du magasin CJ
+      const cjProducts = await this.prisma.cJProductStore.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      this.logger.log(`✅ ${cjProducts.length} produits CJ importés trouvés`);
+      
+      // Transformer les données pour l'interface
+      return cjProducts.map(product => ({
+        id: product.id,
+        cjProductId: product.cjProductId,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+        category: product.category,
+        status: product.status,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }));
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération produits importés: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      return [];
+    }
+  }
+
+  /**
    * Importer un produit CJ vers KAMRI
    */
   async importProduct(pid: string, categoryId?: string, margin: number = 2.5): Promise<any> {
