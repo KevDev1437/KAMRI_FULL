@@ -99,6 +99,7 @@ export class CJAPIClient {
   private config: CJConfig | null = null;
   private requestQueue: Array<() => Promise<void>> = [];
   private isProcessingQueue: boolean = false;
+  public tier: 'free' | 'plus' | 'prime' | 'advanced' = 'free';
 
   constructor(
     private configService: ConfigService
@@ -130,6 +131,8 @@ export class CJAPIClient {
    */
   setConfig(config: CJConfig): void {
     this.config = config;
+    this.tier = config.tier || 'free';
+    this.logger.log(`Configuration CJ mise à jour - Niveau: ${this.tier}`);
   }
 
   /**
@@ -150,7 +153,7 @@ export class CJAPIClient {
       this.logger.log('Authentification avec CJ Dropshipping...');
       this.logger.log('Config:', JSON.stringify(this.config, null, 2));
       
-      const response = await this.axiosInstance.post('/auth', {
+      const response = await this.axiosInstance.post('/authentication/getAccessToken', {
         email: this.config!.email,
         apiKey: this.config!.apiKey,
       }, {
@@ -175,6 +178,46 @@ export class CJAPIClient {
   /**
    * Rafraîchir le token d'accès
    */
+  /**
+   * Calcule le délai optimal basé sur le niveau utilisateur
+   */
+  private getOptimalDelay(): number {
+    const tier = this.tier || 'free';
+    
+    switch (tier) {
+      case 'free':
+        return 1200; // 1.2s pour Free (1 req/s)
+      case 'plus':
+        return 600;  // 0.6s pour Plus (2 req/s)
+      case 'prime':
+        return 300;  // 0.3s pour Prime (4 req/s)
+      case 'advanced':
+        return 200;  // 0.2s pour Advanced (6 req/s)
+      default:
+        return 1200; // Par défaut, Free
+    }
+  }
+
+  /**
+   * Calcule le délai de retry après rate limit
+   */
+  private getRetryDelay(): number {
+    const tier = this.tier || 'free';
+    
+    switch (tier) {
+      case 'free':
+        return 15000; // 15s pour Free
+      case 'plus':
+        return 10000; // 10s pour Plus
+      case 'prime':
+        return 8000;  // 8s pour Prime
+      case 'advanced':
+        return 5000;  // 5s pour Advanced
+      default:
+        return 15000; // Par défaut, Free
+    }
+  }
+
   async refreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
       throw new Error('Aucun refresh token disponible');
@@ -252,7 +295,7 @@ export class CJAPIClient {
   /**
    * Effectuer une requête avec gestion automatique des tokens et rate limiting
    */
-  private async makeRequest<T>(
+  public async makeRequest<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     data?: any
@@ -304,9 +347,10 @@ export class CJAPIClient {
       });
       this.logger.log('🔍 === FIN makeRequest ===');
       
-      // ✅ PAUSE OBLIGATOIRE après chaque requête pour respecter le rate limit
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      this.logger.log('⏳ Pause de 1.2s respectée');
+      // ✅ PAUSE INTELLIGENTE basée sur le niveau utilisateur
+      const delay = this.getOptimalDelay();
+      this.logger.log(`⏳ Pause de ${delay}ms respectée (niveau: ${this.tier})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
       
       return response.data;
     } catch (error) {
@@ -315,10 +359,11 @@ export class CJAPIClient {
       this.logger.error('📊 Type d\'erreur:', typeof error);
       this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
       
-      // Gérer l'erreur 429 (Too Many Requests) avec retry
-      if (error instanceof CJAPIError && error.code === 429) {
-        this.logger.warn('⏳ Rate limit atteint, attente de 5 secondes avant retry...');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Attendre 5 secondes
+      // Gérer l'erreur 429 (Too Many Requests) avec retry intelligent
+      if (error instanceof CJAPIError && (error.code === 429 || error.code === 1600200)) {
+        const retryDelay = this.getRetryDelay();
+        this.logger.warn(`⏳ Rate limit atteint (${error.code}), attente de ${retryDelay}ms avant retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
         
         this.logger.log('🔄 Retry après rate limit...');
         try {
@@ -339,9 +384,9 @@ export class CJAPIClient {
         }
       }
       
-      if (error instanceof CJAPIError && error.code === 401) {
-        // Token expiré, essayer de rafraîchir
-        this.logger.warn('🔄 Token expiré, tentative de rafraîchissement...');
+      // Gestion des erreurs d'authentification
+      if (error instanceof CJAPIError && (error.code === 401 || error.code === 1600001 || error.code === 1600003)) {
+        this.logger.warn(`🔑 Erreur d'authentification (${error.code}), tentative de rafraîchissement...`);
         await this.refreshAccessToken();
         
         // Retry avec le nouveau token
@@ -407,13 +452,23 @@ export class CJAPIClient {
 
     this.logger.log('📊 Paramètres finaux:', JSON.stringify(params, null, 2));
 
-    // Utiliser le paramètre keyword de l'API CJ selon la documentation
+    // Utiliser des paramètres moins restrictifs pour obtenir plus de résultats
     const requestParams = {
       pageNum: params.pageNum,
       pageSize: params.pageSize,
-      countryCode: params.countryCode,
       sortBy: params.sortBy,
-      keyword: params.keyword, // Utiliser le keyword de l'API CJ
+      keyword: params.keyword,
+      minPrice: params.minPrice,
+      maxPrice: params.maxPrice,
+      categoryId: params.categoryId,
+      searchType: 0, // 0=All products selon la doc CJ
+      // Paramètres moins restrictifs pour obtenir plus de résultats
+      productType: 'ORDINARY_PRODUCT', // Produits ordinaires
+      // Désactiver les filtres trop restrictifs
+      // isFreeShipping: 1, // Commenté pour inclure tous les produits
+      // verifiedWarehouse: 1, // Commenté pour inclure tous les produits
+      sort: 'desc', // Tri décroissant
+      orderBy: 'createAt', // Trier par date de création
     };
     
     this.logger.log('📡 Paramètres de requête API:', JSON.stringify(requestParams, null, 2));

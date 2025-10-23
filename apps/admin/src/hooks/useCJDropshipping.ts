@@ -150,6 +150,30 @@ export const useCJDropshipping = () => {
     }
   };
 
+  const getConnectionStatus = async (): Promise<{
+    connected: boolean;
+    tier: string;
+    lastSync: string | null;
+    apiLimits: {
+      qps: string;
+      loginPer5min: number;
+      refreshPerMin: number;
+    };
+    tips: string[];
+  }> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/status');
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération du statut');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ===== PRODUITS =====
 
   const getDefaultProducts = async (params?: { pageNum?: number; pageSize?: number; countryCode?: string }): Promise<CJProduct[]> => {
@@ -381,6 +405,7 @@ export const useCJDropshipping = () => {
     getConfig,
     updateConfig,
     testConnection,
+    getConnectionStatus,
     getDefaultProducts,
     searchProducts,
     getProductDetails,

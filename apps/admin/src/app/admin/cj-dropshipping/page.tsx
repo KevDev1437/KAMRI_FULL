@@ -13,11 +13,23 @@ export default function CJDropshippingPage() {
     getConfig,
     getStats,
     testConnection,
+    getConnectionStatus,
   } = useCJDropshipping();
 
   const [config, setConfig] = useState<CJConfig | null>(null);
   const [stats, setStats] = useState<CJStats | null>(null);
   const [testing, setTesting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    connected: boolean;
+    tier: string;
+    lastSync: string | null;
+    apiLimits: {
+      qps: string;
+      loginPer5min: number;
+      refreshPerMin: number;
+    };
+    tips: string[];
+  } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -25,12 +37,14 @@ export default function CJDropshippingPage() {
 
   const loadData = async () => {
     try {
-      const [configData, statsData] = await Promise.all([
+      const [configData, statsData, statusData] = await Promise.all([
         getConfig(),
         getStats(),
+        getConnectionStatus(),
       ]);
       setConfig(configData);
       setStats(statsData);
+      setConnectionStatus(statusData);
     } catch (err) {
       console.error('Erreur lors du chargement des données:', err);
     }
@@ -88,13 +102,13 @@ export default function CJDropshippingPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Statut</p>
               <p className={`text-2xl font-bold ${
-                config?.connected ? 'text-green-600' : 'text-red-600'
+                connectionStatus?.connected ? 'text-green-600' : 'text-red-600'
               }`}>
-                {config?.connected ? 'Connecté' : 'Déconnecté'}
+                {connectionStatus?.connected ? 'Connecté' : 'Déconnecté'}
               </p>
             </div>
             <div className={`w-3 h-3 rounded-full ${
-              config?.connected ? 'bg-green-500' : 'bg-red-500'
+              connectionStatus?.connected ? 'bg-green-500' : 'bg-red-500'
             }`}></div>
           </div>
         </Card>
@@ -103,7 +117,7 @@ export default function CJDropshippingPage() {
           <div>
             <p className="text-sm font-medium text-gray-600">Tier</p>
             <p className="text-2xl font-bold text-blue-600 capitalize">
-              {config?.tier || 'Non configuré'}
+              {connectionStatus?.tier || config?.tier || 'Non configuré'}
             </p>
           </div>
         </Card>
@@ -148,6 +162,18 @@ export default function CJDropshippingPage() {
                 {config?.apiKey ? '***' + config.apiKey.slice(-4) : 'Non configuré'}
               </p>
             </div>
+            {connectionStatus && (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-gray-600">Limites API</p>
+                  <p className="font-medium">{connectionStatus.apiLimits.qps}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Dernière sync</p>
+                  <p className="font-medium">{connectionStatus.lastSync || 'Jamais'}</p>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 onClick={handleTestConnection}
@@ -241,6 +267,21 @@ export default function CJDropshippingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Conseils */}
+      {connectionStatus?.tips && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Conseils</h3>
+          <div className="space-y-2">
+            {connectionStatus.tips.map((tip, index) => (
+              <div key={index} className="flex items-start space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                <p className="text-sm text-gray-700">{tip}</p>
+              </div>
+            ))}
           </div>
         </Card>
       )}

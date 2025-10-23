@@ -150,6 +150,83 @@ export class CJDropshippingService {
     }
   }
 
+  /**
+   * Obtenir le statut de connexion CJ
+   */
+  async getConnectionStatus(): Promise<{
+    connected: boolean;
+    tier: string;
+    lastSync: string | null;
+    apiLimits: {
+      qps: string;
+      loginPer5min: number;
+      refreshPerMin: number;
+    };
+    tips: string[];
+  }> {
+    try {
+      // Récupérer la configuration
+      const config = await this.getConfig();
+      
+      // Vérifier si le client est connecté
+      let connected = false;
+      let tier = config.tier || 'free';
+      
+      try {
+        if (config.email && config.apiKey) {
+          const client = await this.initializeClient();
+          connected = true;
+        }
+      } catch (error) {
+        connected = false;
+      }
+
+      // Définir les limites selon le tier
+      const apiLimits = {
+        free: { qps: '1 req/s', loginPer5min: 1, refreshPerMin: 5 },
+        plus: { qps: '2 req/s', loginPer5min: 1, refreshPerMin: 5 },
+        prime: { qps: '4 req/s', loginPer5min: 1, refreshPerMin: 5 },
+        advanced: { qps: '6 req/s', loginPer5min: 1, refreshPerMin: 5 }
+      };
+
+      const limits = apiLimits[tier as keyof typeof apiLimits] || apiLimits.free;
+
+      return {
+        connected,
+        tier,
+        lastSync: null, // TODO: Implémenter le suivi de la dernière sync
+        apiLimits: {
+          qps: limits.qps,
+          loginPer5min: limits.loginPer5min,
+          refreshPerMin: limits.refreshPerMin
+        },
+        tips: [
+          'Testez votre connexion avec le bouton "Tester la connexion"',
+          'Synchronisez votre tier avec votre compte CJ officiel',
+          'Activez l\'intégration pour commencer à utiliser les fonctionnalités',
+          'Gardez vos credentials sécurisés et ne les partagez jamais'
+        ]
+      };
+    } catch (error) {
+      this.logger.error('Erreur récupération statut connexion:', error);
+      return {
+        connected: false,
+        tier: 'free',
+        lastSync: null,
+        apiLimits: {
+          qps: '1 req/s',
+          loginPer5min: 1,
+          refreshPerMin: 5
+        },
+        tips: [
+          'Erreur lors de la récupération du statut',
+          'Vérifiez votre configuration CJ',
+          'Contactez le support si le problème persiste'
+        ]
+      };
+    }
+  }
+
   // Cache simple pour éviter les requêtes répétées
   private defaultProductsCache: { data: CJProduct[]; timestamp: number } | null = null;
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -246,42 +323,12 @@ export class CJDropshippingService {
         listLength: result.list?.length || 0
       }, null, 2));
 
-      // Filtrage côté client si l'API CJ ne filtre pas correctement
+      // Retourner tous les produits sans filtrage côté client pour éviter de perdre des résultats
       let filteredProducts = result.list || [];
-      this.logger.log(`🔍 Avant filtrage: ${filteredProducts.length} produits`);
-
-      if (query.keyword && query.keyword.trim()) {
-        this.logger.log(`🔍 Filtrage par mot-clé: "${query.keyword}"`);
-        const keyword = query.keyword.toLowerCase();
-        
-        filteredProducts = result.list.filter(product => {
-          const name = (product.productName || '').toLowerCase();
-          const nameEn = (product.productNameEn || '').toLowerCase();
-          const sku = (product.productSku || '').toLowerCase();
-          const category = (product.categoryName || '').toLowerCase();
-
-          const matches = name.includes(keyword) ||
-                         nameEn.includes(keyword) ||
-                         sku.includes(keyword) ||
-                         category.includes(keyword);
-
-          if (matches) {
-            this.logger.log(`✅ Produit correspondant trouvé: ${product.productNameEn || product.productName} (SKU: ${product.productSku})`);
-          } else {
-            // Log des produits non correspondants pour debug
-            this.logger.log(`❌ Produit non correspondant: ${product.productNameEn || product.productName} (SKU: ${product.productSku})`);
-            this.logger.log(`   - Name: "${name}"`);
-            this.logger.log(`   - NameEn: "${nameEn}"`);
-            this.logger.log(`   - SKU: "${sku}"`);
-            this.logger.log(`   - Category: "${category}"`);
-            this.logger.log(`   - Keyword recherché: "${keyword}"`);
-          }
-
-          return matches;
-        });
-        
-        this.logger.log(`🔍 Après filtrage: ${filteredProducts.length} produits`);
-      }
+      this.logger.log(`🔍 Produits retournés par l'API CJ: ${filteredProducts.length} produits`);
+      
+      // Désactiver le filtrage côté client pour permettre plus de résultats
+      this.logger.log('🔍 Filtrage côté client désactivé - retour de tous les produits de l\'API CJ');
 
       this.logger.log('🎉 Recherche terminée avec succès');
       this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ ===');
@@ -898,5 +945,220 @@ export class CJDropshippingService {
     });
 
     return newCategory.id;
+  }
+
+  /**
+   * Ajoute un produit à "Mes Produits"
+   */
+  async addToMyProducts(productId: string): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`➕ Ajout du produit ${productId} à mes produits...`);
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/addToMyProduct', {
+        productId: productId
+      });
+      
+      if (result.code === 200) {
+        this.logger.log(`✅ Produit ${productId} ajouté à mes produits`);
+        return {
+          success: true,
+          message: 'Produit ajouté à mes produits avec succès'
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de l\'ajout du produit');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur ajout produit ${productId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère la liste de mes produits
+   */
+  async getMyProducts(params: {
+    keyword?: string;
+    categoryId?: string;
+    startAt?: string;
+    endAt?: string;
+    isListed?: number;
+    visiable?: number;
+    hasPacked?: number;
+    hasVirPacked?: number;
+  } = {}): Promise<{ success: boolean; products: any[]; total: number }> {
+    this.logger.log('📦 Récupération de mes produits...');
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/myProduct/query', params, 'GET');
+      
+      if (result.code === 200) {
+        this.logger.log(`✅ ${result.data.totalRecords} produits trouvés dans mes produits`);
+        return {
+          success: true,
+          products: result.data.content || [],
+          total: result.data.totalRecords || 0
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération des produits');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération mes produits: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les variantes d'un produit
+   */
+  async getProductVariants(params: {
+    pid?: string;
+    productSku?: string;
+    variantSku?: string;
+    countryCode?: string;
+  }): Promise<{ success: boolean; variants: any[] }> {
+    this.logger.log('🔍 Récupération des variantes du produit...');
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/variant/query', params, 'GET');
+      
+      if (result.code === 200) {
+        this.logger.log(`✅ ${result.data.length} variantes trouvées`);
+        return {
+          success: true,
+          variants: result.data || []
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération des variantes');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération variantes: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère le stock d'un produit
+   */
+  async getProductStock(vid: string): Promise<{ success: boolean; stock: any[] }> {
+    this.logger.log(`📦 Récupération du stock pour la variante ${vid}...`);
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/stock/queryByVid', { vid }, 'GET');
+      
+      if (result.code === 200) {
+        this.logger.log(`✅ Stock récupéré pour ${result.data.length} entrepôts`);
+        return {
+          success: true,
+          stock: result.data || []
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération du stock');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération stock: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les avis d'un produit
+   */
+  async getProductReviews(params: {
+    pid: string;
+    score?: number;
+    pageNum?: number;
+    pageSize?: number;
+  }): Promise<{ success: boolean; reviews: any[]; total: number }> {
+    this.logger.log(`⭐ Récupération des avis du produit ${params.pid}...`);
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/productComments', params, 'GET');
+      
+      if (result.code === 0) {
+        this.logger.log(`✅ ${result.data.total} avis trouvés`);
+        return {
+          success: true,
+          reviews: result.data.list || [],
+          total: parseInt(result.data.total) || 0
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération des avis');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération avis: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Crée une demande de sourcing
+   */
+  async createSourcing(params: {
+    productName: string;
+    productImage: string;
+    productUrl?: string;
+    remark?: string;
+    price?: number;
+    thirdProductId?: string;
+    thirdVariantId?: string;
+    thirdProductSku?: string;
+  }): Promise<{ success: boolean; cjSourcingId: string; message: string }> {
+    this.logger.log(`🔍 Création d'une demande de sourcing pour ${params.productName}...`);
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/sourcing/create', params);
+      
+      if (result.code === 0) {
+        this.logger.log(`✅ Demande de sourcing créée: ${result.data.cjSourcingId}`);
+        return {
+          success: true,
+          cjSourcingId: result.data.cjSourcingId,
+          message: 'Demande de sourcing créée avec succès'
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la création de la demande de sourcing');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur création sourcing: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les catégories de produits
+   */
+  async getProductCategories(): Promise<{ success: boolean; categories: any[] }> {
+    this.logger.log('📂 Récupération des catégories de produits...');
+    
+    try {
+      const client = await this.initializeClient();
+      
+      const result = await client.makeRequest('/product/getCategory', {}, 'GET');
+      
+      if (result.code === 200) {
+        this.logger.log(`✅ ${result.data.length} catégories trouvées`);
+        return {
+          success: true,
+          categories: result.data || []
+        };
+      } else {
+        throw new Error(result.message || 'Erreur lors de la récupération des catégories');
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération catégories: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

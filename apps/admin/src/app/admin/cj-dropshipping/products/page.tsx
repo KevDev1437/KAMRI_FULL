@@ -21,7 +21,7 @@ export default function CJProductsPage() {
   const [filters, setFilters] = useState<CJProductSearchFilters>({
     keyword: '',
     pageNum: 1,
-    pageSize: 20,
+    pageSize: 50, // Augmenter le nombre de produits par page
     minPrice: undefined,
     maxPrice: undefined,
     countryCode: 'US',
@@ -96,11 +96,7 @@ export default function CJProductsPage() {
   };
 
   const handleSearch = async () => {
-    if (!filters.keyword?.trim()) {
-      alert('Veuillez entrer un mot-clé de recherche');
-      return;
-    }
-
+    // Permettre la recherche même sans mot-clé pour voir tous les produits
     setSearching(true);
     setProducts([]); // Effacer les résultats précédents
     try {
@@ -184,7 +180,7 @@ export default function CJProductsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mot-clé *
+              Mot-clé (optionnel)
             </label>
             <Input
               type="text"
@@ -232,15 +228,20 @@ export default function CJProductsPage() {
               Pays
             </label>
             <select
-              value={filters.countryCode || 'US'}
-              onChange={(e) => setFilters(prev => ({ ...prev, countryCode: e.target.value }))}
+              value={filters.countryCode || 'ALL'}
+              onChange={(e) => setFilters(prev => ({ ...prev, countryCode: e.target.value === 'ALL' ? undefined : e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="US">États-Unis</option>
-              <option value="FR">France</option>
-              <option value="DE">Allemagne</option>
-              <option value="GB">Royaume-Uni</option>
-              <option value="CA">Canada</option>
+              <option value="ALL">🌍 Tous les pays</option>
+              <option value="US">🇺🇸 États-Unis</option>
+              <option value="FR">🇫🇷 France</option>
+              <option value="DE">🇩🇪 Allemagne</option>
+              <option value="GB">🇬🇧 Royaume-Uni</option>
+              <option value="CA">🇨🇦 Canada</option>
+              <option value="CN">🇨🇳 Chine</option>
+              <option value="IT">🇮🇹 Italie</option>
+              <option value="ES">🇪🇸 Espagne</option>
+              <option value="AU">🇦🇺 Australie</option>
             </select>
           </div>
         </div>
@@ -248,10 +249,22 @@ export default function CJProductsPage() {
         <div className="flex gap-4">
           <Button
             onClick={handleSearch}
-            disabled={searching || !filters.keyword?.trim()}
+            disabled={searching}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {searching ? 'Recherche...' : 'Rechercher'}
+          </Button>
+          
+          <Button
+            onClick={() => {
+              setFilters(prev => ({ ...prev, keyword: '', minPrice: undefined, maxPrice: undefined }));
+              handleSearch();
+            }}
+            disabled={searching}
+            variant="outline"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {searching ? 'Chargement...' : 'Voir tous les produits'}
           </Button>
           
           <Button

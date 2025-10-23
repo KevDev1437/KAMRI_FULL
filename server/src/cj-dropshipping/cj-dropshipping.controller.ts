@@ -53,6 +53,13 @@ export class CJDropshippingController {
     return this.cjService.testConnection();
   }
 
+  @Get('status')
+  @ApiOperation({ summary: 'Obtenir le statut de connexion CJ Dropshipping' })
+  @ApiResponse({ status: 200, description: 'Statut récupéré avec succès' })
+  async getConnectionStatus() {
+    return this.cjService.getConnectionStatus();
+  }
+
   // ===== PRODUITS =====
 
   @Get('products/default')
