@@ -273,6 +273,48 @@ export class CJDropshippingService {
     this.logger.log('🔍 === DÉBUT getDefaultProducts ===');
     this.logger.log('📝 Paramètres:', JSON.stringify(query, null, 2));
     
+    // 🚨 PROTECTION : Si le token est valide, utiliser la base de données locale
+    const hasToken = this.cjApiClient['accessToken'];
+    const tokenExpiry = this.cjApiClient['tokenExpiry'];
+    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    
+    if (isTokenValid) {
+      this.logger.log('✅ Token CJ valide - Utilisation de la base de données locale');
+      const existingProducts = await this.prisma.cJProductStore.count();
+      
+      if (existingProducts > 0) {
+        this.logger.log(`📦 ${existingProducts} produits en base - Utilisation du cache local`);
+        const cachedProducts = await this.prisma.cJProductStore.findMany({
+          take: query.pageSize || 100,
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        // Transformer en format CJProduct
+        return cachedProducts.map(product => ({
+          pid: product.cjProductId,
+          productName: product.name,
+          productNameEn: product.name,
+          productSku: product.cjProductId,
+          sellPrice: Number(product.originalPrice) || 0,
+          productImage: product.image,
+          categoryName: product.category,
+          description: product.description,
+          variants: [],
+          rating: 0,
+          totalReviews: 0,
+          weight: 0,
+          dimensions: '',
+          brand: '',
+          tags: [],
+          reviews: []
+        }));
+      } else {
+        this.logger.log('📦 Aucun produit en base - Appel API CJ nécessaire');
+      }
+    } else {
+      this.logger.log('🔑 Token CJ invalide ou expiré - Appel API CJ nécessaire');
+    }
+    
     // Vérifier le cache pour la première page
     if (query.pageNum === 1 && this.defaultProductsCache && 
         (Date.now() - this.defaultProductsCache.timestamp) < this.CACHE_DURATION) {
@@ -332,6 +374,9 @@ export class CJDropshippingService {
   async searchProducts(query: CJProductSearchDto): Promise<CJProduct[]> {
     this.logger.log('🔍 === DÉBUT RECHERCHE PRODUITS CJ ===');
     this.logger.log('📝 Paramètres de recherche:', JSON.stringify(query, null, 2));
+    
+    // 🔍 RECHERCHE CJ DROPSHIPPING : Toujours sur l'API CJ pour découvrir de nouveaux produits
+    this.logger.log('🔍 Recherche sur l\'API CJ Dropshipping...');
     
     try {
       this.logger.log('🚀 Initialisation du client CJ...');
@@ -1157,7 +1202,14 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('🔗 Client CJ initialisé, appel API...');
       
-      const result = await client.makeRequest('GET', '/product/myProduct/query', params);
+      // Ajouter la pagination pour récupérer plus de favoris
+      const paramsWithPagination = {
+        ...params,
+        pageNum: 1,
+        pageSize: 100 // Récupérer jusqu'à 100 favoris
+      };
+      
+      const result = await client.makeRequest('GET', '/product/myProduct/query', paramsWithPagination);
       
       this.logger.log('📊 Réponse API reçue:', {
         code: result.code,
@@ -1437,6 +1489,13 @@ export class CJDropshippingService {
   async importProduct(pid: string, categoryId?: string, margin: number = 2.5, isFavorite: boolean = false): Promise<any> {
     this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
     this.logger.log('📝 Paramètres:', { pid, categoryId, margin, isFavorite });
+    
+    // 🚨 VALIDATION : Rejeter les PID invalides
+    if (!pid || pid === 'imported' || pid === 'available' || pid === 'selected' || pid === 'pending') {
+      this.logger.error(`❌ PID invalide reçu dans importProduct: "${pid}" - Ce n'est pas un ID de produit CJ valide`);
+      this.logger.error('🔍 Stack trace pour identifier l\'appelant:', new Error().stack);
+      throw new Error(`PID invalide: "${pid}" n'est pas un ID de produit CJ valide`);
+    }
     
     try {
       this.logger.log('🔗 Initialisation du client CJ...');
