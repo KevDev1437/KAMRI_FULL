@@ -1237,27 +1237,141 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('🔗 Client CJ initialisé, appel API...');
       
-      // Ajouter la pagination pour récupérer plus de favoris
-      const paramsWithPagination = {
-        ...params,
-        pageNum: 1,
-        pageSize: 100 // Récupérer jusqu'à 100 favoris
-      };
+      // 🔄 RÉCUPÉRATION DE TOUTES LES PAGES DE FAVORIS
+      this.logger.log('📦 Récupération de TOUS les favoris CJ (pagination complète)...');
+      console.log(`🚀 === DÉBUT PAGINATION COMPLÈTE ===`);
+      console.log(`📊 Paramètres initiaux:`, JSON.stringify(params, null, 2));
       
-      const result = await client.makeRequest('GET', '/product/myProduct/query', paramsWithPagination);
+      const allFavorites: any[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+      let totalRecords = 0;
       
-      this.logger.log('📊 Réponse API reçue:', {
-        code: result.code,
-        hasData: !!result.data,
-        dataType: typeof result.data
+      do {
+        this.logger.log(`📄 Récupération page ${currentPage}...`);
+        console.log(`\n📄 === PAGE ${currentPage} ===`);
+        
+        const paramsWithPagination = {
+          ...params,
+          pageNum: currentPage,
+          pageSize: 100 // Maximum par page
+        };
+        
+        console.log(`📝 Paramètres page ${currentPage}:`, JSON.stringify(paramsWithPagination, null, 2));
+        
+        const result = await client.makeRequest('GET', '/product/myProduct/query', paramsWithPagination);
+        
+        if (result.code === 200) {
+          const data = result.data as any;
+          totalRecords = data.totalRecords || 0;
+          totalPages = data.totalPages || 1;
+          
+          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
+          console.log(`🔍 === DÉTAILS PAGE ${currentPage} ===`);
+          console.log('📊 Structure de la réponse:', JSON.stringify({
+            totalRecords: data.totalRecords,
+            totalPages: data.totalPages,
+            pageSize: data.pageSize,
+            pageNumber: data.pageNumber,
+            contentLength: data.content?.length || 0
+          }, null, 2));
+          
+          if (data.content && data.content.length > 0) {
+            console.log(`📦 Premiers produits de la page ${currentPage}:`);
+            data.content.slice(0, 3).forEach((product: any, index: number) => {
+              console.log(`  ${index + 1}. ${product.nameEn || product.productName || 'Sans nom'}`);
+              console.log(`     - SKU: ${product.sku}`);
+              console.log(`     - Prix: ${product.sellPrice}`);
+              console.log(`     - Image: ${product.bigImage ? '✅' : '❌'}`);
+              console.log(`     - ProductId: ${product.productId}`);
+            });
+            
+            allFavorites.push(...data.content);
+          }
+          
+          currentPage++;
+          
+          console.log(`📊 État pagination: page ${currentPage}/${totalPages}, total: ${totalRecords}`);
+          
+          // Attendre entre les pages pour éviter le rate limiting
+          if (currentPage <= totalPages) {
+            console.log(`⏳ Attente 2 secondes avant page ${currentPage}...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Augmenté à 2 secondes
+          }
+        } else {
+          this.logger.error(`❌ Erreur page ${currentPage}:`, result.message);
+          break;
+        }
+      } while (currentPage <= totalPages);
+      
+      this.logger.log(`✅ Total récupéré: ${allFavorites.length} favoris sur ${totalRecords}`);
+      console.log(`\n🎉 === RÉSUMÉ COMPLET PAGINATION ===`);
+      console.log(`📊 Total favoris récupérés: ${allFavorites.length}`);
+      console.log(`📊 Total attendu: ${totalRecords}`);
+      console.log(`📊 Pages traitées: ${currentPage - 1}`);
+      console.log(`📊 Taux de récupération: ${((allFavorites.length / totalRecords) * 100).toFixed(1)}%`);
+      
+      if (allFavorites.length < totalRecords) {
+        console.log(`⚠️ ATTENTION: Seulement ${allFavorites.length} favoris récupérés sur ${totalRecords} attendus !`);
+        console.log(`🔍 Vérifiez la pagination et les paramètres de l'API CJ`);
+      }
+      
+      // Afficher un échantillon des favoris récupérés
+      console.log(`📦 Échantillon des favoris récupérés (premiers 5):`);
+      allFavorites.slice(0, 5).forEach((favorite: any, index: number) => {
+        console.log(`  ${index + 1}. ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
+        console.log(`     - SKU: ${favorite.sku}`);
+        console.log(`     - Prix: ${favorite.sellPrice}`);
+        console.log(`     - Image: ${favorite.bigImage ? '✅' : '❌'}`);
+        console.log(`     - ProductId: ${favorite.productId}`);
       });
       
-      if (result.code === 200) {
-        const data = result.data as any;
+      // Utiliser les données récupérées
+      const data = {
+        totalRecords: totalRecords,
+        content: allFavorites
+      };
+      
+      // Traitement des données récupérées
+      if (data.totalRecords > 0) {
         this.logger.log('📦 Détails des favoris:', {
           totalRecords: data.totalRecords,
           contentLength: data.content?.length || 0,
           hasContent: !!data.content
+        });
+        
+        // 🔧 CORRECTION : Transformer les données selon la structure CJ
+        console.log(`🔄 Transformation de ${data.content.length} favoris...`);
+        const transformedProducts = (data.content || []).map((product: any, index: number) => {
+          const transformed = {
+            productId: product.productId,
+            productName: product.nameEn || product.productName,
+            productNameEn: product.nameEn,
+            productSku: product.sku,
+            sellPrice: product.sellPrice,
+            productImage: product.bigImage,
+            categoryName: product.categoryName || '',
+            description: product.description || '',
+            variants: [],
+            rating: 0,
+            totalReviews: 0,
+            weight: product.weight || 0,
+            dimensions: '',
+            brand: '',
+            tags: [],
+            reviews: []
+          };
+          
+          // Log des premiers produits transformés
+          if (index < 3) {
+            console.log(`  🔄 Produit ${index + 1} transformé:`);
+            console.log(`     - Nom: ${transformed.productName}`);
+            console.log(`     - SKU: ${transformed.productSku}`);
+            console.log(`     - Prix: ${transformed.sellPrice}`);
+            console.log(`     - Image: ${transformed.productImage ? '✅' : '❌'}`);
+          }
+          
+          return transformed;
         });
         
         this.logger.log(`✅ ${data.totalRecords} produits favoris trouvés`);
@@ -1265,12 +1379,16 @@ export class CJDropshippingService {
         
         return {
           success: true,
-          products: data.content || [],
+          products: transformedProducts,
           total: data.totalRecords || 0
         };
       } else {
-        this.logger.error('❌ Erreur API CJ:', result.message);
-        throw new Error(result.message || 'Erreur lors de la récupération des favoris');
+        this.logger.log('ℹ️ Aucun favori trouvé');
+        return {
+          success: true,
+          products: [],
+          total: 0
+        };
       }
     } catch (error) {
       this.logger.error('❌ === ERREUR RÉCUPÉRATION FAVORIS ===');
@@ -1317,6 +1435,9 @@ export class CJDropshippingService {
       }
 
       this.logger.log(`📦 ${favorites.products.length} favoris trouvés, début de l'import...`);
+      console.log(`🚀 === DÉBUT IMPORT DES FAVORIS ===`);
+      console.log(`📊 Total favoris à importer: ${favorites.products.length}`);
+      
       let synced = 0;
       const errors = [];
 
@@ -1325,21 +1446,53 @@ export class CJDropshippingService {
         const favorite = favorites.products[i];
         this.logger.log(`🔄 Traitement favori ${i + 1}/${favorites.products.length}: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
         
+        console.log(`\n📦 === FAVORI ${i + 1}/${favorites.products.length} ===`);
+        console.log(`📝 Nom: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
+        console.log(`📝 SKU: ${favorite.sku}`);
+        console.log(`📝 ProductId: ${favorite.productId}`);
+        console.log(`📝 Prix: ${favorite.sellPrice}`);
+        console.log(`📝 Image: ${favorite.productImage ? '✅' : '❌'}`);
+        
         try {
           this.logger.log(`📝 Import du favori: PID=${favorite.productId}, SKU=${favorite.sku}`);
-          await this.importProduct(favorite.productId, undefined, 2.5, true); // isFavorite = true
+          const importResult = await this.importProduct(favorite.productId, undefined, 2.5, true); // isFavorite = true
           synced++;
+          console.log(`✅ Favori ${i + 1} importé avec succès`);
           this.logger.log(`✅ Favori ${i + 1} importé avec succès: ${favorite.nameEn || favorite.productName}`);
+          
+          // Attendre entre les imports pour éviter le rate limiting
+          if (i < favorites.products.length - 1) {
+            console.log(`⏳ Attente 3 secondes avant le prochain import...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
         } catch (error) {
           errors.push(favorite.sku || favorite.productId);
+          console.log(`❌ Erreur import favori ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
           this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.sku || favorite.productId}):`, error);
+          
+          // Attendre même en cas d'erreur pour éviter le rate limiting
+          if (i < favorites.products.length - 1) {
+            console.log(`⏳ Attente 3 secondes après erreur...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
         }
       }
 
       this.logger.log('📊 === RÉSULTAT SYNCHRONISATION ===');
       this.logger.log(`✅ Favoris importés: ${synced}`);
       this.logger.log(`❌ Erreurs: ${errors.length}`);
+      
+      console.log(`\n🎉 === RÉSULTAT FINAL SYNCHRONISATION ===`);
+      console.log(`✅ Favoris importés avec succès: ${synced}`);
+      console.log(`❌ Erreurs d'import: ${errors.length}`);
+      console.log(`📊 Total traités: ${favorites.products.length}`);
+      console.log(`📊 Taux de succès: ${((synced / favorites.products.length) * 100).toFixed(1)}%`);
+      
       if (errors.length > 0) {
+        console.log(`\n❌ Erreurs détaillées:`);
+        errors.forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error}`);
+        });
         this.logger.log('🔍 Erreurs détaillées:', errors);
       }
 
@@ -1551,7 +1704,20 @@ export class CJDropshippingService {
       });
       
       // Créer le produit KAMRI
-      const originalPrice = Number(cjProduct.sellPrice) || 0; // Prix original avec fallback
+      // 🔧 CORRECTION : Gérer les prix avec plage (ex: "2.4-12.81")
+      let originalPrice = 0;
+      const priceStr = String(cjProduct.sellPrice || '');
+      console.log(`💰 Prix brut reçu: "${priceStr}" (type: ${typeof cjProduct.sellPrice})`);
+      
+      if (priceStr.includes('-')) {
+        // Prendre le prix minimum de la plage
+        const priceRange = priceStr.split('-');
+        originalPrice = Number(priceRange[0]) || 0;
+        console.log(`💰 Prix plage détectée: ${priceRange[0]} → ${originalPrice}`);
+      } else {
+        originalPrice = Number(priceStr) || 0;
+        console.log(`💰 Prix simple: ${priceStr} → ${originalPrice}`);
+      }
       const sellingPrice = originalPrice * margin; // Prix de vente avec marge
       
       this.logger.log('💰 Prix calculés:', {

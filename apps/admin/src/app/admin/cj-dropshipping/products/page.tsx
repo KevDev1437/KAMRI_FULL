@@ -498,10 +498,19 @@ export default function CJProductsPage() {
                 
                 <div className="aspect-square bg-gray-100">
                   <img
-                    src={product.productImage}
+                    src={(() => {
+                      // Vérifier que l'image est une URL valide
+                      const imageUrl = product.productImage;
+                      if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.includes('[') || imageUrl.includes(']')) {
+                        console.warn('Image invalide détectée:', imageUrl);
+                        return '/placeholder-product.jpg';
+                      }
+                      return imageUrl;
+                    })()}
                     alt={product.productNameEn}
                     className="w-full h-full object-cover"
                     onError={(e) => {
+                      console.warn('Erreur de chargement d\'image:', product.productImage);
                       (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
                     }}
                   />
@@ -572,7 +581,16 @@ export default function CJProductsPage() {
                     </Button>
                     
                     <Button
-                      onClick={() => window.open(`/admin/cj-dropshipping/products/${product.pid}`, '_blank')}
+                      onClick={() => {
+                        // Vérifier que le PID est valide (pas un tableau d'URLs)
+                        const pid = String(product.pid || '');
+                        if (pid.includes('http') || pid.includes('[') || pid.includes(']')) {
+                          console.warn('PID invalide détecté:', pid);
+                          alert('❌ Impossible d\'afficher les détails : PID invalide');
+                          return;
+                        }
+                        window.open(`/admin/cj-dropshipping/products/${encodeURIComponent(pid)}`, '_blank');
+                      }}
                       variant="outline"
                     >
                       Détails
