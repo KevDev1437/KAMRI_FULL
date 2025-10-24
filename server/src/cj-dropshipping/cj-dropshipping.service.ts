@@ -198,13 +198,8 @@ export class CJDropshippingService {
       // Récupérer la configuration
       const config = await this.getConfig();
       
-      this.logger.log('🔍 === DIAGNOSTIC CONNEXION CJ ===');
-      this.logger.log('📝 Configuration:', {
-        email: config.email ? `${config.email.substring(0, 3)}***` : 'NON DÉFINI',
-        apiKey: config.apiKey ? 'DÉFINI' : 'NON DÉFINI',
-        enabled: config.enabled,
-        tier: config.tier
-      });
+      // 🔇 LOGS RÉDUITS : Éviter le spam de logs
+      this.logger.log('🔍 Vérification connexion CJ...');
       
       // Vérifier si le client est connecté
       let connected = false;
@@ -315,7 +310,7 @@ export class CJDropshippingService {
       if (existingProducts > 0) {
         this.logger.log(`📦 ${existingProducts} produits en base - Utilisation du cache local`);
         const cachedProducts = await this.prisma.cJProductStore.findMany({
-          take: query.pageSize || 100,
+          take: Number(query.pageSize) || 100,
           orderBy: { createdAt: 'desc' }
         });
         
@@ -407,6 +402,16 @@ export class CJDropshippingService {
     
     // 🔍 RECHERCHE CJ DROPSHIPPING : Toujours sur l'API CJ pour découvrir de nouveaux produits
     this.logger.log('🔍 Recherche sur l\'API CJ Dropshipping...');
+    
+    // 🚨 PROTECTION : Éviter les appels inutiles pendant le rate limiting
+    const hasToken = this.cjApiClient['accessToken'];
+    const tokenExpiry = this.cjApiClient['tokenExpiry'];
+    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    
+    if (!isTokenValid) {
+      this.logger.log('🔑 Token CJ invalide - Connexion requise');
+      throw new Error('Token CJ invalide - Veuillez vous reconnecter');
+    }
     
     try {
       this.logger.log('🚀 Initialisation du client CJ...');
@@ -1522,9 +1527,13 @@ export class CJDropshippingService {
     
     // 🚨 VALIDATION : Rejeter les PID invalides
     if (!pid || pid === 'imported' || pid === 'available' || pid === 'selected' || pid === 'pending') {
-      this.logger.error(`❌ PID invalide reçu dans importProduct: "${pid}" - Ce n'est pas un ID de produit CJ valide`);
-      this.logger.error('🔍 Stack trace pour identifier l\'appelant:', new Error().stack);
-      throw new Error(`PID invalide: "${pid}" n'est pas un ID de produit CJ valide`);
+      this.logger.error(`❌ PID invalide reçu: "${pid}" - Ignoré pour éviter les appels API inutiles`);
+      this.logger.error('🔍 Stack trace:', new Error().stack);
+      return {
+        success: false,
+        message: `PID invalide: "${pid}" - Ce n'est pas un ID de produit CJ valide`,
+        product: null
+      };
     }
     
     try {
