@@ -198,21 +198,47 @@ export class CJDropshippingService {
       // Récupérer la configuration
       const config = await this.getConfig();
       
+      this.logger.log('🔍 === DIAGNOSTIC CONNEXION CJ ===');
+      this.logger.log('📝 Configuration:', {
+        email: config.email ? `${config.email.substring(0, 3)}***` : 'NON DÉFINI',
+        apiKey: config.apiKey ? 'DÉFINI' : 'NON DÉFINI',
+        enabled: config.enabled,
+        tier: config.tier
+      });
+      
       // Vérifier si le client est connecté
       let connected = false;
       let tier = config.tier || 'free';
+      let errorMessage = '';
       
       try {
-        if (config.email && config.apiKey) {
+        if (!config.email || !config.apiKey) {
+          errorMessage = 'Email ou API Key manquant';
+          this.logger.log('❌ Credentials manquants');
+        } else if (!config.enabled) {
+          errorMessage = 'Intégration CJ désactivée';
+          this.logger.log('❌ Intégration désactivée');
+        } else {
           const client = await this.initializeClient();
           connected = true;
           
-          // ✅ SUPPRESSION DE LA SYNCHRONISATION AUTOMATIQUE
-          // La synchronisation ne doit se faire que sur demande explicite
+          // Vérifier le token
+          const hasToken = this.cjApiClient['accessToken'];
+          const tokenExpiry = this.cjApiClient['tokenExpiry'];
+          const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+          
+          this.logger.log('🔑 État du token:', {
+            hasToken: !!hasToken,
+            tokenExpiry: tokenExpiry,
+            isTokenValid: isTokenValid
+          });
+          
           this.logger.log('✅ Client CJ connecté (sans synchronisation automatique)');
         }
       } catch (error) {
         connected = false;
+        errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error('❌ Erreur de connexion:', errorMessage);
       }
 
       // Définir les limites selon le tier
@@ -234,11 +260,15 @@ export class CJDropshippingService {
           loginPer5min: limits.loginPer5min,
           refreshPerMin: limits.refreshPerMin
         },
-        tips: [
-          'Testez votre connexion avec le bouton "Tester la connexion"',
-          'Synchronisez votre tier avec votre compte CJ officiel',
-          'Activez l\'intégration pour commencer à utiliser les fonctionnalités',
-          'Gardez vos credentials sécurisés et ne les partagez jamais'
+        tips: connected ? [
+          'Connexion CJ active - Vous pouvez rechercher des produits',
+          'Synchronisez vos favoris pour les importer',
+          'Gérez vos commandes via l\'interface CJ'
+        ] : [
+          errorMessage || 'Problème de connexion détecté',
+          'Vérifiez vos credentials CJ',
+          'Activez l\'intégration si nécessaire',
+          'Testez la connexion avec le bouton "Tester la connexion"'
         ]
       };
     } catch (error) {
