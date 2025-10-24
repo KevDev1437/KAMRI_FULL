@@ -40,6 +40,12 @@ export default function CJProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  
+  // États pour la sélection multiple
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [showBulkMapping, setShowBulkMapping] = useState(false);
+  const [selectedKamriCategory, setSelectedKamriCategory] = useState<string>('');
 
   // Charger les catégories et produits lors de la connexion
   useEffect(() => {
@@ -170,6 +176,70 @@ export default function CJProductsPage() {
       alert('❌ Erreur lors de l\'import du produit');
     } finally {
       setImporting(null);
+    }
+  };
+
+  // Fonctions pour la sélection multiple
+  const toggleProductSelection = (pid: string) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pid)) {
+        newSet.delete(pid);
+      } else {
+        newSet.add(pid);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllProducts = () => {
+    setSelectedProducts(new Set(products.map(p => p.pid)));
+  };
+
+  const clearSelection = () => {
+    setSelectedProducts(new Set());
+  };
+
+  const handleBulkImport = async () => {
+    if (selectedProducts.size === 0) {
+      alert('❌ Veuillez sélectionner au moins un produit');
+      return;
+    }
+
+    if (!selectedKamriCategory) {
+      alert('❌ Veuillez sélectionner une catégorie KAMRI');
+      return;
+    }
+
+    setBulkImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const pid of Array.from(selectedProducts)) {
+        try {
+          await importProduct(pid, selectedKamriCategory, 2.5);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          console.error(`Erreur import produit ${pid}:`, error);
+        }
+      }
+
+      alert(`✅ Import en lot terminé !\n✅ ${successCount} produits importés\n❌ ${errorCount} erreurs`);
+      
+      // Marquer les produits comme importés
+      setProducts(prev => prev.map(p => 
+        selectedProducts.has(p.pid) ? { ...p, imported: true } : p
+      ));
+
+      // Vider la sélection
+      clearSelection();
+      setShowBulkMapping(false);
+    } catch (err) {
+      alert('❌ Erreur lors de l\'import en lot');
+    } finally {
+      setBulkImporting(false);
     }
   };
 
@@ -376,13 +446,56 @@ export default function CJProductsPage() {
       {/* Résultats de recherche */}
       {products.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-4">
-            Résultats ({products.length} produits trouvés) - Page {currentPage}
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">
+              Résultats ({products.length} produits trouvés) - Page {currentPage}
+            </h2>
+            
+            {/* Contrôles de sélection multiple */}
+            <div className="flex gap-2">
+              <Button
+                onClick={selectAllProducts}
+                variant="outline"
+                size="sm"
+                disabled={selectedProducts.size === products.length}
+              >
+                Tout sélectionner
+              </Button>
+              
+              <Button
+                onClick={clearSelection}
+                variant="outline"
+                size="sm"
+                disabled={selectedProducts.size === 0}
+              >
+                Désélectionner tout
+              </Button>
+              
+              {selectedProducts.size > 0 && (
+                <Button
+                  onClick={() => setShowBulkMapping(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                >
+                  Importer sélection ({selectedProducts.size})
+                </Button>
+              )}
+            </div>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
-              <Card key={product.pid} className="overflow-hidden">
+              <Card key={product.pid} className="overflow-hidden relative">
+                {/* Checkbox de sélection */}
+                <div className="absolute top-2 left-2 z-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.has(product.pid)}
+                    onChange={() => toggleProductSelection(product.pid)}
+                    className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
+                
                 <div className="aspect-square bg-gray-100">
                   <img
                     src={product.productImage}
@@ -506,6 +619,55 @@ export default function CJProductsPage() {
             <p>Récupération des produits populaires depuis CJ Dropshipping</p>
           </div>
         </Card>
+      )}
+
+      {/* Modal de mapping en lot */}
+      {showBulkMapping && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Importer {selectedProducts.size} produits
+            </h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Catégorie KAMRI de destination
+              </label>
+              <select
+                value={selectedKamriCategory}
+                onChange={(e) => setSelectedKamriCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sélectionner une catégorie...</option>
+                {categories.map((category) => (
+                  <option key={category.categoryFirstId || category.id} value={category.categoryFirstId || category.id}>
+                    {category.categoryFirstName || category.name || category.nameEn}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <Button
+                onClick={() => {
+                  setShowBulkMapping(false);
+                  setSelectedKamriCategory('');
+                }}
+                variant="outline"
+              >
+                Annuler
+              </Button>
+              
+              <Button
+                onClick={handleBulkImport}
+                disabled={bulkImporting || !selectedKamriCategory}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {bulkImporting ? 'Import en cours...' : 'Importer'}
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );
