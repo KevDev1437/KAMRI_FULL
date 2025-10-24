@@ -75,6 +75,7 @@ export default function StoresPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categories, setCategories] = useState<string[]>([]);
+  const [syncingStatus, setSyncingStatus] = useState(false);
 
   // Récupérer les magasins
   const fetchStores = useCallback(async () => {
@@ -165,29 +166,19 @@ export default function StoresPage() {
   // Récupérer les produits d'un magasin
   const fetchStoreProducts = useCallback(async (storeId: string) => {
     try {
-       if (storeId === 'cj-dropshipping') {
-         // Récupérer les produits CJ via l'endpoint des magasins (workflow original)
+       if (storeId === 'cj-dropshipping' || storeId === 'cj-favorites') {
+         // 🔄 UTILISER L'ENDPOINT CJ QUI RÉCUPÈRE DEPUIS LA BASE DE DONNÉES
          const params = new URLSearchParams();
          if (searchTerm) params.append('search', searchTerm);
          if (statusFilter !== 'all') params.append('status', statusFilter);
          if (categoryFilter !== 'all') params.append('category', categoryFilter);
          
-         const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
-         console.log('📦 Données reçues du serveur (Magasin CJ):', data);
+         // Utiliser l'endpoint CJ qui lit depuis la base de données (pas d'appel API CJ)
+         const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/cj-dropshipping/stores/${storeId}/products?${params}`);
+         console.log(`📦 Données reçues depuis la base de données (${storeId}):`, data);
          setProducts(data.products || []);
          setCategories(data.categories || []);
-       } else if (storeId === 'cj-favorites') {
-         // Récupérer les produits CJ favoris via l'endpoint des magasins (même système que le magasin principal)
-         const params = new URLSearchParams();
-         if (searchTerm) params.append('search', searchTerm);
-         if (statusFilter !== 'all') params.append('status', statusFilter);
-         if (categoryFilter !== 'all') params.append('category', categoryFilter);
-         
-         const data = await apiClient<{ products: StoreProduct[], categories: string[] }>(`/stores/${storeId}/products?${params}`);
-         console.log('📦 Données reçues du serveur (Favoris CJ):', data);
-         setProducts(data.products || []);
-         setCategories(data.categories || []);
-      } else {
+       } else {
         const params = new URLSearchParams();
         if (searchTerm) params.append('search', searchTerm);
         if (statusFilter !== 'all') params.append('status', statusFilter);
@@ -219,16 +210,32 @@ export default function StoresPage() {
 
   // Importer les produits sélectionnés
   const importSelectedProducts = useCallback(async (storeId: string) => {
+    setSyncingStatus(true);
     try {
       const data = await apiClient<{ message: string }>(`/stores/${storeId}/import-selected`, {
         method: 'POST',
       });
       alert(data.message);
-      fetchStoreProducts(storeId);
-      fetchStores();
+      
+      // 🔄 SYNCHRONISATION AUTOMATIQUE DU STATUT
+      console.log('🔄 Synchronisation du statut après import...');
+      
+      // Recharger les produits pour mettre à jour les statuts
+      await fetchStoreProducts(storeId);
+      
+      // Recharger les magasins pour mettre à jour les statistiques
+      await fetchStores();
+      
+      // Déclencher un événement pour notifier les autres composants
+      window.dispatchEvent(new CustomEvent('productStatusChanged', {
+        detail: { storeId, action: 'import' }
+      }));
+      
     } catch (error) {
       console.error('Erreur lors de l\'import:', error);
       alert(`Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setSyncingStatus(false);
     }
   }, [fetchStoreProducts, fetchStores]);
 
@@ -241,6 +248,26 @@ export default function StoresPage() {
       fetchStoreProducts(selectedStoreId);
     }
   }, [selectedStoreId, fetchStoreProducts]);
+
+  // 🔄 ÉCOUTER LES CHANGEMENTS DE STATUT DEPUIS D'AUTRES SECTIONS
+  useEffect(() => {
+    const handleProductStatusChange = () => {
+      console.log('🔄 Changement de statut détecté, rechargement des produits...');
+      if (selectedStoreId) {
+        fetchStoreProducts(selectedStoreId);
+        fetchStores();
+      }
+    };
+
+    // Écouter les événements de changement de statut
+    window.addEventListener('productStatusChanged', handleProductStatusChange);
+    window.addEventListener('cjProductImported', handleProductStatusChange);
+    
+    return () => {
+      window.removeEventListener('productStatusChanged', handleProductStatusChange);
+      window.removeEventListener('cjProductImported', handleProductStatusChange);
+    };
+  }, [selectedStoreId, fetchStoreProducts, fetchStores]);
 
   const handleViewProducts = (storeId: string) => {
     setSelectedStoreId(storeId);
@@ -281,8 +308,18 @@ export default function StoresPage() {
               <Button onClick={handleCloseProducts} variant="outline">
                 Fermer
               </Button>
-              <Button onClick={() => importSelectedProducts(selectedStoreId)}>
-                Importer les sélectionnés ({products.filter(p => p.status === 'selected').length})
+              <Button 
+                onClick={() => importSelectedProducts(selectedStoreId)}
+                disabled={syncingStatus}
+              >
+                {syncingStatus ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Synchronisation...
+                  </>
+                ) : (
+                  `Importer les sélectionnés (${products.filter(p => p.status === 'selected').length})`
+                )}
               </Button>
             </div>
           </CardHeader>

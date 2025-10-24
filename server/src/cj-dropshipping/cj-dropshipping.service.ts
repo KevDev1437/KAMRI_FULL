@@ -49,7 +49,7 @@ export class CJDropshippingService {
       await this.cjApiClient.login();
       this.logger.log('✅ Login CJ réussi');
     } else {
-      this.logger.log('✅ Token CJ déjà valide');
+      this.logger.log('✅ Token CJ déjà valide - Utilisation de la connexion existante');
     }
     
     return this.cjApiClient;
@@ -158,15 +158,9 @@ export class CJDropshippingService {
       
       this.logger.log(`✅ Connexion réussie - ${categories.length} catégories, ${products.length} produits chargés`);
       
-      // 🔄 SYNCHRONISATION AUTOMATIQUE DES FAVORIS LORS DE LA CONNEXION
-      this.logger.log('🔄 Synchronisation automatique des favoris CJ...');
-      try {
-        const syncResult = await this.syncFavorites();
-        this.logger.log(`✅ Favoris synchronisés automatiquement: ${syncResult.synced} favoris`);
-      } catch (syncError) {
-        this.logger.warn('⚠️ Erreur synchronisation automatique favoris:', syncError);
-        // Ne pas faire échouer la connexion si la sync échoue
-      }
+      // ✅ SUPPRESSION DE LA SYNCHRONISATION AUTOMATIQUE
+      // La synchronisation ne doit se faire que sur demande explicite
+      this.logger.log('✅ Connexion CJ établie (sans synchronisation automatique)');
       
       return { 
         success: true, 
@@ -213,15 +207,9 @@ export class CJDropshippingService {
           const client = await this.initializeClient();
           connected = true;
           
-          // 🔄 SYNCHRONISATION AUTOMATIQUE DES FAVORIS LORS DE LA CONNEXION
-          this.logger.log('🔄 Synchronisation automatique des favoris CJ...');
-          try {
-            await this.syncFavorites();
-            this.logger.log('✅ Favoris synchronisés automatiquement');
-          } catch (syncError) {
-            this.logger.warn('⚠️ Erreur synchronisation automatique favoris:', syncError);
-            // Ne pas faire échouer la connexion si la sync échoue
-          }
+          // ✅ SUPPRESSION DE LA SYNCHRONISATION AUTOMATIQUE
+          // La synchronisation ne doit se faire que sur demande explicite
+          this.logger.log('✅ Client CJ connecté (sans synchronisation automatique)');
         }
       } catch (error) {
         connected = false;

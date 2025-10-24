@@ -359,5 +359,70 @@ export class CJDropshippingController {
   async getWebhookStats() {
     return this.cjService.getWebhookStats();
   }
+
+  @Get('stores/:storeId/products')
+  @ApiOperation({ summary: 'Récupérer les produits d\'un magasin CJ depuis la base de données' })
+  @ApiResponse({ status: 200, description: 'Produits du magasin récupérés' })
+  async getStoreProducts(@Param('storeId') storeId: string, @Query() query: any) {
+    try {
+      this.logger.log(`🔍 Récupération des produits du magasin ${storeId} depuis la base de données...`);
+      
+      // Construire les filtres
+      const whereClause: any = {};
+      
+      // Filtre par statut
+      if (query.status && query.status !== 'all') {
+        whereClause.status = query.status;
+      }
+      
+      // Filtre par catégorie
+      if (query.category && query.category !== 'all') {
+        whereClause.category = { contains: query.category };
+      }
+      
+      // Filtre par recherche
+      if (query.search) {
+        whereClause.OR = [
+          { name: { contains: query.search } },
+          { description: { contains: query.search } },
+          { category: { contains: query.search } }
+        ];
+      }
+      
+      // Récupérer les produits depuis la base de données
+      const products = await this.prisma.cJProductStore.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      // Récupérer les catégories uniques
+      const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
+      
+      this.logger.log(`✅ ${products.length} produits récupérés depuis la base de données`);
+      
+      return {
+        products: products.map(product => ({
+          id: product.id,
+          cjProductId: product.cjProductId,
+          name: product.name,
+          description: product.description || '',
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          category: product.category,
+          status: product.status,
+          createdAt: product.createdAt,
+          updatedAt: product.updatedAt
+        })),
+        categories
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération produits magasin: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        products: [],
+        categories: []
+      };
+    }
+  }
 }
 
