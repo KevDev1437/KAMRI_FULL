@@ -96,7 +96,7 @@ export default function SimilarProducts({ products }: SimilarProductsProps) {
                   </div>
                   
                   {/* Badge */}
-                  {product.badge && (
+                  {product.badge && badgeConfig && (
                     <div 
                       className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold"
                       style={{ 

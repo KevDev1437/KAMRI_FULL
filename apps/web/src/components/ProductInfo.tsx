@@ -54,7 +54,7 @@ export default function ProductInfo({ product }: ProductInfoProps) {
   return (
     <div className="space-y-6">
       {/* Badge */}
-      {product.badge && (
+      {product.badge && badgeConfig && (
         <div 
           className="inline-block px-3 py-1 rounded-full text-sm font-bold"
           style={{ 
