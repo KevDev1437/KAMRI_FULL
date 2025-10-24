@@ -1237,70 +1237,89 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('🔗 Client CJ initialisé, appel API...');
       
-      // 🔄 RÉCUPÉRATION SIMPLE ET EFFICACE
-      this.logger.log('📦 Récupération des favoris CJ...');
+      // 🔄 RÉCUPÉRATION AVEC PAGINATION (nécessaire car API CJ limite à 10 par page)
+      this.logger.log('📦 Récupération des favoris CJ avec pagination...');
       
-      const result = await client.makeRequest('GET', '/product/myProduct/query', {
-        ...params,
-        pageNum: 1,
-        pageSize: 100 // Récupérer le maximum en une fois
-      });
+      const allFavorites: any[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+      let totalRecords = 0;
       
-      if (result.code === 200) {
-        const data = result.data as any;
-        const allFavorites = data.content || [];
+      do {
+        this.logger.log(`📄 Récupération page ${currentPage}...`);
         
-        this.logger.log(`✅ ${allFavorites.length} favoris récupérés`);
-      
-        // Utiliser les données récupérées
-        const responseData = {
-          totalRecords: data.totalRecords || allFavorites.length,
-          content: allFavorites
-        };
-      
-        // Traitement des données récupérées
-        if (responseData.totalRecords > 0) {
-          this.logger.log(`✅ ${responseData.totalRecords} favoris trouvés`);
+        const result = await client.makeRequest('GET', '/product/myProduct/query', {
+          ...params,
+          pageNum: currentPage,
+          pageSize: 10 // Limite fixe de l'API CJ
+        });
+        
+        if (result.code === 200) {
+          const data = result.data as any;
+          totalRecords = data.totalRecords || 0;
+          totalPages = data.totalPages || 1;
           
-          // Transformer les données selon la structure CJ
-          const transformedProducts = responseData.content.map((product: any) => {
-            return {
-              productId: product.productId,
-              productName: product.nameEn || product.productName,
-              productNameEn: product.nameEn,
-              productSku: product.sku,
-              sellPrice: product.sellPrice,
-              productImage: product.bigImage,
-              categoryName: product.categoryName || '',
-              description: product.description || '',
-              variants: [],
-              rating: 0,
-              totalReviews: 0,
-              weight: product.weight || 0,
-              dimensions: '',
-              brand: '',
-              tags: [],
-              reviews: []
-            };
-          });
+          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
           
-          return {
-            success: true,
-            products: transformedProducts,
-            total: responseData.totalRecords
-          };
+          if (data.content && data.content.length > 0) {
+            allFavorites.push(...data.content);
+          }
+          
+          currentPage++;
+          
+          // Attendre entre les pages pour éviter le rate limiting
+          if (currentPage <= totalPages) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         } else {
-          this.logger.log('ℹ️ Aucun favori trouvé');
-          return {
-            success: true,
-            products: [],
-            total: 0
-          };
+          this.logger.error(`❌ Erreur page ${currentPage}:`, result.message);
+          break;
         }
-      } else {
-        this.logger.error(`❌ Erreur API: ${result.message}`);
+      } while (currentPage <= totalPages);
+      
+      this.logger.log(`✅ Total récupéré: ${allFavorites.length} favoris sur ${totalRecords}`);
+      
+      // Utiliser les données récupérées
+      const responseData = {
+        totalRecords: totalRecords,
+        content: allFavorites
+      };
+      
+      // Traitement des données récupérées
+      if (responseData.totalRecords > 0) {
+        this.logger.log(`✅ ${responseData.totalRecords} favoris trouvés`);
+        
+        // Transformer les données selon la structure CJ
+        const transformedProducts = responseData.content.map((product: any) => {
+          return {
+            productId: product.productId,
+            productName: product.nameEn || product.productName,
+            productNameEn: product.nameEn,
+            productSku: product.sku,
+            sellPrice: product.sellPrice,
+            productImage: product.bigImage,
+            categoryName: product.categoryName || '',
+            description: product.description || '',
+            variants: [],
+            rating: 0,
+            totalReviews: 0,
+            weight: product.weight || 0,
+            dimensions: '',
+            brand: '',
+            tags: [],
+            reviews: []
+          };
+        });
+        
         return {
-          success: false,
+          success: true,
+          products: transformedProducts,
+          total: responseData.totalRecords
+        };
+      } else {
+        this.logger.log('ℹ️ Aucun favori trouvé');
+        return {
+          success: true,
           products: [],
           total: 0
         };

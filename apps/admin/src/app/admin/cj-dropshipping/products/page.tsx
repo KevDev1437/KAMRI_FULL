@@ -1,5 +1,6 @@
 'use client';
 
+import { ProductDetailsModal } from '@/components/cj/ProductDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,10 @@ export default function CJProductsPage() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [showBulkMapping, setShowBulkMapping] = useState(false);
   const [selectedKamriCategory, setSelectedKamriCategory] = useState<string>('');
+  
+  // États pour le modal de détails
+  const [selectedProduct, setSelectedProduct] = useState<CJProduct | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Charger les catégories et produits lors de la connexion
   useEffect(() => {
@@ -262,6 +267,31 @@ export default function CJProductsPage() {
       alert('❌ Erreur lors de la synchronisation');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Fonctions pour le modal de détails
+  const handleShowDetails = (product: CJProduct) => {
+    setSelectedProduct(product);
+    setShowDetailsModal(true);
+  };
+
+  const handleCloseDetails = () => {
+    setShowDetailsModal(false);
+    setSelectedProduct(null);
+  };
+
+  const handleImportFromModal = async (productId: string) => {
+    try {
+      await importProduct(productId, undefined, 2.5);
+      // Fermer le modal après import
+      handleCloseDetails();
+      // Marquer le produit comme importé dans la liste
+      setProducts(prev => prev.map(p => 
+        p.pid === productId ? { ...p, imported: true } : p
+      ));
+    } catch (error) {
+      console.error('Erreur lors de l\'import:', error);
     }
   };
 
@@ -615,16 +645,7 @@ export default function CJProductsPage() {
                     </Button>
                     
                     <Button
-                      onClick={() => {
-                        // Vérifier que le PID est valide (pas un tableau d'URLs)
-                        const pid = String(product.pid || '');
-                        if (pid.includes('http') || pid.includes('[') || pid.includes(']')) {
-                          console.warn('PID invalide détecté:', pid);
-                          alert('❌ Impossible d\'afficher les détails : PID invalide');
-                          return;
-                        }
-                        window.open(`/admin/cj-dropshipping/products/${encodeURIComponent(pid)}`, '_blank');
-                      }}
+                      onClick={() => handleShowDetails(product)}
                       variant="outline"
                     >
                       Détails
@@ -721,6 +742,15 @@ export default function CJProductsPage() {
           </Card>
         </div>
       )}
+
+      {/* Modal de détails du produit */}
+      <ProductDetailsModal
+        isOpen={showDetailsModal}
+        onClose={handleCloseDetails}
+        product={selectedProduct}
+        onImport={handleImportFromModal}
+        importing={importing === selectedProduct?.pid}
+      />
     </div>
   );
 }
