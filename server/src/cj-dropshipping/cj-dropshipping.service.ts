@@ -1237,155 +1237,70 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('🔗 Client CJ initialisé, appel API...');
       
-      // 🔄 RÉCUPÉRATION DE TOUTES LES PAGES DE FAVORIS
-      this.logger.log('📦 Récupération de TOUS les favoris CJ (pagination complète)...');
-      console.log(`🚀 === DÉBUT PAGINATION COMPLÈTE ===`);
-      console.log(`📊 Paramètres initiaux:`, JSON.stringify(params, null, 2));
+      // 🔄 RÉCUPÉRATION SIMPLE ET EFFICACE
+      this.logger.log('📦 Récupération des favoris CJ...');
       
-      const allFavorites: any[] = [];
-      let currentPage = 1;
-      let totalPages = 1;
-      let totalRecords = 0;
-      
-      do {
-        this.logger.log(`📄 Récupération page ${currentPage}...`);
-        console.log(`\n📄 === PAGE ${currentPage} ===`);
-        
-        const paramsWithPagination = {
-          ...params,
-          pageNum: currentPage,
-          pageSize: 100 // Maximum par page
-        };
-        
-        console.log(`📝 Paramètres page ${currentPage}:`, JSON.stringify(paramsWithPagination, null, 2));
-        
-        const result = await client.makeRequest('GET', '/product/myProduct/query', paramsWithPagination);
-        
-        if (result.code === 200) {
-          const data = result.data as any;
-          totalRecords = data.totalRecords || 0;
-          totalPages = data.totalPages || 1;
-          
-          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
-          console.log(`🔍 === DÉTAILS PAGE ${currentPage} ===`);
-          console.log('📊 Structure de la réponse:', JSON.stringify({
-            totalRecords: data.totalRecords,
-            totalPages: data.totalPages,
-            pageSize: data.pageSize,
-            pageNumber: data.pageNumber,
-            contentLength: data.content?.length || 0
-          }, null, 2));
-          
-          if (data.content && data.content.length > 0) {
-            console.log(`📦 Premiers produits de la page ${currentPage}:`);
-            data.content.slice(0, 3).forEach((product: any, index: number) => {
-              console.log(`  ${index + 1}. ${product.nameEn || product.productName || 'Sans nom'}`);
-              console.log(`     - SKU: ${product.sku}`);
-              console.log(`     - Prix: ${product.sellPrice}`);
-              console.log(`     - Image: ${product.bigImage ? '✅' : '❌'}`);
-              console.log(`     - ProductId: ${product.productId}`);
-            });
-            
-            allFavorites.push(...data.content);
-          }
-          
-          currentPage++;
-          
-          console.log(`📊 État pagination: page ${currentPage}/${totalPages}, total: ${totalRecords}`);
-          
-          // Attendre entre les pages pour éviter le rate limiting
-          if (currentPage <= totalPages) {
-            console.log(`⏳ Attente 2 secondes avant page ${currentPage}...`);
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Augmenté à 2 secondes
-          }
-        } else {
-          this.logger.error(`❌ Erreur page ${currentPage}:`, result.message);
-          break;
-        }
-      } while (currentPage <= totalPages);
-      
-      this.logger.log(`✅ Total récupéré: ${allFavorites.length} favoris sur ${totalRecords}`);
-      console.log(`\n🎉 === RÉSUMÉ COMPLET PAGINATION ===`);
-      console.log(`📊 Total favoris récupérés: ${allFavorites.length}`);
-      console.log(`📊 Total attendu: ${totalRecords}`);
-      console.log(`📊 Pages traitées: ${currentPage - 1}`);
-      console.log(`📊 Taux de récupération: ${((allFavorites.length / totalRecords) * 100).toFixed(1)}%`);
-      
-      if (allFavorites.length < totalRecords) {
-        console.log(`⚠️ ATTENTION: Seulement ${allFavorites.length} favoris récupérés sur ${totalRecords} attendus !`);
-        console.log(`🔍 Vérifiez la pagination et les paramètres de l'API CJ`);
-      }
-      
-      // Afficher un échantillon des favoris récupérés
-      console.log(`📦 Échantillon des favoris récupérés (premiers 5):`);
-      allFavorites.slice(0, 5).forEach((favorite: any, index: number) => {
-        console.log(`  ${index + 1}. ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
-        console.log(`     - SKU: ${favorite.sku}`);
-        console.log(`     - Prix: ${favorite.sellPrice}`);
-        console.log(`     - Image: ${favorite.bigImage ? '✅' : '❌'}`);
-        console.log(`     - ProductId: ${favorite.productId}`);
+      const result = await client.makeRequest('GET', '/product/myProduct/query', {
+        ...params,
+        pageNum: 1,
+        pageSize: 100 // Récupérer le maximum en une fois
       });
       
-      // Utiliser les données récupérées
-      const data = {
-        totalRecords: totalRecords,
-        content: allFavorites
-      };
+      if (result.code === 200) {
+        const data = result.data as any;
+        const allFavorites = data.content || [];
+        
+        this.logger.log(`✅ ${allFavorites.length} favoris récupérés`);
       
-      // Traitement des données récupérées
-      if (data.totalRecords > 0) {
-        this.logger.log('📦 Détails des favoris:', {
-          totalRecords: data.totalRecords,
-          contentLength: data.content?.length || 0,
-          hasContent: !!data.content
-        });
-        
-        // 🔧 CORRECTION : Transformer les données selon la structure CJ
-        console.log(`🔄 Transformation de ${data.content.length} favoris...`);
-        const transformedProducts = (data.content || []).map((product: any, index: number) => {
-          const transformed = {
-            productId: product.productId,
-            productName: product.nameEn || product.productName,
-            productNameEn: product.nameEn,
-            productSku: product.sku,
-            sellPrice: product.sellPrice,
-            productImage: product.bigImage,
-            categoryName: product.categoryName || '',
-            description: product.description || '',
-            variants: [],
-            rating: 0,
-            totalReviews: 0,
-            weight: product.weight || 0,
-            dimensions: '',
-            brand: '',
-            tags: [],
-            reviews: []
-          };
-          
-          // Log des premiers produits transformés
-          if (index < 3) {
-            console.log(`  🔄 Produit ${index + 1} transformé:`);
-            console.log(`     - Nom: ${transformed.productName}`);
-            console.log(`     - SKU: ${transformed.productSku}`);
-            console.log(`     - Prix: ${transformed.sellPrice}`);
-            console.log(`     - Image: ${transformed.productImage ? '✅' : '❌'}`);
-          }
-          
-          return transformed;
-        });
-        
-        this.logger.log(`✅ ${data.totalRecords} produits favoris trouvés`);
-        this.logger.log('🔍 === FIN RÉCUPÉRATION FAVORIS CJ ===');
-        
-        return {
-          success: true,
-          products: transformedProducts,
-          total: data.totalRecords || 0
+        // Utiliser les données récupérées
+        const responseData = {
+          totalRecords: data.totalRecords || allFavorites.length,
+          content: allFavorites
         };
+      
+        // Traitement des données récupérées
+        if (responseData.totalRecords > 0) {
+          this.logger.log(`✅ ${responseData.totalRecords} favoris trouvés`);
+          
+          // Transformer les données selon la structure CJ
+          const transformedProducts = responseData.content.map((product: any) => {
+            return {
+              productId: product.productId,
+              productName: product.nameEn || product.productName,
+              productNameEn: product.nameEn,
+              productSku: product.sku,
+              sellPrice: product.sellPrice,
+              productImage: product.bigImage,
+              categoryName: product.categoryName || '',
+              description: product.description || '',
+              variants: [],
+              rating: 0,
+              totalReviews: 0,
+              weight: product.weight || 0,
+              dimensions: '',
+              brand: '',
+              tags: [],
+              reviews: []
+            };
+          });
+          
+          return {
+            success: true,
+            products: transformedProducts,
+            total: responseData.totalRecords
+          };
+        } else {
+          this.logger.log('ℹ️ Aucun favori trouvé');
+          return {
+            success: true,
+            products: [],
+            total: 0
+          };
+        }
       } else {
-        this.logger.log('ℹ️ Aucun favori trouvé');
+        this.logger.error(`❌ Erreur API: ${result.message}`);
         return {
-          success: true,
+          success: false,
           products: [],
           total: 0
         };
@@ -1434,19 +1349,26 @@ export class CJDropshippingService {
         };
       }
 
-      this.logger.log(`📦 ${favorites.products.length} favoris trouvés, début de l'import...`);
+      // 🔧 CORRECTION : Dédoublonner une dernière fois avant import
+      const uniqueFavorites = favorites.products.filter((product: any, index: number, self: any[]) => 
+        index === self.findIndex(p => p.productId === product.productId)
+      );
+      
+      console.log(`🔍 Favoris finaux dédoublonnés: ${favorites.products.length} → ${uniqueFavorites.length}`);
+      
+      this.logger.log(`📦 ${uniqueFavorites.length} favoris uniques trouvés, début de l'import...`);
       console.log(`🚀 === DÉBUT IMPORT DES FAVORIS ===`);
-      console.log(`📊 Total favoris à importer: ${favorites.products.length}`);
+      console.log(`📊 Total favoris à importer: ${uniqueFavorites.length}`);
       
       let synced = 0;
       const errors = [];
 
       // Importer chaque favori vers KAMRI (marquer comme favori)
-      for (let i = 0; i < favorites.products.length; i++) {
-        const favorite = favorites.products[i];
-        this.logger.log(`🔄 Traitement favori ${i + 1}/${favorites.products.length}: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
+      for (let i = 0; i < uniqueFavorites.length; i++) {
+        const favorite = uniqueFavorites[i];
+        this.logger.log(`🔄 Traitement favori ${i + 1}/${uniqueFavorites.length}: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
         
-        console.log(`\n📦 === FAVORI ${i + 1}/${favorites.products.length} ===`);
+        console.log(`\n📦 === FAVORI ${i + 1}/${uniqueFavorites.length} ===`);
         console.log(`📝 Nom: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
         console.log(`📝 SKU: ${favorite.sku}`);
         console.log(`📝 ProductId: ${favorite.productId}`);
@@ -1461,7 +1383,7 @@ export class CJDropshippingService {
           this.logger.log(`✅ Favori ${i + 1} importé avec succès: ${favorite.nameEn || favorite.productName}`);
           
           // Attendre entre les imports pour éviter le rate limiting
-          if (i < favorites.products.length - 1) {
+          if (i < uniqueFavorites.length - 1) {
             console.log(`⏳ Attente 3 secondes avant le prochain import...`);
             await new Promise(resolve => setTimeout(resolve, 3000));
           }
@@ -1471,7 +1393,7 @@ export class CJDropshippingService {
           this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.sku || favorite.productId}):`, error);
           
           // Attendre même en cas d'erreur pour éviter le rate limiting
-          if (i < favorites.products.length - 1) {
+          if (i < uniqueFavorites.length - 1) {
             console.log(`⏳ Attente 3 secondes après erreur...`);
             await new Promise(resolve => setTimeout(resolve, 3000));
           }
@@ -1485,8 +1407,8 @@ export class CJDropshippingService {
       console.log(`\n🎉 === RÉSULTAT FINAL SYNCHRONISATION ===`);
       console.log(`✅ Favoris importés avec succès: ${synced}`);
       console.log(`❌ Erreurs d'import: ${errors.length}`);
-      console.log(`📊 Total traités: ${favorites.products.length}`);
-      console.log(`📊 Taux de succès: ${((synced / favorites.products.length) * 100).toFixed(1)}%`);
+      console.log(`📊 Total traités: ${uniqueFavorites.length}`);
+      console.log(`📊 Taux de succès: ${((synced / uniqueFavorites.length) * 100).toFixed(1)}%`);
       
       if (errors.length > 0) {
         console.log(`\n❌ Erreurs détaillées:`);

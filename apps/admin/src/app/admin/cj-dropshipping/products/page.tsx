@@ -113,9 +113,19 @@ export default function CJProductsPage() {
         console.log('❌ Aucun nouveau produit, fin de pagination');
         setHasMoreProducts(false);
       } else {
-        console.log(`✅ Ajout de ${moreProducts.length} produits (total: ${products.length + moreProducts.length})`);
-        setProducts(prev => [...prev, ...moreProducts]);
-        setCurrentPage(nextPage);
+        // 🔧 CORRECTION : Éviter les doublons en filtrant les PIDs existants
+        const existingPids = new Set(products.map(p => p.pid));
+        const newProducts = moreProducts.filter(p => !existingPids.has(p.pid));
+        
+        console.log(`📦 ${moreProducts.length} produits reçus, ${newProducts.length} nouveaux (${moreProducts.length - newProducts.length} doublons filtrés)`);
+        
+        if (newProducts.length > 0) {
+          setProducts(prev => [...prev, ...newProducts]);
+          setCurrentPage(nextPage);
+        } else {
+          console.log('⚠️ Tous les produits sont des doublons, fin de pagination');
+          setHasMoreProducts(false);
+        }
         
         // Si on a moins de 50 produits, on a probablement atteint la fin
         if (moreProducts.length < 50) {
@@ -420,13 +430,15 @@ export default function CJProductsPage() {
                 const result = await syncFavorites();
                 alert(`✅ ${result.message}`);
                 if (result.synced > 0) {
-                  // Recharger les produits après synchronisation
+                  // Recharger les produits après synchronisation (remplacer au lieu d'ajouter)
                   const defaultProducts = await getDefaultProducts({
                     pageNum: 1,
                     pageSize: 100,
                     countryCode: 'US'
                   });
                   setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
+                  setCurrentPage(1); // Reset pagination
+                  setHasMoreProducts(true); // Réinitialiser la pagination
                 }
               } catch (error) {
                 alert('❌ Erreur lors de la synchronisation des favoris');
@@ -484,8 +496,8 @@ export default function CJProductsPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <Card key={product.pid} className="overflow-hidden relative">
+            {products.map((product, index) => (
+              <Card key={`${product.pid}-${index}`} className="overflow-hidden relative">
                 {/* Checkbox de sélection */}
                 <div className="absolute top-2 left-2 z-10">
                   <input
@@ -499,12 +511,34 @@ export default function CJProductsPage() {
                 <div className="aspect-square bg-gray-100">
                   <img
                     src={(() => {
-                      // Vérifier que l'image est une URL valide
-                      const imageUrl = product.productImage;
-                      if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.includes('[') || imageUrl.includes(']')) {
-                        console.warn('Image invalide détectée:', imageUrl);
+                      // Gérer les images CJ qui peuvent être un tableau ou une string
+                      let imageUrl = product.productImage;
+                      
+                      // Si c'est un tableau, prendre la première image
+                      if (Array.isArray(imageUrl)) {
+                        imageUrl = imageUrl[0];
+                        console.log('📸 Tableau d\'images détecté, utilisation de la première:', imageUrl);
+                      }
+                      
+                      // Si c'est une string qui contient un tableau JSON
+                      if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
+                        try {
+                          const parsed = JSON.parse(imageUrl);
+                          if (Array.isArray(parsed) && parsed.length > 0) {
+                            imageUrl = parsed[0];
+                            console.log('📸 JSON d\'images parsé, utilisation de la première:', imageUrl);
+                          }
+                        } catch (e) {
+                          console.warn('Erreur parsing JSON image:', e);
+                        }
+                      }
+                      
+                      // Vérifier que l'URL est valide
+                      if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
+                        console.warn('Image invalide détectée:', product.productImage);
                         return '/placeholder-product.jpg';
                       }
+                      
                       return imageUrl;
                     })()}
                     alt={product.productNameEn}
