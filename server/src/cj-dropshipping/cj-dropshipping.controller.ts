@@ -166,7 +166,7 @@ export class CJDropshippingController {
     @Param('pid') pid: string,
     @Body() body: { categoryId?: string; margin?: number }
   ) {
-    return this.cjService.importProduct(pid, body.categoryId, body.margin);
+    return this.cjService.importProduct(pid, body.categoryId, body.margin || 0);
   }
 
   @Post('products/sync')

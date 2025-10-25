@@ -581,7 +581,7 @@ export class CJDropshippingService {
     categoryId?: string, 
     margin?: number
   ): Promise<any> {
-    const finalPrice = margin ? cjProduct.sellPrice * (1 + margin / 100) : cjProduct.sellPrice;
+    const finalPrice = cjProduct.sellPrice; // Utiliser le prix original de CJ
     
     // Trouver une catégorie appropriée
     let targetCategoryId = categoryId;
@@ -1167,21 +1167,58 @@ export class CJDropshippingService {
    * Mapper une catégorie CJ vers KAMRI
    */
   private async mapCategory(categoryName: string): Promise<string> {
+    if (!categoryName) {
+      // Créer une catégorie par défaut si pas de nom
+      const defaultCategory = await this.prisma.category.findFirst({
+        where: { name: 'CJ Dropshipping' }
+      });
+      
+      if (defaultCategory) {
+        return defaultCategory.id;
+      }
+      
+      return await this.prisma.category.create({
+        data: {
+          name: 'CJ Dropshipping',
+          description: 'Catégorie par défaut pour les produits CJ',
+        },
+      }).then(cat => cat.id);
+    }
+
+    // Nettoyer le nom de catégorie des caractères spéciaux
+    const cleanCategoryName = categoryName
+      .replace(/，/g, ',')  // Remplacer la virgule chinoise par une virgule normale
+      .replace(/[^\w\s,.-]/g, '')  // Supprimer les caractères spéciaux sauf lettres, chiffres, espaces, virgules, points, tirets
+      .trim();
+
     // Utiliser toLowerCase() pour une recherche case-insensitive universelle
-    const lowerCategoryName = categoryName.toLowerCase();
+    const lowerCategoryName = cleanCategoryName.toLowerCase();
     
     const categories = await this.prisma.category.findMany();
-    const category = categories.find(
+    
+    // Recherche exacte d'abord
+    let category = categories.find(
       c => c.name.toLowerCase() === lowerCategoryName
     );
 
+    // Si pas trouvé, recherche partielle (pour gérer les variations)
+    if (!category) {
+      category = categories.find(
+        c => c.name.toLowerCase().includes(lowerCategoryName) || 
+             lowerCategoryName.includes(c.name.toLowerCase())
+      );
+    }
+
     if (category) {
+      this.logger.log(`✅ Catégorie trouvée: ${categoryName} → ${category.name}`);
       return category.id;
     }
 
+    // Créer une nouvelle catégorie avec le nom nettoyé
+    this.logger.log(`➕ Création nouvelle catégorie: ${cleanCategoryName}`);
     const newCategory = await this.prisma.category.create({
       data: {
-        name: categoryName,
+        name: cleanCategoryName,
         description: `Catégorie CJ: ${categoryName}`,
       },
     });
@@ -1295,7 +1332,7 @@ export class CJDropshippingService {
             productId: product.productId,
             productName: product.nameEn || product.productName,
             productNameEn: product.nameEn,
-            productSku: product.sku,
+            productSku: product.productSku,
             sellPrice: product.sellPrice,
             productImage: product.bigImage,
             categoryName: product.categoryName || '',
@@ -1370,7 +1407,7 @@ export class CJDropshippingService {
 
       // 🔧 CORRECTION : Dédoublonner une dernière fois avant import
       const uniqueFavorites = favorites.products.filter((product: any, index: number, self: any[]) => 
-        index === self.findIndex(p => p.productId === product.productId)
+        index === self.findIndex(p => p.pid === product.pid)
       );
       
       console.log(`🔍 Favoris finaux dédoublonnés: ${favorites.products.length} → ${uniqueFavorites.length}`);
@@ -1389,14 +1426,14 @@ export class CJDropshippingService {
         
         console.log(`\n📦 === FAVORI ${i + 1}/${uniqueFavorites.length} ===`);
         console.log(`📝 Nom: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
-        console.log(`📝 SKU: ${favorite.sku}`);
-        console.log(`📝 ProductId: ${favorite.productId}`);
+        console.log(`📝 SKU: ${favorite.productSku}`);
+        console.log(`📝 ProductId: ${favorite.pid}`);
         console.log(`📝 Prix: ${favorite.sellPrice}`);
         console.log(`📝 Image: ${favorite.productImage ? '✅' : '❌'}`);
         
         try {
-          this.logger.log(`📝 Import du favori: PID=${favorite.productId}, SKU=${favorite.sku}`);
-          const importResult = await this.importProduct(favorite.productId, undefined, 2.5, true); // isFavorite = true
+          this.logger.log(`📝 Import du favori: PID=${favorite.pid}, SKU=${favorite.productSku}`);
+          const importResult = await this.importProduct(favorite.pid, undefined, 0, true); // isFavorite = true, marge = 0
           synced++;
           console.log(`✅ Favori ${i + 1} importé avec succès`);
           this.logger.log(`✅ Favori ${i + 1} importé avec succès: ${favorite.nameEn || favorite.productName}`);
@@ -1407,9 +1444,9 @@ export class CJDropshippingService {
             await new Promise(resolve => setTimeout(resolve, 3000));
           }
         } catch (error) {
-          errors.push(favorite.sku || favorite.productId);
+          errors.push(favorite.productSku || favorite.pid);
           console.log(`❌ Erreur import favori ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
-          this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.sku || favorite.productId}):`, error);
+          this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.productSku || favorite.pid}):`, error);
           
           // Attendre même en cas d'erreur pour éviter le rate limiting
           if (i < uniqueFavorites.length - 1) {
@@ -1615,7 +1652,7 @@ export class CJDropshippingService {
   /**
    * Importer un produit CJ vers KAMRI
    */
-  async importProduct(pid: string, categoryId?: string, margin: number = 2.5, isFavorite: boolean = false): Promise<any> {
+  async importProduct(pid: string, categoryId?: string, margin: number = 0, isFavorite: boolean = false): Promise<any> {
     this.logger.log('🔍 === DÉBUT IMPORT PRODUIT CJ ===');
     this.logger.log('📝 Paramètres:', { pid, categoryId, margin, isFavorite });
     
@@ -1659,11 +1696,10 @@ export class CJDropshippingService {
         originalPrice = Number(priceStr) || 0;
         console.log(`💰 Prix simple: ${priceStr} → ${originalPrice}`);
       }
-      const sellingPrice = originalPrice * margin; // Prix de vente avec marge
+      const sellingPrice = originalPrice; // Utiliser le prix original de CJ
       
       this.logger.log('💰 Prix calculés:', {
         originalPrice,
-        margin,
         sellingPrice
       });
       
