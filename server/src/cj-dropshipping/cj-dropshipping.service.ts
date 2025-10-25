@@ -1355,37 +1355,61 @@ export class CJDropshippingService {
       let totalPages = 1;
       let totalRecords = 0;
       
-      do {
+      // 🚨 CORRECTION RADICALE : Limite de sécurité pour éviter la boucle infinie
+      const MAX_PAGES = 10; // Limite de sécurité absolue
+      let hasMoreData = true;
+      
+      while (currentPage <= MAX_PAGES && hasMoreData) {
         this.logger.log(`📄 Récupération page ${currentPage}...`);
         
-        const result = await client.makeRequest('GET', '/product/list', {
-          ...params,
-          pageNum: currentPage,
+        const result = await client.makeRequest('GET', '/product/myProduct/query', {
+          pageNumber: currentPage,
           pageSize: 10 // Limite fixe de l'API CJ
         });
         
         if (result.code === 200) {
           const data = result.data as any;
-          totalRecords = data.total || 0;
-          totalPages = Math.ceil(totalRecords / 10); // Calculer le nombre de pages
           
-          this.logger.log(`📦 Page ${currentPage}: ${data.list?.length || 0} favoris récupérés`);
+          // Calculer le total seulement sur la première page
+          if (currentPage === 1) {
+            totalRecords = data.totalRecords || 0;
+            totalPages = data.totalPages || Math.ceil(totalRecords / 10);
+            this.logger.log(`📊 Total favoris: ${totalRecords}, Pages nécessaires: ${totalPages}`);
+          }
           
-          if (data.list && data.list.length > 0) {
-            allFavorites.push(...data.list);
+          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
+          
+          // 🚨 ARRÊT IMMÉDIAT si page vide
+          if (!data.content || data.content.length === 0) {
+            this.logger.log(`🛑 Page ${currentPage} vide - ARRÊT IMMÉDIAT`);
+            hasMoreData = false;
+            break;
+          }
+          
+          allFavorites.push(...data.content);
+          
+          // 🚨 ARRÊT IMMÉDIAT si on a assez de favoris
+          if (allFavorites.length >= totalRecords) {
+            this.logger.log(`✅ Tous les favoris récupérés (${allFavorites.length}/${totalRecords}) - ARRÊT IMMÉDIAT`);
+            hasMoreData = false;
+            break;
           }
           
           currentPage++;
           
           // Attendre entre les pages pour éviter le rate limiting
-          if (currentPage <= totalPages) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
         } else {
           this.logger.error(`❌ Erreur page ${currentPage}:`, result.message);
+          hasMoreData = false;
           break;
         }
-      } while (currentPage <= totalPages);
+      }
+      
+      // 🚨 VÉRIFICATION DE SÉCURITÉ
+      if (currentPage > MAX_PAGES) {
+        this.logger.error(`🚨 LIMITE DE SÉCURITÉ ATTEINTE (${MAX_PAGES} pages) - ARRÊT FORCÉ`);
+      }
       
       this.logger.log(`✅ Total récupéré: ${allFavorites.length} favoris sur ${totalRecords}`);
       
@@ -1399,17 +1423,17 @@ export class CJDropshippingService {
       if (responseData.totalRecords > 0) {
         this.logger.log(`✅ ${responseData.totalRecords} favoris trouvés`);
         
-        // Transformer les données selon la structure CJ
+        // Transformer les données selon la structure CJ (myProduct/query API)
         const transformedProducts = responseData.content.map((product: any) => {
           return {
-            pid: product.pid,
-            productName: product.productName,
-            productNameEn: product.productNameEn,
-            productSku: product.productSku,
+            pid: product.productId,
+            productName: product.nameEn,
+            productNameEn: product.nameEn,
+            productSku: product.sku,
             sellPrice: product.sellPrice,
-            productImage: product.productImage,
-            categoryName: product.categoryName || '',
-            description: product.description || '',
+            productImage: product.bigImage,
+            categoryName: product.defaultArea || 'CJ Dropshipping',
+            description: '',
             variants: [],
             rating: 0,
             totalReviews: 0,

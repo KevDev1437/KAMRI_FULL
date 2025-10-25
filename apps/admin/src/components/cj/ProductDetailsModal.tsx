@@ -32,6 +32,39 @@ export function ProductDetailsModal({
     return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
   };
 
+  const formatWeight = (weight: string | number) => {
+    if (!weight) return '';
+    const weightStr = String(weight);
+    
+    // Si c'est une plage (ex: "500.00-620.00g")
+    if (weightStr.includes('-')) {
+      const [min, max] = weightStr.split('-').map(w => parseFloat(w.trim()));
+      if (!isNaN(min) && !isNaN(max)) {
+        const avg = Math.round((min + max) / 2);
+        return `${avg}g`;
+      }
+    }
+    
+    // Si c'est un poids simple
+    const numWeight = parseFloat(weightStr);
+    return isNaN(numWeight) ? '' : `${Math.round(numWeight)}g`;
+  };
+
+  const cleanProductName = (name: string) => {
+    if (!name) return '';
+    
+    // Si le nom contient des caractères chinois, utiliser la version anglaise
+    if (/[\u4e00-\u9fff]/.test(name)) {
+      // Chercher la version anglaise dans le nom
+      const englishMatch = name.match(/[A-Za-z\s]+/);
+      if (englishMatch) {
+        return englishMatch[0].trim();
+      }
+    }
+    
+    return name;
+  };
+
   // Fonction pour nettoyer le HTML de la description
   const cleanDescription = (html: string) => {
     if (!html) return '';
@@ -48,7 +81,7 @@ export function ProductDetailsModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Détails du produit" size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Product Details" size="xl">
       <div className="space-y-6">
         {/* Header avec image et infos principales */}
         <div className="flex gap-6">
@@ -74,7 +107,7 @@ export function ProductDetailsModal({
           <div className="flex-1 space-y-4">
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {product.productName}
+                {cleanProductName(product.productName)}
               </h3>
               {product.productNameEn && product.productNameEn !== product.productName && (
                 <p className="text-sm text-gray-600 mb-2">
@@ -124,7 +157,7 @@ export function ProductDetailsModal({
                 disabled={importing}
                 className="w-full"
               >
-                {importing ? 'Import en cours...' : 'Importer ce produit'}
+                {importing ? 'Importing...' : 'Import this product'}
               </Button>
             )}
           </div>
@@ -143,12 +176,12 @@ export function ProductDetailsModal({
         {/* Variantes */}
         {product.variants && product.variants.length > 0 && (
           <div>
-            <h4 className="text-lg font-semibold text-gray-900 mb-3">Variantes disponibles</h4>
+            <h4 className="text-lg font-semibold text-gray-900 mb-3">Available Variants</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {product.variants.map((variant: any, index: number) => (
                 <div key={index} className="border rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{variant.variantName || `Variante ${index + 1}`}</span>
+                    <span className="font-medium text-sm">{variant.variantName || `Variant ${index + 1}`}</span>
                     {variant.variantSellPrice && (
                       <span className="text-sm font-semibold text-green-600">
                         ${formatPrice(variant.variantSellPrice)}
@@ -160,7 +193,7 @@ export function ProductDetailsModal({
                   )}
                   {variant.stock !== undefined && (
                     <p className="text-xs text-gray-500">
-                      Stock: {variant.stock} unités
+                      Stock: {variant.stock} units
                     </p>
                   )}
                 </div>
@@ -173,7 +206,7 @@ export function ProductDetailsModal({
         {product.reviews && product.reviews.length > 0 && (
           <div>
             <h4 className="text-lg font-semibold text-gray-900 mb-3">
-              Avis clients ({product.reviews.length})
+              Customer Reviews ({product.reviews.length})
             </h4>
             <div className="space-y-3 max-h-48 overflow-y-auto">
               {product.reviews.slice(0, 5).map((review: any, index: number) => (
@@ -191,7 +224,7 @@ export function ProductDetailsModal({
                         />
                       ))}
                     </div>
-                    <span className="text-sm font-medium">{review.userName || 'Anonyme'}</span>
+                    <span className="text-sm font-medium">{review.userName || 'Anonymous'}</span>
                   </div>
                   <p className="text-sm text-gray-700">{review.comment}</p>
                 </div>
@@ -206,7 +239,7 @@ export function ProductDetailsModal({
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Poids: {product.productWeight}g
+                Weight: {formatWeight(product.productWeight)}
               </span>
             </div>
           )}
@@ -215,7 +248,7 @@ export function ProductDetailsModal({
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Poids emballage: {product.packingWeight}g
+                Packing Weight: {formatWeight(product.packingWeight)}
               </span>
             </div>
           )}
@@ -224,7 +257,7 @@ export function ProductDetailsModal({
             <div className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Unité: {product.productUnit}
+                Unit: {product.productUnit}
               </span>
             </div>
           )}
@@ -233,7 +266,7 @@ export function ProductDetailsModal({
             <div className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Code HS: {product.entryCode}
+                HS Code: {product.entryCode}
               </span>
             </div>
           )}
@@ -242,7 +275,7 @@ export function ProductDetailsModal({
             <div className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Nombre de listes: {product.listedNum}
+                Listed Count: {product.listedNum}
               </span>
             </div>
           )}
@@ -265,14 +298,14 @@ export function ProductDetailsModal({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
-            Fermer
+            Close
           </Button>
           {onImport && (
             <Button 
               onClick={() => onImport(product.pid)}
               disabled={importing}
             >
-              {importing ? 'Import en cours...' : 'Importer'}
+              {importing ? 'Importing...' : 'Import'}
             </Button>
           )}
         </div>
