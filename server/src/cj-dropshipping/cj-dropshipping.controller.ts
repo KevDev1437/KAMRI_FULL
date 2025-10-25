@@ -424,5 +424,28 @@ export class CJDropshippingController {
       };
     }
   }
+
+  // ===== CATÉGORIES =====
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Obtenir toutes les catégories CJ' })
+  @ApiResponse({ status: 200, description: 'Liste des catégories' })
+  async getCategories() {
+    return this.cjService.getCategories();
+  }
+
+  @Get('categories/tree')
+  @ApiOperation({ summary: 'Obtenir l\'arbre des catégories CJ' })
+  @ApiResponse({ status: 200, description: 'Arbre des catégories' })
+  async getCategoriesTree() {
+    return this.cjService.getCategoriesTree();
+  }
+
+  @Post('categories/sync')
+  @ApiOperation({ summary: 'Synchroniser les catégories CJ' })
+  @ApiResponse({ status: 200, description: 'Synchronisation des catégories effectuée' })
+  async syncCategories() {
+    return this.cjService.syncCategories();
+  }
 }
 

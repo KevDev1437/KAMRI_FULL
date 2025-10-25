@@ -148,15 +148,15 @@ export function ProductDetailsModal({
               {product.variants.map((variant: any, index: number) => (
                 <div key={index} className="border rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{variant.name || `Variante ${index + 1}`}</span>
-                    {variant.price && (
+                    <span className="font-medium text-sm">{variant.variantName || `Variante ${index + 1}`}</span>
+                    {variant.variantSellPrice && (
                       <span className="text-sm font-semibold text-green-600">
-                        ${formatPrice(variant.price)}
+                        ${formatPrice(variant.variantSellPrice)}
                       </span>
                     )}
                   </div>
-                  {variant.sku && (
-                    <p className="text-xs text-gray-500">SKU: {variant.sku}</p>
+                  {variant.variantSku && (
+                    <p className="text-xs text-gray-500">SKU: {variant.variantSku}</p>
                   )}
                   {variant.stock !== undefined && (
                     <p className="text-xs text-gray-500">
@@ -191,7 +191,7 @@ export function ProductDetailsModal({
                         />
                       ))}
                     </div>
-                    <span className="text-sm font-medium">{review.author || 'Anonyme'}</span>
+                    <span className="text-sm font-medium">{review.userName || 'Anonyme'}</span>
                   </div>
                   <p className="text-sm text-gray-700">{review.comment}</p>
                 </div>

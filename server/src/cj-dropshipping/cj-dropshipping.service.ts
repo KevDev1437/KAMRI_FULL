@@ -319,8 +319,8 @@ export class CJDropshippingService {
           pid: product.cjProductId,
           productName: product.name,
           productNameEn: product.name,
-          productSku: product.cjProductId,
-          sellPrice: Number(product.originalPrice) || 0,
+          productSku: product.cjProductId, // Utiliser le PID comme SKU temporairement
+          sellPrice: Number(product.price) || Number(product.originalPrice) || 0, // Utiliser le prix de vente si disponible
           productImage: product.image,
           categoryName: product.category,
           description: product.description,
@@ -572,6 +572,27 @@ export class CJDropshippingService {
     }
   }
 
+  /**
+   * Synchroniser les catégories CJ
+   */
+  async syncCategories(): Promise<any> {
+    try {
+      const client = await this.initializeClient();
+      const categories = await client.getCategories();
+      
+      // Ici, vous pouvez ajouter une logique pour sauvegarder les catégories
+      // dans votre base de données si nécessaire
+      
+      return {
+        success: true,
+        message: 'Catégories synchronisées avec succès',
+        categories: categories
+      };
+    } catch (error) {
+      this.logger.error('Erreur lors de la synchronisation des catégories:', error);
+      throw error;
+    }
+  }
 
   /**
    * Mapper un produit CJ vers le modèle KAMRI
@@ -1071,7 +1092,59 @@ export class CJDropshippingService {
   async getProductDetails(pid: string): Promise<any> {
     try {
       const client = await this.initializeClient();
-      return await client.getProductDetails(pid);
+      const cjProduct = await client.getProductDetails(pid);
+      
+      // Mapper les données selon la structure attendue par le frontend
+      return {
+        pid: cjProduct.pid,
+        productName: cjProduct.productName,
+        productNameEn: cjProduct.productNameEn,
+        productSku: cjProduct.productSku,
+        sellPrice: cjProduct.sellPrice,
+        productImage: cjProduct.productImage,
+        categoryName: cjProduct.categoryName,
+        description: cjProduct.description,
+        variants: cjProduct.variants || [],
+        rating: cjProduct.rating || 0,
+        totalReviews: cjProduct.totalReviews || 0,
+        weight: cjProduct.weight || 0,
+        dimensions: cjProduct.dimensions || '',
+        brand: cjProduct.brand || '',
+        tags: cjProduct.tags || [],
+        reviews: cjProduct.reviews || [],
+        // Champs supplémentaires de l'API (avec accès sécurisé)
+        productWeight: (cjProduct as any).productWeight,
+        productUnit: (cjProduct as any).productUnit,
+        productType: (cjProduct as any).productType,
+        categoryId: (cjProduct as any).categoryId,
+        entryCode: (cjProduct as any).entryCode,
+        entryName: (cjProduct as any).entryName,
+        entryNameEn: (cjProduct as any).entryNameEn,
+        materialName: (cjProduct as any).materialName,
+        materialNameEn: (cjProduct as any).materialNameEn,
+        materialKey: (cjProduct as any).materialKey,
+        packingWeight: (cjProduct as any).packingWeight,
+        packingName: (cjProduct as any).packingName,
+        packingNameEn: (cjProduct as any).packingNameEn,
+        packingKey: (cjProduct as any).packingKey,
+        productKey: (cjProduct as any).productKey,
+        productKeyEn: (cjProduct as any).productKeyEn,
+        productProSet: (cjProduct as any).productProSet,
+        productProEnSet: (cjProduct as any).productProEnSet,
+        addMarkStatus: (cjProduct as any).addMarkStatus,
+        suggestSellPrice: (cjProduct as any).suggestSellPrice,
+        listedNum: (cjProduct as any).listedNum,
+        status: (cjProduct as any).status,
+        supplierName: (cjProduct as any).supplierName,
+        supplierId: (cjProduct as any).supplierId,
+        customizationVersion: (cjProduct as any).customizationVersion,
+        customizationJson1: (cjProduct as any).customizationJson1,
+        customizationJson2: (cjProduct as any).customizationJson2,
+        customizationJson3: (cjProduct as any).customizationJson3,
+        customizationJson4: (cjProduct as any).customizationJson4,
+        createrTime: (cjProduct as any).createrTime,
+        productVideo: (cjProduct as any).productVideo
+      };
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération des détails du produit ${pid}:`, error);
       throw error;
@@ -1285,7 +1358,7 @@ export class CJDropshippingService {
       do {
         this.logger.log(`📄 Récupération page ${currentPage}...`);
         
-        const result = await client.makeRequest('GET', '/product/myProduct/query', {
+        const result = await client.makeRequest('GET', '/product/list', {
           ...params,
           pageNum: currentPage,
           pageSize: 10 // Limite fixe de l'API CJ
@@ -1293,13 +1366,13 @@ export class CJDropshippingService {
         
         if (result.code === 200) {
           const data = result.data as any;
-          totalRecords = data.totalRecords || 0;
-          totalPages = data.totalPages || 1;
+          totalRecords = data.total || 0;
+          totalPages = Math.ceil(totalRecords / 10); // Calculer le nombre de pages
           
-          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
+          this.logger.log(`📦 Page ${currentPage}: ${data.list?.length || 0} favoris récupérés`);
           
-          if (data.content && data.content.length > 0) {
-            allFavorites.push(...data.content);
+          if (data.list && data.list.length > 0) {
+            allFavorites.push(...data.list);
           }
           
           currentPage++;
@@ -1329,12 +1402,12 @@ export class CJDropshippingService {
         // Transformer les données selon la structure CJ
         const transformedProducts = responseData.content.map((product: any) => {
           return {
-            productId: product.productId,
-            productName: product.nameEn || product.productName,
-            productNameEn: product.nameEn,
+            pid: product.pid,
+            productName: product.productName,
+            productNameEn: product.productNameEn,
             productSku: product.productSku,
             sellPrice: product.sellPrice,
-            productImage: product.bigImage,
+            productImage: product.productImage,
             categoryName: product.categoryName || '',
             description: product.description || '',
             variants: [],
@@ -1750,4 +1823,5 @@ export class CJDropshippingService {
       throw error;
     }
   }
+
 }
