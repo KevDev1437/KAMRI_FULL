@@ -32,6 +32,21 @@ export function ProductDetailsModal({
     return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
   };
 
+  // Fonction pour nettoyer le HTML de la description
+  const cleanDescription = (html: string) => {
+    if (!html) return '';
+    // Supprimer les balises HTML et nettoyer le texte
+    return html
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim();
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Détails du produit" size="xl">
       <div className="space-y-6">
@@ -74,6 +89,11 @@ export function ProductDetailsModal({
                 <span className="text-lg font-semibold text-green-600">
                   ${formatPrice(product.sellPrice)}
                 </span>
+                {product.suggestSellPrice && (
+                  <span className="text-sm text-gray-500">
+                    (Suggéré: ${product.suggestSellPrice})
+                  </span>
+                )}
               </div>
               
               {product.rating > 0 && (
@@ -114,9 +134,9 @@ export function ProductDetailsModal({
         {product.description && (
           <div>
             <h4 className="text-lg font-semibold text-gray-900 mb-2">Description</h4>
-            <p className="text-gray-700 leading-relaxed">
-              {product.description}
-            </p>
+            <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {cleanDescription(product.description)}
+            </div>
           </div>
         )}
 
@@ -182,29 +202,47 @@ export function ProductDetailsModal({
 
         {/* Informations techniques */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {product.weight && (
+          {product.productWeight && (
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Poids: {product.weight}g
+                Poids: {product.productWeight}g
               </span>
             </div>
           )}
           
-          {product.dimensions && (
+          {product.packingWeight && (
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Dimensions: {product.dimensions}
+                Poids emballage: {product.packingWeight}g
               </span>
             </div>
           )}
           
-          {product.brand && (
+          {product.productUnit && (
             <div className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                Marque: {product.brand}
+                Unité: {product.productUnit}
+              </span>
+            </div>
+          )}
+
+          {product.entryCode && (
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-600">
+                Code HS: {product.entryCode}
+              </span>
+            </div>
+          )}
+
+          {product.listedNum && (
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-600">
+                Nombre de listes: {product.listedNum}
               </span>
             </div>
           )}

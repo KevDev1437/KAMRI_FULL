@@ -29,6 +29,39 @@ export interface CJProduct {
   rating: number;
   totalReviews: number;
   stockInfo?: any;
+  
+  // Nouveaux champs de l'API officielle
+  productWeight?: string;
+  productUnit?: string;
+  productType?: string;
+  categoryId?: string;
+  entryCode?: string;
+  entryName?: string;
+  entryNameEn?: string;
+  materialName?: string;
+  materialNameEn?: string;
+  materialKey?: string;
+  packingWeight?: string;
+  packingName?: string;
+  packingNameEn?: string;
+  packingKey?: string;
+  productKey?: string;
+  productKeyEn?: string;
+  productProSet?: string[];
+  productProEnSet?: string[];
+  addMarkStatus?: number;
+  suggestSellPrice?: string;
+  listedNum?: number;
+  status?: string;
+  supplierName?: string;
+  supplierId?: string;
+  customizationVersion?: number;
+  customizationJson1?: string;
+  customizationJson2?: string;
+  customizationJson3?: string;
+  customizationJson4?: string;
+  createrTime?: string;
+  productVideo?: string[];
 }
 
 export interface CJVariant {
