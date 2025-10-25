@@ -544,14 +544,13 @@ export default function CJProductsPage() {
                       // Gérer les images CJ qui peuvent être un tableau ou une string
                       let imageUrl = product.productImage;
                       
-                      // Si c'est un tableau, prendre la première image
+                      // 🔧 CORRECTION : Vérifier d'abord si c'est un array
                       if (Array.isArray(imageUrl)) {
                         imageUrl = imageUrl[0];
                         console.log('📸 Tableau d\'images détecté, utilisation de la première:', imageUrl);
                       }
-                      
                       // Si c'est une string qui contient un tableau JSON
-                      if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
+                      else if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
                         try {
                           const parsed = JSON.parse(imageUrl);
                           if (Array.isArray(parsed) && parsed.length > 0) {

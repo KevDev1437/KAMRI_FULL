@@ -144,6 +144,6 @@ export class CJAPIClientSimple {
    * Obtenir les détails d'un produit
    */
   async getProductDetails(pid: string): Promise<CJResponse<any>> {
-    return this.makeRequest('/product/queryProductDetail', { pid });
+    return this.makeRequest(`/product/queryProductDetail?pid=${pid}`);
   }
 }

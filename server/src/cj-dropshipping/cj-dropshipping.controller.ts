@@ -152,12 +152,6 @@ export class CJDropshippingController {
     }
   }
 
-  @Get('products/:pid')
-  @ApiOperation({ summary: 'Obtenir les détails d\'un produit CJ' })
-  @ApiResponse({ status: 200, description: 'Détails du produit' })
-  async getProductDetails(@Param('pid') pid: string) {
-    return this.cjService.getProductDetails(pid);
-  }
 
   @Post('products/:pid/import')
   @ApiOperation({ summary: 'Importer un produit CJ vers KAMRI' })
@@ -446,6 +440,37 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Synchronisation des catégories effectuée' })
   async syncCategories() {
     return this.cjService.syncCategories();
+  }
+
+  // ===== DÉTAILS PRODUIT =====
+
+  @Get('products/:pid/details')
+  @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ' })
+  @ApiResponse({ status: 200, description: 'Détails du produit récupérés' })
+  async getProductDetails(@Param('pid') pid: string) {
+    try {
+      this.logger.log(`🔍 === DÉBUT CONTROLLER getProductDetails ===`);
+      this.logger.log(`📝 PID reçu: ${pid}`);
+      
+      const productDetails = await this.cjService.getProductDetails(pid);
+      
+      this.logger.log(`✅ Controller getProductDetails terminé avec succès`);
+      this.logger.log(`📊 Données retournées:`, {
+        pid: productDetails.pid,
+        name: productDetails.productName,
+        sku: productDetails.productSku,
+        price: productDetails.sellPrice,
+        hasImage: !!productDetails.productImage,
+        variantsCount: productDetails.variants?.length || 0,
+        reviewsCount: productDetails.reviews?.length || 0
+      });
+      this.logger.log(`🔍 === FIN CONTROLLER getProductDetails ===`);
+      
+      return productDetails;
+    } catch (error) {
+      this.logger.error(`❌ Erreur controller getProductDetails: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      throw error;
+    }
   }
 }
 

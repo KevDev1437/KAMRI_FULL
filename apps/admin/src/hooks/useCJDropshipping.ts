@@ -218,7 +218,7 @@ export const useCJDropshipping = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get(`/products/${pid}`);
+      const { data } = await api.get(`/products/${pid}/details`);
       return data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erreur lors de la récupération des détails du produit');

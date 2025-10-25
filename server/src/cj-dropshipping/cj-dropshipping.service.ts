@@ -18,6 +18,57 @@ export class CJDropshippingService {
     private cjApiClient: CJAPIClient
   ) {}
 
+  // 🧹 Fonction pour nettoyer le HTML de la description
+  private cleanDescription(htmlDescription: string): string {
+    if (!htmlDescription) return 'N/A';
+    
+    // Supprimer les balises HTML
+    let cleaned = htmlDescription
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim(); // Supprimer les espaces en début/fin
+    
+    // Limiter à 200 caractères pour l'affichage
+    if (cleaned.length > 200) {
+      cleaned = cleaned.substring(0, 200) + '...';
+    }
+    
+    return cleaned;
+  }
+
+  // 🎨 Fonction pour extraire les couleurs des variantes
+  private extractColorsFromVariants(variants: any[]): string {
+    if (!variants || variants.length === 0) return 'N/A';
+    
+    const colors = [...new Set(variants.map(v => {
+      const name = v.variantNameEn || v.variantName || '';
+      // Extraire la couleur (première partie avant le tiret)
+      const color = name.split('-')[0]?.trim();
+      return color;
+    }).filter(Boolean))];
+    
+    return colors.join(', ');
+  }
+
+  // 📏 Fonction pour extraire les tailles des variantes
+  private extractSizesFromVariants(variants: any[]): string {
+    if (!variants || variants.length === 0) return 'N/A';
+    
+    const sizes = [...new Set(variants.map(v => {
+      const name = v.variantNameEn || v.variantName || '';
+      // Extraire la taille (deuxième partie après le tiret)
+      const size = name.split('-')[1]?.trim();
+      return size;
+    }).filter(Boolean))];
+    
+    return sizes.join(', ');
+  }
+
   /**
    * Initialiser le client CJ avec la configuration
    */
@@ -1087,31 +1138,66 @@ export class CJDropshippingService {
   }
 
   /**
-   * Obtenir les détails d'un produit CJ
+   * Obtenir les détails d'un produit CJ (comme dans le script test)
    */
   async getProductDetails(pid: string): Promise<any> {
     try {
+      this.logger.log(`📦 Récupération des détails du produit CJ: ${pid}`);
+      
       const client = await this.initializeClient();
-      const cjProduct = await client.getProductDetails(pid);
+      
+      // Utiliser la même logique que le script test
+      const result = await client.makeRequest('GET', `/product/query?pid=${pid}`);
+      
+      if (result.code !== 200) {
+        this.logger.error(`❌ Erreur détails produit ${pid}:`, result.message);
+        throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
+      }
+      
+      const cjProduct = result.data;
+      this.logger.log(`✅ Détails récupérés pour ${pid}`);
+      
+      // 🔍 LOGS DÉTAILLÉS POUR DEBUG
+      this.logger.log('📦 === DONNÉES BRUTES RÉCUPÉRÉES ===');
+      this.logger.log('📝 Nom:', (cjProduct as any).productNameEn || (cjProduct as any).productName);
+      this.logger.log('📦 SKU:', (cjProduct as any).productSku);
+      this.logger.log('💰 Prix:', (cjProduct as any).sellPrice);
+      this.logger.log('🖼️ Image (type):', typeof (cjProduct as any).productImage);
+      this.logger.log('🖼️ Image (contenu):', (cjProduct as any).productImage);
+      this.logger.log('🏷️ Catégorie:', (cjProduct as any).categoryName);
+      this.logger.log('📏 Poids:', (cjProduct as any).productWeight);
+      this.logger.log('📦 Poids emballage:', (cjProduct as any).packingWeight);
+      this.logger.log('📐 Dimensions:', (cjProduct as any).dimensions);
+      this.logger.log('🏪 Statut:', (cjProduct as any).status);
+      this.logger.log('🏷️ Type:', (cjProduct as any).productType);
+      this.logger.log('🏭 Fournisseur:', (cjProduct as any).supplierName);
+      this.logger.log('📊 Lists:', (cjProduct as any).listedNum);
+      this.logger.log('💰 Prix suggéré:', (cjProduct as any).suggestSellPrice);
+      this.logger.log('📅 Date création:', (cjProduct as any).createrTime);
+      this.logger.log('🎨 Variantes (nombre):', (cjProduct as any).variants?.length || 0);
+      this.logger.log('⭐ Avis (nombre):', (cjProduct as any).reviews?.length || 0);
+      this.logger.log('📋 Description (longueur):', (cjProduct as any).description?.length || 0);
       
       // Mapper les données selon la structure attendue par le frontend
-      return {
-        pid: cjProduct.pid,
-        productName: cjProduct.productName,
-        productNameEn: cjProduct.productNameEn,
-        productSku: cjProduct.productSku,
-        sellPrice: cjProduct.sellPrice,
-        productImage: cjProduct.productImage,
-        categoryName: cjProduct.categoryName,
-        description: cjProduct.description,
-        variants: cjProduct.variants || [],
-        rating: cjProduct.rating || 0,
-        totalReviews: cjProduct.totalReviews || 0,
-        weight: cjProduct.weight || 0,
-        dimensions: cjProduct.dimensions || '',
-        brand: cjProduct.brand || '',
-        tags: cjProduct.tags || [],
-        reviews: cjProduct.reviews || [],
+      const mappedProduct = {
+        pid: (cjProduct as any).pid,
+        productName: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+        productNameEn: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+        productSku: (cjProduct as any).productSku,
+        sellPrice: (cjProduct as any).sellPrice,
+        productImage: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
+        // Ajouter toutes les images pour le frontend
+        images: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage : [(cjProduct as any).productImage],
+        categoryName: (cjProduct as any).categoryName,
+        description: this.cleanDescription((cjProduct as any).description || ''),
+        variants: (cjProduct as any).variants || [],
+        rating: (cjProduct as any).rating || 0,
+        totalReviews: (cjProduct as any).totalReviews || (cjProduct as any).reviews?.length || 0,
+        weight: (cjProduct as any).productWeight || (cjProduct as any).weight || 0,
+        dimensions: (cjProduct as any).dimensions || '',
+        brand: (cjProduct as any).brand || '',
+        tags: (cjProduct as any).tags || [],
+        reviews: (cjProduct as any).reviews || [],
         // Champs supplémentaires de l'API (avec accès sécurisé)
         productWeight: (cjProduct as any).productWeight,
         productUnit: (cjProduct as any).productUnit,
@@ -1145,6 +1231,28 @@ export class CJDropshippingService {
         createrTime: (cjProduct as any).createrTime,
         productVideo: (cjProduct as any).productVideo
       };
+      
+      // 🔍 LOGS DU PRODUIT MAPPÉ FINAL
+      this.logger.log('📦 === PRODUIT MAPPÉ FINAL ===');
+      this.logger.log('📝 Nom final:', mappedProduct.productName);
+      this.logger.log('📦 SKU final:', mappedProduct.productSku);
+      this.logger.log('💰 Prix final:', mappedProduct.sellPrice);
+      this.logger.log('🖼️ Image finale:', mappedProduct.productImage);
+      this.logger.log('🏷️ Catégorie finale:', mappedProduct.categoryName);
+      this.logger.log('📏 Poids final:', mappedProduct.productWeight);
+      this.logger.log('📦 Poids emballage final:', mappedProduct.packingWeight);
+      this.logger.log('🏪 Statut final:', mappedProduct.status);
+      this.logger.log('🏷️ Type final:', mappedProduct.productType);
+      this.logger.log('🏭 Fournisseur final:', mappedProduct.supplierName);
+      this.logger.log('📊 Lists final:', mappedProduct.listedNum);
+      this.logger.log('💰 Prix suggéré final:', mappedProduct.suggestSellPrice);
+      this.logger.log('📅 Date création finale:', mappedProduct.createrTime);
+      this.logger.log('🎨 Variantes finales (nombre):', mappedProduct.variants?.length || 0);
+      this.logger.log('⭐ Avis finaux (nombre):', mappedProduct.reviews?.length || 0);
+      this.logger.log('📋 Description finale (longueur):', mappedProduct.description?.length || 0);
+      this.logger.log('📦 === FIN LOGS DEBUG ===');
+      
+      return mappedProduct;
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération des détails du produit ${pid}:`, error);
       throw error;
@@ -1221,7 +1329,22 @@ export class CJDropshippingService {
         price: product.price,
         originalPrice: product.originalPrice,
         image: product.image,
-        category: product.category,
+        // Ajouter les champs manquants pour la compatibilité avec l'API CJ
+        pid: product.cjProductId,
+        productName: product.name,
+        productNameEn: product.name,
+        productSku: product.cjProductId, // Utiliser le PID comme SKU temporaire
+        productImage: product.image, // Image principale
+        sellPrice: product.price,
+        categoryName: product.category,
+        weight: 0,
+        dimensions: '',
+        brand: '',
+        tags: [],
+        reviews: [],
+        rating: 0,
+        totalReviews: 0,
+        variants: [],
         status: product.status,
         isFavorite: product.isFavorite || false,
         cjProductId: product.cjProductId,
@@ -1347,95 +1470,34 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       this.logger.log('🔗 Client CJ initialisé, appel API...');
       
-      // 🔄 RÉCUPÉRATION AVEC PAGINATION (nécessaire car API CJ limite à 10 par page)
-      this.logger.log('📦 Récupération des favoris CJ avec pagination...');
-      
-      const allFavorites: any[] = [];
-      let currentPage = 1;
-      let totalPages = 1;
-      let totalRecords = 0;
-      
-      // 🚨 CORRECTION RADICALE : Limite de sécurité pour éviter la boucle infinie
-      const MAX_PAGES = 10; // Limite de sécurité absolue
-      let hasMoreData = true;
-      
-      while (currentPage <= MAX_PAGES && hasMoreData) {
-        this.logger.log(`📄 Récupération page ${currentPage}...`);
+      // 🔄 RÉCUPÉRATION SIMPLIFIÉE : Maximum 10 favoris (1 page)
+      this.logger.log('📦 Récupération des favoris CJ (limité à 10)...');
         
         const result = await client.makeRequest('GET', '/product/myProduct/query', {
-          pageNumber: currentPage,
+        pageNumber: 1,
           pageSize: 10 // Limite fixe de l'API CJ
         });
         
-        if (result.code === 200) {
-          const data = result.data as any;
-          
-          // Calculer le total seulement sur la première page
-          if (currentPage === 1) {
-            totalRecords = data.totalRecords || 0;
-            totalPages = data.totalPages || Math.ceil(totalRecords / 10);
-            this.logger.log(`📊 Total favoris: ${totalRecords}, Pages nécessaires: ${totalPages}`);
-          }
-          
-          this.logger.log(`📦 Page ${currentPage}: ${data.content?.length || 0} favoris récupérés`);
-          
-          // 🚨 ARRÊT IMMÉDIAT si page vide
-          if (!data.content || data.content.length === 0) {
-            this.logger.log(`🛑 Page ${currentPage} vide - ARRÊT IMMÉDIAT`);
-            hasMoreData = false;
-            break;
-          }
-          
-          allFavorites.push(...data.content);
-          
-          // 🚨 ARRÊT IMMÉDIAT si on a assez de favoris
-          if (allFavorites.length >= totalRecords) {
-            this.logger.log(`✅ Tous les favoris récupérés (${allFavorites.length}/${totalRecords}) - ARRÊT IMMÉDIAT`);
-            hasMoreData = false;
-            break;
-          }
-          
-          // 🔍 VÉRIFICATION INTELLIGENTE DES DOUBLONS
-          if (currentPage > 1) {
-            const currentPagePids = data.content.map((p: any) => p.productId);
-            const allPids = allFavorites.map((p: any) => p.productId);
-            const duplicates = currentPagePids.filter(pid => allPids.includes(pid));
-            
-            if (duplicates.length > 0) {
-              this.logger.log(`⚠️ DOUBLONS DÉTECTÉS page ${currentPage}: ${duplicates.length}/${data.content.length} produits`);
-              
-              // 🚨 ARRÊT IMMÉDIAT si plus de 50% des produits sont des doublons
-              const duplicateRatio = duplicates.length / data.content.length;
-              if (duplicateRatio > 0.5) {
-                this.logger.log(`🛑 ${Math.round(duplicateRatio * 100)}% de doublons détectés - ARRÊT IMMÉDIAT`);
-                hasMoreData = false;
-                break;
-              }
-            }
-          }
-          
-          currentPage++;
-          
-          // Attendre entre les pages pour éviter le rate limiting
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          this.logger.error(`❌ Erreur page ${currentPage}:`, result.message);
-          hasMoreData = false;
-          break;
-        }
+      if (result.code !== 200) {
+        this.logger.error('❌ Erreur récupération favoris:', result.message);
+        return {
+          success: false,
+          products: [],
+          total: 0
+        };
       }
       
-      // 🚨 VÉRIFICATION DE SÉCURITÉ
-      if (currentPage > MAX_PAGES) {
-        this.logger.error(`🚨 LIMITE DE SÉCURITÉ ATTEINTE (${MAX_PAGES} pages) - ARRÊT FORCÉ`);
-      }
+      const data = result.data as any;
+      const totalRecords = data.totalRecords || 0;
+      const favorites = data.content || [];
       
-      this.logger.log(`✅ Total récupéré: ${allFavorites.length} favoris sur ${totalRecords}`);
+      this.logger.log(`📦 Page 1: ${favorites.length} favoris récupérés`);
+      this.logger.log(`📊 Total API: ${totalRecords} favoris`);
       
       // Utiliser les données récupérées
       const responseData = {
         totalRecords: totalRecords,
-        content: allFavorites
+        content: favorites
       };
       
       // Traitement des données récupérées
@@ -1446,21 +1508,34 @@ export class CJDropshippingService {
         const transformedProducts = responseData.content.map((product: any) => {
           return {
             pid: product.productId,
-            productName: product.nameEn,
-            productNameEn: product.nameEn,
-            productSku: product.sku,
+            productName: product.nameEn || product.productName,
+            productNameEn: product.nameEn || product.productName,
+            productSku: product.sku || product.productSku,
             sellPrice: product.sellPrice,
-            productImage: product.bigImage,
-            categoryName: product.defaultArea || 'CJ Dropshipping',
-            description: '',
-            variants: [],
-            rating: 0,
-            totalReviews: 0,
-            weight: product.weight || 0,
-            dimensions: '',
-            brand: '',
-            tags: [],
-            reviews: []
+            productImage: product.bigImage || product.productImage,
+            categoryName: product.defaultArea || product.categoryName || 'CJ Dropshipping',
+            description: this.cleanDescription(product.description || ''),
+            variants: product.variants || [],
+            rating: product.rating || 0,
+            totalReviews: product.totalReviews || product.reviews?.length || 0,
+            weight: product.weight || product.productWeight || 0,
+            dimensions: product.dimensions || '',
+            brand: product.brand || '',
+            tags: product.tags || [],
+            reviews: product.reviews || [],
+            // Informations supplémentaires comme dans le script test
+            productWeight: product.productWeight,
+            packingWeight: product.packingWeight,
+            productType: product.productType,
+            productUnit: product.productUnit,
+            productKeyEn: product.productKeyEn,
+            materialNameEn: product.materialNameEn,
+            packingNameEn: product.packingNameEn,
+            suggestSellPrice: product.suggestSellPrice,
+            listedNum: product.listedNum,
+            supplierName: product.supplierName,
+            createrTime: product.createrTime,
+            status: product.status
           };
         });
         
@@ -1804,20 +1879,50 @@ export class CJDropshippingService {
       const client = await this.initializeClient();
       
       this.logger.log('📦 Récupération des détails du produit CJ...');
-      const cjProduct = await client.getProductDetails(pid);
+      
+      // 🔧 UTILISER LA MÊME LOGIQUE QUE getProductDetails
+      const result = await client.makeRequest('GET', `/product/query?pid=${pid}`);
+      
+      if (result.code !== 200) {
+        this.logger.error(`❌ Erreur détails produit ${pid}:`, result.message);
+        throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
+      }
+      
+      const cjProduct = result.data;
+      
+      // 🔍 LOGS DÉTAILLÉS POUR L'IMPORT
+      this.logger.log('📦 === DONNÉES BRUTES RÉCUPÉRÉES POUR IMPORT ===');
+      this.logger.log('📝 Nom:', (cjProduct as any).productNameEn || (cjProduct as any).productName);
+      this.logger.log('📦 SKU:', (cjProduct as any).productSku);
+      this.logger.log('💰 Prix:', (cjProduct as any).sellPrice);
+      this.logger.log('🖼️ Image (type):', typeof (cjProduct as any).productImage);
+      this.logger.log('🖼️ Image (contenu):', (cjProduct as any).productImage);
+      this.logger.log('🏷️ Catégorie:', (cjProduct as any).categoryName);
+      this.logger.log('📏 Poids:', (cjProduct as any).productWeight);
+      this.logger.log('📦 Poids emballage:', (cjProduct as any).packingWeight);
+      this.logger.log('📐 Dimensions:', (cjProduct as any).dimensions);
+      this.logger.log('🏪 Statut:', (cjProduct as any).status);
+      this.logger.log('🏷️ Type:', (cjProduct as any).productType);
+      this.logger.log('🏭 Fournisseur:', (cjProduct as any).supplierName);
+      this.logger.log('📊 Lists:', (cjProduct as any).listedNum);
+      this.logger.log('💰 Prix suggéré:', (cjProduct as any).suggestSellPrice);
+      this.logger.log('📅 Date création:', (cjProduct as any).createrTime);
+      this.logger.log('🎨 Variantes (nombre):', (cjProduct as any).variants?.length || 0);
+      this.logger.log('⭐ Avis (nombre):', (cjProduct as any).reviews?.length || 0);
+      this.logger.log('📋 Description (longueur):', (cjProduct as any).description?.length || 0);
       
       this.logger.log('📦 Produit CJ récupéré:', {
-        name: cjProduct.productNameEn || cjProduct.productName,
-        price: cjProduct.sellPrice,
-        category: cjProduct.categoryName,
-        hasImage: !!cjProduct.productImage
+        name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+        price: (cjProduct as any).sellPrice,
+        category: (cjProduct as any).categoryName,
+        hasImage: !!(cjProduct as any).productImage
       });
       
       // Créer le produit KAMRI
       // 🔧 CORRECTION : Gérer les prix avec plage (ex: "2.4-12.81")
       let originalPrice = 0;
-      const priceStr = String(cjProduct.sellPrice || '');
-      console.log(`💰 Prix brut reçu: "${priceStr}" (type: ${typeof cjProduct.sellPrice})`);
+      const priceStr = String((cjProduct as any).sellPrice || '');
+      console.log(`💰 Prix brut reçu: "${priceStr}" (type: ${typeof (cjProduct as any).sellPrice})`);
       
       if (priceStr.includes('-')) {
         // Prendre le prix minimum de la plage
@@ -1836,30 +1941,30 @@ export class CJDropshippingService {
       });
       
       // ✅ SAUVEGARDER SEULEMENT LA CATÉGORIE EXTERNE (comme les produits statiques)
-      this.logger.log('🔍 Catégorie externe CJ:', cjProduct.categoryName);
+      this.logger.log('🔍 Catégorie externe CJ:', (cjProduct as any).categoryName);
       
       this.logger.log('💾 Sauvegarde dans la base de données...');
       // ✅ NOUVELLE APPROCHE : STOCKER DANS LE MAGASIN CJ (upsert pour éviter les doublons)
       const cjStoreProduct = await this.prisma.cJProductStore.upsert({
         where: { cjProductId: pid },
         update: {
-          name: cjProduct.productNameEn || cjProduct.productName,
-          description: cjProduct.description,
+          name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+          description: (cjProduct as any).description,
           price: sellingPrice,
           originalPrice: originalPrice,
-          image: cjProduct.productImage,
-          category: cjProduct.categoryName,
+          image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
+          category: (cjProduct as any).categoryName,
           status: 'available', // Remettre en disponible si déjà importé
           isFavorite: isFavorite, // Marquer comme favori si spécifié
         },
         create: {
           cjProductId: pid,
-          name: cjProduct.productNameEn || cjProduct.productName,
-          description: cjProduct.description,
+          name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+          description: (cjProduct as any).description,
           price: sellingPrice,
           originalPrice: originalPrice,
-          image: cjProduct.productImage,
-          category: cjProduct.categoryName,
+          image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
+          category: (cjProduct as any).categoryName,
           status: 'available',
           isFavorite: isFavorite, // Marquer comme favori si spécifié
         },

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { CJProduct } from '@/types/cj.types';
-import { DollarSign, Image as ImageIcon, Package, Star, Tag } from 'lucide-react';
+import { DollarSign, Image as ImageIcon, Star, Tag } from 'lucide-react';
 
 interface ProductDetailsModalProps {
   isOpen: boolean;
@@ -80,6 +80,34 @@ export function ProductDetailsModal({
       .trim();
   };
 
+  // 🎨 Fonction pour extraire les couleurs des variantes
+  const extractColorsFromVariants = (variants: any[]): string => {
+    if (!variants || variants.length === 0) return 'N/A';
+    
+    const colors = [...new Set(variants.map(v => {
+      const name = v.variantNameEn || v.variantName || '';
+      // Extraire la couleur (première partie avant le tiret)
+      const color = name.split('-')[0]?.trim();
+      return color;
+    }).filter(Boolean))];
+    
+    return colors.join(', ');
+  };
+
+  // 📏 Fonction pour extraire les tailles des variantes
+  const extractSizesFromVariants = (variants: any[]): string => {
+    if (!variants || variants.length === 0) return 'N/A';
+    
+    const sizes = [...new Set(variants.map(v => {
+      const name = v.variantNameEn || v.variantName || '';
+      // Extraire la taille (deuxième partie après le tiret)
+      const size = name.split('-')[1]?.trim();
+      return size;
+    }).filter(Boolean))];
+    
+    return sizes.join(', ');
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Product Details" size="xl">
       <div className="space-y-6">
@@ -90,7 +118,28 @@ export function ProductDetailsModal({
             <div className="w-48 h-48 bg-gray-100 rounded-lg overflow-hidden">
               {product.productImage ? (
                 <img
-                  src={product.productImage}
+                  src={(() => {
+                    // 🔧 CORRECTION : Même logique que dans page.tsx
+                    let imageUrl = product.productImage;
+                    
+                    // Si c'est un array, prendre la première image
+                    if (Array.isArray(imageUrl)) {
+                      imageUrl = imageUrl[0];
+                    }
+                    // Si c'est une string qui contient un tableau JSON
+                    else if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
+                      try {
+                        const parsed = JSON.parse(imageUrl);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                          imageUrl = parsed[0];
+                        }
+                      } catch (e) {
+                        console.warn('Erreur parsing JSON image dans modal:', e);
+                      }
+                    }
+                    
+                    return imageUrl;
+                  })()}
                   alt={product.productName}
                   className="w-full h-full object-cover"
                   onError={handleImageError}
@@ -173,15 +222,31 @@ export function ProductDetailsModal({
           </div>
         )}
 
-        {/* Variantes */}
+        {/* === VARIANTES DISPONIBLES (comme CJ) === */}
         {product.variants && product.variants.length > 0 && (
-          <div>
-            <h4 className="text-lg font-semibold text-gray-900 mb-3">Available Variants</h4>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">🎨 Available Variants</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Total Variants</label>
+                <p className="text-sm text-gray-900 mt-1">{product.variants.length}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Colors</label>
+                <p className="text-sm text-gray-900 mt-1">{extractColorsFromVariants(product.variants)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Sizes</label>
+                <p className="text-sm text-gray-900 mt-1">{extractSizesFromVariants(product.variants)}</p>
+              </div>
+            </div>
+            
+            {/* Afficher seulement les 5 premières variantes pour éviter l'écriture en boucle */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.variants.map((variant: any, index: number) => (
-                <div key={index} className="border rounded-lg p-3">
+              {product.variants.slice(0, 5).map((variant: any, index: number) => (
+                <div key={index} className="border rounded-lg p-3 bg-white">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{variant.variantName || `Variant ${index + 1}`}</span>
+                    <span className="font-medium text-sm">{variant.variantNameEn || variant.variantName || `Variant ${index + 1}`}</span>
                     {variant.variantSellPrice && (
                       <span className="text-sm font-semibold text-green-600">
                         ${formatPrice(variant.variantSellPrice)}
@@ -191,13 +256,16 @@ export function ProductDetailsModal({
                   {variant.variantSku && (
                     <p className="text-xs text-gray-500">SKU: {variant.variantSku}</p>
                   )}
-                  {variant.stock !== undefined && (
-                    <p className="text-xs text-gray-500">
-                      Stock: {variant.stock} units
-                    </p>
+                  {variant.variantWeight && (
+                    <p className="text-xs text-gray-500">Weight: {formatWeight(variant.variantWeight)}</p>
                   )}
                 </div>
               ))}
+              {product.variants.length > 5 && (
+                <div className="col-span-full text-center text-sm text-gray-500 py-2">
+                  ... et {product.variants.length - 5} autres variantes
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -233,52 +301,75 @@ export function ProductDetailsModal({
           </div>
         )}
 
-        {/* Informations techniques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {product.productWeight && (
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Weight: {formatWeight(product.productWeight)}
-              </span>
+        {/* === PRIX ET MARGES === */}
+        <div className="bg-yellow-50 p-4 rounded-lg">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4">💰 Pricing Information</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Base Price</label>
+              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.sellPrice)}</p>
             </div>
-          )}
-          
-          {product.packingWeight && (
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Packing Weight: {formatWeight(product.packingWeight)}
-              </span>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Suggested Price</label>
+              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.suggestSellPrice)}</p>
             </div>
-          )}
-          
-          {product.productUnit && (
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Unit: {product.productUnit}
-              </span>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Lists</label>
+              <p className="text-sm text-gray-900 mt-1">{product.listedNum || 'N/A'}</p>
             </div>
-          )}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Supplier</label>
+              <p className="text-sm text-gray-900 mt-1">{product.supplierName || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
 
-          {product.entryCode && (
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                HS Code: {product.entryCode}
-              </span>
-            </div>
-          )}
+        {/* === INFORMATIONS TECHNIQUES === */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4">🔧 Technical Information</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {product.productWeight && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Weight</label>
+                <p className="text-sm text-gray-900 mt-1">{formatWeight(product.productWeight)}</p>
+              </div>
+            )}
+            
+            {product.packingWeight && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Packing Weight</label>
+                <p className="text-sm text-gray-900 mt-1">{formatWeight(product.packingWeight)}</p>
+              </div>
+            )}
+            
+            {product.productUnit && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Unit</label>
+                <p className="text-sm text-gray-900 mt-1">{product.productUnit}</p>
+              </div>
+            )}
 
-          {product.listedNum && (
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Listed Count: {product.listedNum}
-              </span>
-            </div>
-          )}
+            {product.entryCode && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">HS Code</label>
+                <p className="text-sm text-gray-900 mt-1">{product.entryCode}</p>
+              </div>
+            )}
+
+            {product.productType && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Type</label>
+                <p className="text-sm text-gray-900 mt-1">{product.productType}</p>
+              </div>
+            )}
+
+            {product.createrTime && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Creation Date</label>
+                <p className="text-sm text-gray-900 mt-1">{product.createrTime}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tags */}
