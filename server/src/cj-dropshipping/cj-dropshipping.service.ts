@@ -1395,6 +1395,25 @@ export class CJDropshippingService {
             break;
           }
           
+          // 🔍 VÉRIFICATION INTELLIGENTE DES DOUBLONS
+          if (currentPage > 1) {
+            const currentPagePids = data.content.map((p: any) => p.productId);
+            const allPids = allFavorites.map((p: any) => p.productId);
+            const duplicates = currentPagePids.filter(pid => allPids.includes(pid));
+            
+            if (duplicates.length > 0) {
+              this.logger.log(`⚠️ DOUBLONS DÉTECTÉS page ${currentPage}: ${duplicates.length}/${data.content.length} produits`);
+              
+              // 🚨 ARRÊT IMMÉDIAT si plus de 50% des produits sont des doublons
+              const duplicateRatio = duplicates.length / data.content.length;
+              if (duplicateRatio > 0.5) {
+                this.logger.log(`🛑 ${Math.round(duplicateRatio * 100)}% de doublons détectés - ARRÊT IMMÉDIAT`);
+                hasMoreData = false;
+                break;
+              }
+            }
+          }
+          
           currentPage++;
           
           // Attendre entre les pages pour éviter le rate limiting
@@ -1506,6 +1525,22 @@ export class CJDropshippingService {
       const uniqueFavorites = favorites.products.filter((product: any, index: number, self: any[]) => 
         index === self.findIndex(p => p.pid === product.pid)
       );
+      
+      // 🔍 DEBUG : Analyser les doublons
+      this.logger.log(`🔍 Analyse des doublons:`);
+      this.logger.log(`📊 Total avant dédoublonnage: ${favorites.products.length}`);
+      this.logger.log(`📊 Total après dédoublonnage: ${uniqueFavorites.length}`);
+      
+      // Vérifier les PIDs pour identifier les doublons
+      const pids = favorites.products.map(p => p.pid);
+      const uniquePids = [...new Set(pids)];
+      this.logger.log(`📊 PIDs uniques: ${uniquePids.length}, PIDs totaux: ${pids.length}`);
+      
+      if (pids.length !== uniquePids.length) {
+        this.logger.log(`⚠️ DOUBLONS DÉTECTÉS dans les PIDs`);
+        const duplicates = pids.filter((pid, index) => pids.indexOf(pid) !== index);
+        this.logger.log(`🔄 PIDs dupliqués: ${duplicates.join(', ')}`);
+      }
       
       console.log(`🔍 Favoris finaux dédoublonnés: ${favorites.products.length} → ${uniqueFavorites.length}`);
       
