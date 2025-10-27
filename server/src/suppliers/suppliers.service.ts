@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CJDropshippingService } from '../cj-dropshipping/cj-dropshipping.service';
+import { CJMainService } from '../cj-dropshipping/services/cj-main.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -8,7 +8,7 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto';
 export class SuppliersService {
   constructor(
     private prisma: PrismaService,
-    private cjDropshippingService: CJDropshippingService
+    private cjMainService: CJMainService
   ) {}
 
   async create(createSupplierDto: CreateSupplierDto) {
@@ -96,10 +96,10 @@ export class SuppliersService {
       // Tester la connexion CJ via le service CJ
       try {
         // Import du service CJ (éviter la dépendance circulaire)
-        const { CJDropshippingService } = await import('../cj-dropshipping/cj-dropshipping.service');
+        const { CJMainService } = await import('../cj-dropshipping/services/cj-main.service');
         const { CJAPIClient } = await import('../cj-dropshipping/cj-api-client');
         const cjApiClient = new CJAPIClient({} as any);
-        const cjService = new CJDropshippingService(this.prisma, cjApiClient);
+        const cjService = new CJMainService(this.prisma, cjApiClient, null, null, null, null, null);
         const result = await cjService.testConnection();
         
         return result;

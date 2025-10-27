@@ -319,6 +319,26 @@ model CJProductStore {
   category      String?
   status        String   @default("available") // available, selected, imported
   isFavorite    Boolean  @default(false) // Marquer comme favori CJ
+  
+  // 🔧 AJOUTER TOUS LES CHAMPS DÉTAILLÉS
+  productSku        String?
+  productWeight     String?
+  packingWeight     String?
+  productType       String?
+  productUnit       String?
+  productKeyEn      String?
+  materialNameEn    String?
+  packingNameEn     String?
+  suggestSellPrice  String?
+  listedNum         Int?
+  supplierName      String?
+  createrTime       String?
+  variants          String? // JSON string
+  reviews           String? // JSON string
+  dimensions        String?
+  brand             String?
+  tags              String? // JSON string
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

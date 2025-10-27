@@ -1,23 +1,25 @@
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Logger,
-  Param,
-  Post,
-  Put,
-  Query
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Logger,
+    Param,
+    Post,
+    Put,
+    Query
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
-import { CJDropshippingService } from './cj-dropshipping.service';
+// 🔧 ANCIEN SERVICE SUPPRIMÉ - Remplacé par CJMainService
 import { UpdateCJConfigDto } from './dto/cj-config.dto';
 import { CJOrderCreateDto } from './dto/cj-order-create.dto';
 import { CJProductSearchDto } from './dto/cj-product-search.dto';
 import { CJWebhookDto } from './dto/cj-webhook.dto';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
+// 🔧 NOUVEAUX SERVICES REFACTORISÉS
+import { CJMainService } from './services/cj-main.service';
 
 @ApiTags('cj-dropshipping')
 @Controller('api/cj-dropshipping')
@@ -27,7 +29,7 @@ export class CJDropshippingController {
   private readonly logger = new Logger(CJDropshippingController.name);
   
   constructor(
-    private readonly cjService: CJDropshippingService,
+    private readonly cjMainService: CJMainService, // 🔧 SERVICE REFACTORISÉ
     private readonly prisma: PrismaService
   ) {}
 
@@ -37,7 +39,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Obtenir la configuration CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Configuration récupérée avec succès' })
   async getConfig() {
-    return this.cjService.getConfig();
+    return this.cjMainService.getConfig();
   }
 
   @Get('config/status')
@@ -45,7 +47,7 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Statut de connexion récupéré' })
   async getConnectionStatus() {
     try {
-      const status = await this.cjService.getConnectionStatus();
+      const status = await this.cjMainService.getConnectionStatus();
       return status;
     } catch (error) {
       this.logger.error(`❌ Erreur récupération statut: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
@@ -67,7 +69,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Mettre à jour la configuration CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Configuration mise à jour avec succès' })
   async updateConfig(@Body() dto: UpdateCJConfigDto) {
-    return this.cjService.updateConfig(dto);
+    return this.cjMainService.updateConfig(dto);
   }
 
   @Post('config/test')
@@ -75,7 +77,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Tester la connexion CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Test de connexion effectué' })
   async testConnection() {
-    return this.cjService.testConnection();
+    return this.cjMainService.testConnection();
   }
 
 
@@ -83,7 +85,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Obtenir le statut de connexion CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Statut récupéré avec succès' })
   async getStatus() {
-    return this.cjService.getConnectionStatus();
+    return this.cjMainService.getConnectionStatus();
   }
 
 
@@ -101,7 +103,7 @@ export class CJDropshippingController {
     this.logger.log('📝 Query reçue:', JSON.stringify(query, null, 2));
     
     try {
-      const result = await this.cjService.getDefaultProducts(query);
+      const result = await this.cjMainService.getDefaultProducts(query);
       this.logger.log('✅ Controller getDefaultProducts terminé avec succès');
       this.logger.log('📊 Nombre de produits retournés:', result.length);
       this.logger.log('🔍 === FIN CONTROLLER getDefaultProducts ===');
@@ -130,7 +132,7 @@ export class CJDropshippingController {
     this.logger.log('📝 Query reçue:', JSON.stringify(query, null, 2));
     
     try {
-      const result = await this.cjService.searchProducts(query);
+      const result = await this.cjMainService.searchProducts(query);
       this.logger.log('✅ Controller searchProducts terminé avec succès');
       this.logger.log('📊 Nombre de produits retournés:', result.length);
       this.logger.log('🔍 === FIN CONTROLLER searchProducts ===');
@@ -160,14 +162,14 @@ export class CJDropshippingController {
     @Param('pid') pid: string,
     @Body() body: { categoryId?: string; margin?: number }
   ) {
-    return this.cjService.importProduct(pid, body.categoryId, body.margin || 0);
+    return this.cjMainService.importProduct(pid, body.categoryId, body.margin || 0);
   }
 
   @Post('products/sync')
   @ApiOperation({ summary: 'Synchroniser tous les produits CJ' })
   @ApiResponse({ status: 200, description: 'Synchronisation effectuée' })
   async syncProducts(@Body() filters?: any) {
-    return this.cjService.syncProducts(filters);
+    return this.cjMainService.syncProducts(filters);
   }
 
   // ===== INVENTAIRE =====
@@ -176,14 +178,14 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Obtenir le stock d\'une variante CJ' })
   @ApiResponse({ status: 200, description: 'Informations de stock' })
   async getInventory(@Param('vid') vid: string) {
-    return this.cjService.getInventory(vid);
+    return this.cjMainService.getInventory(vid);
   }
 
   @Post('inventory/sync')
   @ApiOperation({ summary: 'Synchroniser l\'inventaire des produits CJ' })
   @ApiResponse({ status: 200, description: 'Synchronisation de l\'inventaire effectuée' })
   async syncInventory(@Body() body: { productIds?: string[] }) {
-    return this.cjService.syncInventory(body.productIds || []);
+    return this.cjMainService.syncInventory(body.productIds || []);
   }
 
   // ===== COMMANDES =====
@@ -192,21 +194,21 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Créer une commande CJ Dropshipping' })
   @ApiResponse({ status: 201, description: 'Commande créée avec succès' })
   async createOrder(@Body() dto: CJOrderCreateDto) {
-    return this.cjService.createOrder(dto);
+    return this.cjMainService.createOrder(dto);
   }
 
   @Get('orders/:orderId')
   @ApiOperation({ summary: 'Obtenir le statut d\'une commande CJ' })
   @ApiResponse({ status: 200, description: 'Statut de la commande' })
   async getOrderStatus(@Param('orderId') orderId: string) {
-    return this.cjService.getOrderStatus(orderId);
+    return this.cjMainService.getOrderStatus(orderId);
   }
 
   @Post('orders/sync')
   @ApiOperation({ summary: 'Synchroniser les statuts des commandes CJ' })
   @ApiResponse({ status: 200, description: 'Synchronisation des commandes effectuée' })
   async syncOrderStatuses() {
-    return this.cjService.syncOrderStatuses();
+    return this.cjMainService.syncOrderStatuses();
   }
 
   // ===== LOGISTIQUE =====
@@ -215,14 +217,14 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Calculer les frais de port' })
   @ApiResponse({ status: 200, description: 'Frais de port calculés' })
   async calculateShipping(@Body() data: any) {
-    return this.cjService.calculateShipping(data);
+    return this.cjMainService.calculateShipping(data);
   }
 
   @Get('logistics/tracking/:trackNumber')
   @ApiOperation({ summary: 'Obtenir le tracking d\'un colis' })
   @ApiResponse({ status: 200, description: 'Informations de tracking' })
   async getTracking(@Param('trackNumber') trackNumber: string) {
-    return this.cjService.getTracking(trackNumber);
+    return this.cjMainService.getTracking(trackNumber);
   }
 
   // ===== WEBHOOKS =====
@@ -238,21 +240,21 @@ export class CJDropshippingController {
       messageId: dto.messageId,
       params: dto.params,
     };
-    return this.cjService.handleWebhook(payload.type, payload);
+    return this.cjMainService.handleWebhook(payload.type, payload);
   }
 
   @Post('webhooks/configure')
   @ApiOperation({ summary: 'Configurer les webhooks CJ' })
   @ApiResponse({ status: 200, description: 'Webhooks configurés' })
   async configureWebhooks(@Body() body: { enable: boolean }) {
-    return this.cjService.configureWebhooks(body.enable);
+    return this.cjMainService.configureWebhooks(body.enable);
   }
 
   @Get('webhooks/logs')
   @ApiOperation({ summary: 'Obtenir les logs des webhooks' })
   @ApiResponse({ status: 200, description: 'Logs des webhooks' })
   async getWebhookLogs(@Query() query: any) {
-    return this.cjService.getWebhookLogs(query);
+    return this.cjMainService.getWebhookLogs(query);
   }
 
   // ===== STATISTIQUES =====
@@ -261,7 +263,7 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Obtenir les statistiques CJ Dropshipping' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées' })
   async getStats() {
-    return this.cjService.getStats();
+    return this.cjMainService.getStats();
   }
 
   @Post('sync-favorites')
@@ -269,7 +271,7 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Favoris synchronisés avec succès' })
   async syncFavorites() {
     try {
-      const result = await this.cjService.syncFavorites();
+      const result = await this.cjMainService.syncFavorites();
       return result;
     } catch (error) {
       this.logger.error(`❌ Erreur synchronisation favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
@@ -325,7 +327,7 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Produits favoris importés récupérés' })
   async getImportedFavorites() {
     try {
-      const products = await this.cjService.getImportedProducts({ isFavorite: true });
+      const products = await this.cjMainService.getImportedProducts({ isFavorite: true });
       return products;
     } catch (error) {
       this.logger.error(`❌ Erreur récupération produits favoris: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
@@ -337,21 +339,21 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Statistiques des produits' })
   @ApiResponse({ status: 200, description: 'Statistiques produits' })
   async getProductStats() {
-    return this.cjService.getProductStats();
+    return this.cjMainService.getProductStats();
   }
 
   @Get('stats/orders')
   @ApiOperation({ summary: 'Statistiques des commandes' })
   @ApiResponse({ status: 200, description: 'Statistiques commandes' })
   async getOrderStats() {
-    return this.cjService.getOrderStats();
+    return this.cjMainService.getOrderStats();
   }
 
   @Get('stats/webhooks')
   @ApiOperation({ summary: 'Statistiques des webhooks' })
   @ApiResponse({ status: 200, description: 'Statistiques webhooks' })
   async getWebhookStats() {
-    return this.cjService.getWebhookStats();
+    return this.cjMainService.getWebhookStats();
   }
 
   @Get('stores/:storeId/products')
@@ -425,21 +427,21 @@ export class CJDropshippingController {
   @ApiOperation({ summary: 'Obtenir toutes les catégories CJ' })
   @ApiResponse({ status: 200, description: 'Liste des catégories' })
   async getCategories() {
-    return this.cjService.getCategories();
+    return this.cjMainService.getCategories();
   }
 
   @Get('categories/tree')
   @ApiOperation({ summary: 'Obtenir l\'arbre des catégories CJ' })
   @ApiResponse({ status: 200, description: 'Arbre des catégories' })
   async getCategoriesTree() {
-    return this.cjService.getCategoriesTree();
+    return this.cjMainService.getCategoriesTree();
   }
 
   @Post('categories/sync')
   @ApiOperation({ summary: 'Synchroniser les catégories CJ' })
   @ApiResponse({ status: 200, description: 'Synchronisation des catégories effectuée' })
   async syncCategories() {
-    return this.cjService.syncCategories();
+    return this.cjMainService.syncCategories();
   }
 
   // ===== DÉTAILS PRODUIT =====
@@ -452,7 +454,7 @@ export class CJDropshippingController {
       this.logger.log(`🔍 === DÉBUT CONTROLLER getProductDetails ===`);
       this.logger.log(`📝 PID reçu: ${pid}`);
       
-      const productDetails = await this.cjService.getProductDetails(pid);
+      const productDetails = await this.cjMainService.getProductDetails(pid);
       
       this.logger.log(`✅ Controller getProductDetails terminé avec succès`);
       this.logger.log(`📊 Données retournées:`, {

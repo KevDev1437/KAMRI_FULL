@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { CJProduct } from '@/types/cj.types';
-import { DollarSign, Image as ImageIcon, Star, Tag } from 'lucide-react';
+import { DollarSign, Star, Tag } from 'lucide-react';
+import { useState } from 'react';
 
 interface ProductDetailsModalProps {
   isOpen: boolean;
@@ -84,12 +85,12 @@ export function ProductDetailsModal({
   const extractColorsFromVariants = (variants: any[]): string => {
     if (!variants || variants.length === 0) return 'N/A';
     
-    const colors = [...new Set(variants.map(v => {
-      const name = v.variantNameEn || v.variantName || '';
+    const colors = Array.from(new Set(variants.map(v => {
+      const name = (v as any).variantNameEn || (v as any).variantName || '';
       // Extraire la couleur (première partie avant le tiret)
       const color = name.split('-')[0]?.trim();
       return color;
-    }).filter(Boolean))];
+    }).filter(Boolean)));
     
     return colors.join(', ');
   };
@@ -98,57 +99,118 @@ export function ProductDetailsModal({
   const extractSizesFromVariants = (variants: any[]): string => {
     if (!variants || variants.length === 0) return 'N/A';
     
-    const sizes = [...new Set(variants.map(v => {
-      const name = v.variantNameEn || v.variantName || '';
+    const sizes = Array.from(new Set(variants.map(v => {
+      const name = (v as any).variantNameEn || (v as any).variantName || '';
       // Extraire la taille (deuxième partie après le tiret)
       const size = name.split('-')[1]?.trim();
       return size;
-    }).filter(Boolean))];
+    }).filter(Boolean)));
     
     return sizes.join(', ');
   };
 
+  // État pour la galerie d'images/couleurs
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  // Extraire toutes les images du produit (chaque image = une couleur)
+  const getAllImages = () => {
+    let images = [];
+    
+    // Image principale
+    if (product.productImage) {
+      let mainImage = product.productImage;
+      
+      if (Array.isArray(mainImage)) {
+        images = mainImage;
+      } else if (typeof mainImage === 'string' && mainImage.includes('[')) {
+        try {
+          const parsed = JSON.parse(mainImage);
+          if (Array.isArray(parsed)) {
+            images = parsed;
+          } else {
+            images = [mainImage];
+          }
+        } catch (e) {
+          images = [mainImage];
+        }
+      } else {
+        images = [mainImage];
+      }
+    }
+    
+    // Ajouter les images des variantes
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach(variant => {
+        if (variant.images && Array.isArray(variant.images)) {
+          images.push(...variant.images);
+        }
+      });
+    }
+    
+    // Supprimer les doublons
+    return Array.from(new Set(images));
+  };
+
+  // Extraire les couleurs des variantes (pour l'affichage)
+  const getColorsFromVariants = () => {
+    if (!product.variants || product.variants.length === 0) return [];
+    
+    const colors = Array.from(new Set(product.variants.map(v => {
+      const name = (v as any).variantNameEn || (v as any).variantName || '';
+      const color = name.split('-')[0]?.trim();
+      return color;
+    }).filter(Boolean)));
+    
+    return colors;
+  };
+
+  const allImages = getAllImages();
+  const colors = getColorsFromVariants();
+  const currentImage = allImages[selectedImageIndex] || '/placeholder-product.jpg';
+  const currentColor = colors[selectedImageIndex] || 'Couleur principale';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Product Details" size="xl">
       <div className="space-y-6">
-        {/* Header avec image et infos principales */}
+        {/* Header avec galerie d'images et infos principales */}
         <div className="flex gap-6">
-          {/* Image du produit */}
+          {/* Galerie d'images comme CJ Dropshipping */}
           <div className="flex-shrink-0">
-            <div className="w-48 h-48 bg-gray-100 rounded-lg overflow-hidden">
-              {product.productImage ? (
+            <div className="flex gap-4">
+              {/* Thumbnails à gauche (Images = Couleurs) */}
+              {allImages.length > 1 && (
+                <div className="flex flex-col gap-2 w-16">
+                  {allImages.map((image, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedImageIndex(index)}
+                      className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                        selectedImageIndex === index 
+                          ? 'border-orange-500' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      title={colors[index] || `Couleur ${index + 1}`}
+                    >
+                      <img
+                        src={image}
+                        alt={colors[index] || `Couleur ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={handleImageError}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Image principale */}
+              <div className="w-64 h-64 bg-gray-100 rounded-lg overflow-hidden">
                 <img
-                  src={(() => {
-                    // 🔧 CORRECTION : Même logique que dans page.tsx
-                    let imageUrl = product.productImage;
-                    
-                    // Si c'est un array, prendre la première image
-                    if (Array.isArray(imageUrl)) {
-                      imageUrl = imageUrl[0];
-                    }
-                    // Si c'est une string qui contient un tableau JSON
-                    else if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
-                      try {
-                        const parsed = JSON.parse(imageUrl);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                          imageUrl = parsed[0];
-                        }
-                      } catch (e) {
-                        console.warn('Erreur parsing JSON image dans modal:', e);
-                      }
-                    }
-                    
-                    return imageUrl;
-                  })()}
+                  src={currentImage}
                   alt={product.productName}
                   className="w-full h-full object-cover"
                   onError={handleImageError}
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <ImageIcon className="w-12 h-12" />
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -199,6 +261,40 @@ export function ProductDetailsModal({
                 </Badge>
               )}
             </div>
+
+            {/* Sélecteurs comme CJ Dropshipping */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="space-y-4">
+                {/* Affichage de la couleur sélectionnée */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Couleur ({currentColor})
+                  </label>
+                  <div className="text-sm text-gray-600">
+                    Cliquez sur les images à gauche pour changer de couleur
+                  </div>
+                </div>
+
+                {/* Sélecteur de tailles */}
+                {extractSizesFromVariants(product.variants) !== 'N/A' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tailles disponibles
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {extractSizesFromVariants(product.variants).split(', ').map((size, index) => (
+                        <button
+                          key={index}
+                          className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
+                        >
+                          {size.trim()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {onImport && (
               <Button 
@@ -311,11 +407,15 @@ export function ProductDetailsModal({
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Suggested Price</label>
-              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.suggestSellPrice)}</p>
+              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.suggestSellPrice || 0)}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Lists</label>
               <p className="text-sm text-gray-900 mt-1">{product.listedNum || 'N/A'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">SKU</label>
+              <p className="text-sm text-gray-900 mt-1">{product.productSku || 'N/A'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Supplier</label>
