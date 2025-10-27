@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJConfig } from '@/types/cj.types';
 import { debugAdminAuth, forceReconnect, testLogin } from '@/utils/debug-auth';
@@ -29,6 +30,7 @@ export default function CJConfigPage() {
   });
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     loadConfig();
@@ -62,13 +64,13 @@ export default function CJConfigPage() {
     try {
       const success = await testConnection();
       if (success) {
-        alert('✅ Connexion CJ Dropshipping réussie !');
+        toast.showToast({ type: 'success', title: 'CJ', description: '✅ Connexion CJ Dropshipping réussie !' });
         await loadConfig(); // Recharger la config
       } else {
-        alert('❌ Connexion CJ Dropshipping échouée. Vérifiez vos credentials.');
+        toast.showToast({ type: 'error', title: 'CJ', description: '❌ Connexion CJ Dropshipping échouée. Vérifiez vos credentials.' });
       }
     } catch (err) {
-      alert('❌ Erreur lors du test de connexion');
+      toast.showToast({ type: 'error', title: 'CJ', description: '❌ Erreur lors du test de connexion' });
     } finally {
       setTesting(false);
     }
@@ -79,9 +81,9 @@ export default function CJConfigPage() {
     debugAuth();
     const authOk = await testCJAuthentication();
     if (authOk) {
-      alert('✅ Authentification OK ! Vous pouvez maintenant utiliser CJ Dropshipping.');
+      toast.showToast({ type: 'success', title: 'Auth', description: '✅ Authentification OK ! Vous pouvez maintenant utiliser CJ Dropshipping.' });
     } else {
-      alert('❌ Problème d\'authentification. Vérifiez la console pour plus de détails.');
+      toast.showToast({ type: 'error', title: 'Auth', description: '❌ Problème d\'authentification. Vérifiez la console pour plus de détails.' });
     }
   };
 
@@ -104,10 +106,10 @@ export default function CJConfigPage() {
       console.log('🔐 Test de connexion avec credentials...');
       const success = await testLogin(email, password);
       if (success) {
-        alert('✅ Connexion réussie ! Rechargez la page.');
+        toast.showToast({ type: 'success', title: 'Connexion', description: '✅ Connexion réussie ! Rechargez la page.' });
         window.location.reload();
       } else {
-        alert('❌ Connexion échouée. Vérifiez vos credentials.');
+        toast.showToast({ type: 'error', title: 'Connexion', description: '❌ Connexion échouée. Vérifiez vos credentials.' });
       }
     }
   };
@@ -115,7 +117,7 @@ export default function CJConfigPage() {
   const handleCheckAuth = () => {
     console.log('🔍 Vérification du statut d\'authentification...');
     const status = checkAuthStatus();
-    alert(`Statut: ${status}`);
+    toast.showToast({ type: 'info', title: 'Auth', description: `Statut: ${status}` });
   };
 
   const handleForceLogout = () => {
@@ -128,26 +130,26 @@ export default function CJConfigPage() {
     console.log('🔐 Test de connexion directe...');
     const success = await testDirectLogin();
     if (success) {
-      alert('✅ Connexion directe réussie !');
+      toast.showToast({ type: 'success', title: 'Connexion directe', description: '✅ Connexion directe réussie !' });
     } else {
-      alert('❌ Connexion directe échouée. Vérifiez la console.');
+      toast.showToast({ type: 'error', title: 'Connexion directe', description: '❌ Connexion directe échouée. Vérifiez la console.' });
     }
   };
 
   const handleCheckBackend = async () => {
     console.log('🏥 Vérification du backend...');
     const healthy = await checkBackendHealth();
-    alert(healthy ? '✅ Backend accessible' : '❌ Backend inaccessible');
+    toast.showToast({ type: healthy ? 'success' : 'error', title: 'Backend', description: healthy ? '✅ Backend accessible' : '❌ Backend inaccessible' });
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await updateConfig(formData);
-      alert('✅ Configuration sauvegardée avec succès !');
+      toast.showToast({ type: 'success', title: 'CJ', description: '✅ Configuration sauvegardée avec succès !' });
       await loadConfig();
     } catch (err) {
-      alert('❌ Erreur lors de la sauvegarde de la configuration');
+      toast.showToast({ type: 'error', title: 'CJ', description: '❌ Erreur lors de la sauvegarde de la configuration' });
     } finally {
       setSaving(false);
     }

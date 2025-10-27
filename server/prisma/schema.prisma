@@ -74,6 +74,30 @@ model Product {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  // ✅ CJ Dropshipping - Données détaillées avec contraintes anti-doublons
+  cjProductId      String?  @unique // ✅ ID produit CJ unique pour éviter doublons
+  productSku       String?  // SKU du produit CJ (peut être dupliqué entre fournisseurs)
+  productWeight    String?  // Poids du produit (peut être une plage)
+  packingWeight    String?  // Poids d'emballage
+  productType      String?  // Type de produit CJ
+  productUnit      String?  // Unité du produit
+  productKeyEn     String?  // Attributs/clés du produit
+  materialNameEn   String?  // Matériau (ex: "Cloth")
+  packingNameEn    String?  // Type d'emballage (ex: "Plastic bags")
+  suggestSellPrice String?  // Prix de vente suggéré CJ (peut être une plage)
+  listedNum        Int?     // Nombre de listings
+  supplierName     String?  // Nom du fournisseur
+  createrTime      String?  // Date de création CJ
+  variants         String?  // JSON des variants CJ
+  cjReviews        String?  // JSON des avis CJ (pour éviter conflit avec reviews relation)
+  dimensions       String?  // Dimensions du produit
+  brand            String?  // Marque
+  tags             String?  // JSON des tags
+  
+  // ✅ Tracking de l'import pour éviter doublons
+  importStatus     String?  @default("new") // new, updated, imported, duplicate
+  lastImportAt     DateTime? // Dernière date d'import
+
   // Relations
   category      Category?     @relation(fields: [categoryId], references: [id])
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])

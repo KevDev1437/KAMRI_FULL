@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJConfig, CJStats } from '@/types/cj.types';
 import { useEffect, useState } from 'react';
@@ -30,6 +31,7 @@ export default function CJDropshippingPage() {
     };
     tips: string[];
   } | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     loadData();
@@ -55,13 +57,13 @@ export default function CJDropshippingPage() {
     try {
       const success = await testConnection();
       if (success) {
-        alert('✅ Connexion CJ Dropshipping réussie !');
+        toast.showToast({ type: 'success', title: 'CJ Dropshipping', description: '✅ Connexion CJ Dropshipping réussie !' });
         await loadData(); // Recharger les données
       } else {
-        alert('❌ Connexion CJ Dropshipping échouée');
+        toast.showToast({ type: 'error', title: 'CJ Dropshipping', description: '❌ Connexion CJ Dropshipping échouée' });
       }
     } catch (err) {
-      alert('❌ Erreur lors du test de connexion');
+      toast.showToast({ type: 'error', title: 'CJ Dropshipping', description: '❌ Erreur lors du test de connexion' });
     } finally {
       setTesting(false);
     }

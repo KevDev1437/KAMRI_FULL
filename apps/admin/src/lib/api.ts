@@ -33,6 +33,8 @@ export class ApiClient {
         this.token = data.access_token;
         if (typeof window !== 'undefined') {
           localStorage.setItem('token', data.access_token);
+          // store refresh token if backend returns it
+          if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
           localStorage.setItem('user', JSON.stringify(data.user));
         }
         return { data };
@@ -60,6 +62,7 @@ export class ApiClient {
         this.token = data.access_token;
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', data.access_token);
+          if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
         }
         return { data };
       } else {
@@ -104,10 +107,61 @@ export class ApiClient {
       if (response.ok) {
         return { data };
       } else {
-        return { error: data.message || 'Erreur API' };
+        // If 401 attempt refresh once
+        if (response.status === 401) {
+          const refreshed = await this.attemptRefresh();
+          if (refreshed) {
+            // retry original request once
+            const retry = await fetch(`${API_BASE_URL}${endpoint}`, {
+              ...options,
+              headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json',
+                ...options.headers,
+              },
+            });
+            try {
+              const retryData = await retry.json();
+              if (retry.ok) return { data: retryData };
+              return { error: retryData.message || `Erreur API (${retry.status})` };
+            } catch (e) {
+              return { error: `Erreur API (${retry.status})` };
+            }
+          }
+        }
+
+        return { error: data?.message || `Erreur API (${response.status})` };
       }
     } catch (error) {
       return { error: 'Erreur réseau' };
+    }
+  }
+
+  // Attempt to refresh tokens using refresh_token stored in localStorage
+  private async attemptRefresh(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return false;
+
+    try {
+      const resp = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.access_token) {
+        this.token = data.access_token;
+        localStorage.setItem('token', data.access_token);
+        if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
+        return true;
+      }
+      // failed refresh -> logout
+      this.logout();
+      return false;
+    } catch (e) {
+      this.logout();
+      return false;
     }
   }
 
@@ -383,6 +437,11 @@ export class ApiClient {
   async getCJProductStock(pid: string, countryCode?: string) {
     const url = `/cj-dropshipping/products/${pid}/stock?countryCode=${countryCode || 'US'}`;
     return this.fetchWithAuth(url);
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Statistiques anti-doublons
+  async getDuplicateStats() {
+    return this.fetchWithAuth('/duplicates/stats');
   }
 }
 

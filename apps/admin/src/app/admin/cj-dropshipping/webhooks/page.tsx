@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJWebhookLog } from '@/types/cj.types';
 import { useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ export default function CJWebhooksPage() {
   const [webhookLogs, setWebhookLogs] = useState<CJWebhookLog[]>([]);
   const [configuring, setConfiguring] = useState(false);
   const [webhooksEnabled, setWebhooksEnabled] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     loadWebhookLogs();
@@ -36,9 +38,9 @@ export default function CJWebhooksPage() {
     try {
       await configureWebhooks(enable);
       setWebhooksEnabled(enable);
-      alert(enable ? '✅ Webhooks activés avec succès' : '✅ Webhooks désactivés avec succès');
+      toast.showToast({ type: 'success', title: 'Webhooks', description: enable ? '✅ Webhooks activés avec succès' : '✅ Webhooks désactivés avec succès' });
     } catch (err) {
-      alert('❌ Erreur lors de la configuration des webhooks');
+      toast.showToast({ type: 'error', title: 'Webhooks', description: '❌ Erreur lors de la configuration des webhooks' });
     } finally {
       setConfiguring(false);
     }

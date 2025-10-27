@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CommonModule } from '../../common/common.module';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJConfigService } from './cj-config.service';
@@ -9,6 +10,7 @@ import { CJProductService } from './cj-product.service';
 import { CJWebhookService } from './cj-webhook.service';
 
 @Module({
+  imports: [CommonModule], // ✅ Importer le module commun pour DuplicatePreventionService
   providers: [
     PrismaService,
     CJAPIClient,

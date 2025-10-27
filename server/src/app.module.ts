@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CJDropshippingModule } from './cj-dropshipping/cj-dropshipping.module';
+import { CommonModule } from './common/common.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
@@ -24,6 +25,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
       isGlobal: true,
     }),
     PrismaModule,
+    CommonModule, // ✅ Module anti-doublons
     AuthModule,
     ProductsModule,
     CategoriesModule,

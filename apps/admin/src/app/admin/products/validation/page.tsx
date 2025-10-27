@@ -1,10 +1,11 @@
 'use client'
 
+import { ProductDetailsModal } from '@/components/cj/ProductDetailsModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
-import { Check, Package, X } from 'lucide-react'
+import { Check, Eye, Package, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface Product {
@@ -20,6 +21,20 @@ interface Product {
   badge?: string
   stock: number
   sales: number
+  source?: string
+  // Champs CJ spécifiques
+  variants?: string
+  productSku?: string
+  productWeight?: string
+  materialNameEn?: string
+  packingNameEn?: string
+  suggestSellPrice?: string
+  cjReviews?: string
+  packingWeight?: string
+  productType?: string
+  productUnit?: string
+  productImage?: string
+  images?: string
 }
 
 export default function ProductValidationPage() {
@@ -28,6 +43,9 @@ export default function ProductValidationPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [productImageIndices, setProductImageIndices] = useState<{[key: string]: number}>({})
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
@@ -72,6 +90,7 @@ export default function ProductValidationPage() {
         const productsData = response.data.data || response.data;
         // S'assurer que productsData est un tableau
         const productsArray = Array.isArray(productsData) ? productsData : [];
+
         setPendingProducts(productsArray);
       }
     } catch (error) {
@@ -95,6 +114,111 @@ export default function ProductValidationPage() {
     } catch (error) {
       console.error('Erreur lors du rejet:', error)
     }
+  }
+
+  const handleShowDetails = (product: Product) => {
+    setSelectedProduct(product)
+    setIsModalOpen(true)
+  }
+
+  // Fonction pour obtenir le vrai prix du produit (pas le prix suggéré)
+  const getDisplayPrice = (product: Product) => {
+    // Priorité : prix original > prix de base (le vrai prix récupéré)
+    if (product.originalPrice && product.originalPrice > 0) {
+      return product.originalPrice
+    }
+    
+    if (product.price && product.price > 0) {
+      return product.price
+    }
+    
+    return 0
+  }
+
+  // Fonction pour récupérer toutes les images d'un produit
+  const getAllProductImages = (product: Product): string[] => {
+    let images: string[] = [];
+    
+    // Essayer productImage en premier
+    if (product.productImage) {
+      try {
+        if (typeof product.productImage === 'string' && product.productImage.startsWith('[')) {
+          const parsed = JSON.parse(product.productImage);
+          if (Array.isArray(parsed)) {
+            images = parsed.filter(img => img && typeof img === 'string');
+          }
+        } else if (typeof product.productImage === 'string' && product.productImage.startsWith('http')) {
+          images = [product.productImage];
+        }
+      } catch (e) {
+        console.error('Erreur parsing productImage:', e);
+      }
+    }
+    
+    // Si pas d'images via productImage, essayer image
+    if (images.length === 0 && product.image) {
+      try {
+        if (typeof product.image === 'string' && product.image.startsWith('[')) {
+          const parsed = JSON.parse(product.image);
+          if (Array.isArray(parsed)) {
+            images = parsed.filter(img => img && typeof img === 'string');
+          }
+        } else if (typeof product.image === 'string' && product.image.startsWith('http')) {
+          images = [product.image];
+        }
+      } catch (e) {
+        console.error('Erreur parsing image:', e);
+      }
+    }
+    
+    return images.length > 0 ? images : ['https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+produit'];
+  }
+
+  // Fonction pour obtenir l'image du produit (modifiée pour utiliser l'index)
+  const getProductImage = (product: Product) => {
+    const allImages = getAllProductImages(product);
+    const currentIndex = productImageIndices[product.id] || 0;
+    return allImages[currentIndex] || allImages[0];
+  }
+
+  // Fonction pour naviguer entre les images
+  const nextImage = (product: Product) => {
+    const allImages = getAllProductImages(product);
+    if (allImages.length > 1) {
+      const currentIndex = productImageIndices[product.id] || 0;
+      const nextIndex = (currentIndex + 1) % allImages.length;
+      setProductImageIndices(prev => ({
+        ...prev,
+        [product.id]: nextIndex
+      }));
+    }
+  }
+
+  const previousImage = (product: Product) => {
+    const allImages = getAllProductImages(product);
+    if (allImages.length > 1) {
+      const currentIndex = productImageIndices[product.id] || 0;
+      const prevIndex = currentIndex === 0 ? allImages.length - 1 : currentIndex - 1;
+      setProductImageIndices(prev => ({
+        ...prev,
+        [product.id]: prevIndex
+      }));
+    }
+  }
+
+  // Fonction pour nettoyer la description HTML
+  const cleanDescription = (description: string) => {
+    if (!description) return ''
+    
+    return description
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim()
   }
 
   if (!isAuthenticated) {
@@ -190,15 +314,82 @@ export default function ProductValidationPage() {
                 </div>
               </CardHeader>
               
+              {/* Image du produit avec navigation */}
+              <div className="px-6 pb-4 relative">
+                <div className="relative group">
+                  <img 
+                    src={getProductImage(product)}
+                    alt={product.name}
+                    className="w-full h-48 object-cover rounded-lg"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+produit';
+                    }}
+                  />
+                  
+                  {/* Navigation des images */}
+                  {getAllProductImages(product).length > 1 && (
+                    <>
+                      {/* Boutons de navigation */}
+                      <div className="absolute inset-0 flex items-center justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => previousImage(product)}
+                          className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          onClick={() => nextImage(product)}
+                          className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+                        >
+                          ›
+                        </button>
+                      </div>
+                      
+                      {/* Indicateur du nombre d'images */}
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                        {(productImageIndices[product.id] || 0) + 1} / {getAllProductImages(product).length}
+                      </div>
+                      
+                      {/* Points indicateurs */}
+                      <div className="absolute bottom-2 left-2 flex space-x-1">
+                        {getAllProductImages(product).map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setProductImageIndices(prev => ({
+                              ...prev,
+                              [product.id]: index
+                            }))}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              index === (productImageIndices[product.id] || 0)
+                                ? 'bg-white'
+                                : 'bg-white bg-opacity-50'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
               <CardContent className="space-y-4">
                 {/* Product Info */}
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Prix:</span>
                     <span className="font-semibold text-green-600">
-                      {product.price.toFixed(2)}€
+                      {getDisplayPrice(product).toFixed(2)}€
                     </span>
                   </div>
+                  
+                  {product.suggestSellPrice && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Prix suggéré CJ:</span>
+                      <span className="text-sm text-blue-600 font-medium">
+                        {product.suggestSellPrice}€
+                      </span>
+                    </div>
+                  )}
                   
                   {product.originalPrice && (
                     <div className="flex justify-between">
@@ -227,19 +418,34 @@ export default function ProductValidationPage() {
                       <span className="text-sm">{product.supplier.name}</span>
                     </div>
                   )}
+                  
+                  {product.productSku && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">SKU CJ:</span>
+                      <span className="text-sm font-mono text-gray-800">{product.productSku}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}
                 {product.description && (
                   <div>
                     <p className="text-sm text-gray-600 line-clamp-2">
-                      {product.description}
+                      {cleanDescription(product.description)}
                     </p>
                   </div>
                 )}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-4">
+                  <Button
+                    onClick={() => handleShowDetails(product)}
+                    variant="outline"
+                    className="px-3"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  
                   <Button
                     onClick={() => approveProduct(product.id)}
                     className="flex-1 bg-green-600 hover:bg-green-700"
@@ -261,6 +467,22 @@ export default function ProductValidationPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Modal de détails du produit */}
+      {isModalOpen && selectedProduct && (
+        <ProductDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedProduct(null)
+          }}
+          product={selectedProduct as any}
+          onImport={() => {
+            // Pas d'importation depuis la validation
+            console.log('Import non disponible depuis la validation')
+          }}
+        />
       )}
     </div>
   )

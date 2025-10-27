@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CJMainService } from '../cj-dropshipping/services/cj-main.service';
+import { DuplicatePreventionService } from '../common/services/duplicate-prevention.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -8,7 +9,8 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto';
 export class SuppliersService {
   constructor(
     private prisma: PrismaService,
-    private cjMainService: CJMainService
+    private cjMainService: CJMainService,
+    private duplicateService: DuplicatePreventionService
   ) {}
 
   async create(createSupplierDto: CreateSupplierDto) {
@@ -85,9 +87,47 @@ export class SuppliersService {
     });
   }
 
+  async ensureCJSupplierExists() {
+    // Vérifier si le fournisseur CJ Dropshipping existe
+    let cjSupplier = await this.prisma.supplier.findFirst({
+      where: { name: 'CJ Dropshipping' }
+    });
+
+    if (!cjSupplier) {
+      console.log('🏢 Création automatique du fournisseur CJ Dropshipping...');
+      cjSupplier = await this.prisma.supplier.create({
+        data: {
+          name: 'CJ Dropshipping',
+          description: 'Fournisseur CJ Dropshipping pour vente réelle',
+          apiUrl: 'https://developers.cjdropshipping.com',
+          apiKey: 'cj-api-key',
+          status: 'connected',
+          lastSync: new Date(),
+        }
+      });
+      console.log(`✅ Fournisseur CJ créé automatiquement avec ID: ${cjSupplier.id}`);
+    } else {
+      // S'assurer que le statut est 'connected' 
+      if (cjSupplier.status !== 'connected') {
+        await this.prisma.supplier.update({
+          where: { id: cjSupplier.id },
+          data: { 
+            status: 'connected',
+            lastSync: new Date(),
+          }
+        });
+        console.log(`✅ Statut du fournisseur CJ mis à jour vers 'connected'`);
+      }
+    }
+
+    return cjSupplier;
+  }
+
   async testConnection(id: string) {
     // Gestion spéciale pour CJ Dropshipping
     if (id === 'cj-dropshipping') {
+      // S'assurer que le fournisseur CJ existe d'abord
+      await this.ensureCJSupplierExists();
       const cjConfig = await this.prisma.cJConfig.findFirst();
       if (!cjConfig) {
         return { success: false, message: 'CJ Dropshipping non configuré' };
@@ -158,8 +198,18 @@ export class SuppliersService {
     console.log('🚀 === DÉBUT IMPORT PRODUITS ===');
     console.log('🔍 Supplier ID:', supplierId);
     
+    // Vérifier si c'est le fournisseur CJ Dropshipping (par ID ou nom)
+    const foundSupplier = await this.prisma.supplier.findFirst({
+      where: {
+        OR: [
+          { id: supplierId },
+          { name: 'CJ Dropshipping' }
+        ]
+      }
+    });
+
     // Gestion spéciale pour CJ Dropshipping - Import en lot depuis le magasin
-    if (supplierId === 'cj-dropshipping') {
+    if (foundSupplier?.name === 'CJ Dropshipping' || supplierId === 'cj-dropshipping') {
       try {
         console.log('🛒 === IMPORT EN LOT DEPUIS LE MAGASIN CJ ===');
         
@@ -244,58 +294,96 @@ export class SuppliersService {
             console.log(`📝 Nom: ${cjProduct.name}`);
             console.log(`🏷️ Catégorie: ${cjProduct.category}`);
             console.log(`💰 Prix: ${cjProduct.price}`);
+            console.log(`🆔 CJ Product ID: ${cjProduct.cjProductId}`);
             
-            // Mapper les catégories externes vers nos catégories
-            const categoryId = await this.mapExternalCategory(cjProduct.category || '', 'cj-dropshipping');
-            console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
+            // ✅ NOUVELLE LOGIQUE ANTI-DOUBLONS avec service dédié
+            const duplicateCheck = await this.duplicateService.checkCJProductDuplicate(
+              cjProduct.cjProductId, 
+              cjProduct.productSku
+            );
+            
+            console.log(`🔍 Résultat vérification doublons:`, {
+              isDuplicate: duplicateCheck.isDuplicate,
+              action: duplicateCheck.action,
+              reason: duplicateCheck.reason
+            });
 
-            // Créer le produit KAMRI (comme les produits statiques)
-            const productData: any = {
+            // ✅ IMPORTANT : Mapper la catégorie externe dans tous les cas
+            const categoryId = await this.mapExternalCategory(cjProduct.category || '', cjSupplier.id);
+            console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
+            
+            // Préparer les données du produit pour l'upsert intelligent
+            const productData = {
               name: cjProduct.name,
               description: cjProduct.description,
               price: cjProduct.price,
               originalPrice: cjProduct.originalPrice,
               image: cjProduct.image,
-              supplierId: cjSupplier.id, // ✅ Vrai fournisseur CJ
+              categoryId: categoryId,
+              supplierId: cjSupplier.id,
               externalCategory: cjProduct.category,
               source: 'cj-dropshipping',
-              status: 'pending', // En attente de validation
+              status: 'pending', // Statut pour validation
+              cjProductId: cjProduct.cjProductId, // ✅ Nouvel ID unique CJ
+              productSku: cjProduct.productSku,
+              suggestSellPrice: cjProduct.suggestSellPrice,
+              variants: cjProduct.variants,
+              dimensions: cjProduct.dimensions,
+              brand: cjProduct.brand,
+              tags: cjProduct.tags,
+              productWeight: cjProduct.productWeight,
+              packingWeight: cjProduct.packingWeight,
+              materialNameEn: cjProduct.materialNameEn,
+              packingNameEn: cjProduct.packingNameEn,
+              listedNum: cjProduct.listedNum,
+              supplierName: cjProduct.supplierName,
+              createrTime: cjProduct.createrTime,
+              cjReviews: cjProduct.reviews,
+              productType: cjProduct.productType,
+              productUnit: cjProduct.productUnit,
+              productKeyEn: cjProduct.productKeyEn,
               badge: this.generateBadge(),
               stock: Math.floor(Math.random() * 50) + 10,
             };
 
-            // Ajouter categoryId seulement si une catégorie est assignée
-            if (categoryId) {
-              productData.categoryId = categoryId;
-            }
-
-            const product = await this.prisma.product.create({
-              data: productData,
-              include: {
-                category: true,
-                supplier: true,
-              },
-            });
-
-            // Marquer le produit comme importé dans le magasin
-            await this.prisma.cJProductStore.update({
-              where: { id: cjProduct.id },
-              data: { status: 'imported' }
-            });
-
-            // Créer le mapping CJ
-            await this.prisma.cJProductMapping.create({
-              data: {
-                productId: product.id,
-                cjProductId: cjProduct.cjProductId,
-                cjSku: cjProduct.cjProductId, // Utiliser cjProductId comme SKU
-                lastSyncAt: new Date(),
-              },
-            });
+            // ✅ UTILISER UPSERT INTELLIGENT avec le service anti-doublons
+            const importResult = await this.duplicateService.upsertCJProduct(productData, duplicateCheck);
             
-            console.log(`✅ Produit KAMRI créé: ${product.name} (statut: pending)`);
-            console.log(`📊 ID produit: ${product.id}`);
-            importedProducts.push(product);
+            console.log(`✅ Produit ${importResult.status}:`, {
+              productId: importResult.productId,
+              changes: importResult.changes
+            });
+
+            if (importResult.productId) {
+              // Marquer le produit comme importé dans le magasin
+              await this.prisma.cJProductStore.update({
+                where: { id: cjProduct.id },
+                data: { status: 'imported' }
+              });
+
+              // Créer/mettre à jour le mapping CJ
+              await this.prisma.cJProductMapping.upsert({
+                where: { productId: importResult.productId },
+                update: {
+                  cjProductId: cjProduct.cjProductId,
+                  cjSku: cjProduct.cjProductId,
+                  lastSyncAt: new Date(),
+                },
+                create: {
+                  productId: importResult.productId,
+                  cjProductId: cjProduct.cjProductId,
+                  cjSku: cjProduct.cjProductId,
+                  lastSyncAt: new Date(),
+                },
+              });
+
+              importedProducts.push({
+                id: importResult.productId,
+                name: cjProduct.name,
+                status: importResult.status,
+                changes: importResult.changes
+              });
+            }
           } catch (error) {
             console.error(`❌ Erreur lors de la création du produit ${cjProduct.name}:`, error);
           }
@@ -370,7 +458,7 @@ export class SuppliersService {
             });
             
             // Mapper les catégories externes vers nos catégories
-            const categoryId = await this.mapExternalCategory(cleanedData.category || '', 'cj-dropshipping');
+            const categoryId = await this.mapExternalCategory(cleanedData.category || '', supplier.id);
             console.log(`✅ Catégorie mappée vers ID: ${categoryId}`);
             
             // Créer le produit KAMRI avec les données nettoyées
@@ -551,14 +639,26 @@ export class SuppliersService {
 
     if (existingMapping) {
       console.log(`✅ Mapping existant trouvé:`, existingMapping);
-      // Trouver la catégorie interne correspondante
-      const internalCategory = await this.prisma.category.findFirst({
-        where: { name: existingMapping.internalCategory }
+      // Vérifier si internalCategory contient un ID ou un nom
+      let internalCategory;
+      
+      // Essayer d'abord comme ID (nouveau format)
+      internalCategory = await this.prisma.category.findUnique({
+        where: { id: existingMapping.internalCategory }
       });
+      
+      // Si pas trouvé, essayer comme nom (ancien format)
+      if (!internalCategory) {
+        internalCategory = await this.prisma.category.findFirst({
+          where: { name: existingMapping.internalCategory }
+        });
+      }
       
       if (internalCategory) {
         console.log(`✅ Catégorie interne trouvée: ${internalCategory.name} (ID: ${internalCategory.id})`);
         return internalCategory.id;
+      } else {
+        console.log(`❌ Catégorie interne non trouvée pour mapping: ${existingMapping.internalCategory}`);
       }
     } else {
       console.log(`❌ Aucun mapping existant pour "${fakeCategory}"`);

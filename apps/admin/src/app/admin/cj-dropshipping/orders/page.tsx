@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJOrder } from '@/types/cj.types';
 import { useState } from 'react';
@@ -21,14 +22,15 @@ export default function CJOrdersPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingInfo, setTrackingInfo] = useState<any>(null);
   const [loadingTracking, setLoadingTracking] = useState(false);
+  const toast = useToast();
 
   const handleSyncOrders = async () => {
     setSyncing(true);
     try {
       const result = await syncOrderStatuses();
-      alert(`✅ Synchronisation terminée: ${result.synced} commandes mises à jour, ${result.errors} erreurs`);
+      toast.showToast({ type: 'success', title: 'Synchronisation', description: `✅ Synchronisation terminée: ${result.synced} commandes mises à jour, ${result.errors} erreurs` });
     } catch (err) {
-      alert('❌ Erreur lors de la synchronisation des commandes');
+      toast.showToast({ type: 'error', title: 'Synchronisation', description: '❌ Erreur lors de la synchronisation des commandes' });
     } finally {
       setSyncing(false);
     }
@@ -36,7 +38,7 @@ export default function CJOrdersPage() {
 
   const handleTrackPackage = async () => {
     if (!trackingNumber.trim()) {
-      alert('Veuillez entrer un numéro de suivi');
+      toast.showToast({ type: 'warning', title: 'Suivi', description: 'Veuillez entrer un numéro de suivi' });
       return;
     }
 
@@ -45,7 +47,7 @@ export default function CJOrdersPage() {
       const info = await getTracking(trackingNumber);
       setTrackingInfo(info);
     } catch (err) {
-      alert('❌ Erreur lors de la récupération du suivi');
+      toast.showToast({ type: 'error', title: 'Suivi', description: '❌ Erreur lors de la récupération du suivi' });
     } finally {
       setLoadingTracking(false);
     }

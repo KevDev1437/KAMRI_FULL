@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { CJProduct } from '@/types/cj.types';
 import { DollarSign, Star, Tag } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface ProductDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  product: CJProduct | null;
+  product: CJProduct | any | null; // Accepter CJProduct ou tout type de produit
   onImport?: (productId: string) => void;
   importing?: boolean;
 }
@@ -22,14 +22,151 @@ export function ProductDetailsModal({
   onImport, 
   importing = false 
 }: ProductDetailsModalProps) {
+  // TOUS LES HOOKS DOIVENT ÊTRE AU DÉBUT
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  // Parser les variants avec useMemo pour éviter les re-calculs
+  const parsedVariants = useMemo(() => {
+    if (!product?.variants) return [];
+    
+    // Si c'est déjà un tableau, le retourner
+    if (Array.isArray(product.variants)) return product.variants;
+    
+    // Si c'est une chaîne JSON, la parser
+    if (typeof product.variants === 'string') {
+      try {
+        const parsed = JSON.parse(product.variants);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.error('Erreur de parsing des variants:', error);
+        return [];
+      }
+    }
+    
+    return [];
+  }, [product?.variants]);
+
+  // Parser les tags de la même manière
+  const parsedTags = useMemo(() => {
+    if (!product?.tags) return [];
+    
+    // Si c'est déjà un tableau, le retourner
+    if (Array.isArray(product.tags)) return product.tags;
+    
+    // Si c'est une chaîne JSON, la parser
+    if (typeof product.tags === 'string') {
+      try {
+        const parsed = JSON.parse(product.tags);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.error('Erreur de parsing des tags:', error);
+        return [];
+      }
+    }
+    
+    return [];
+  }, [product?.tags]);
+  
+  const handleClose = () => {
+    setSelectedSize('');
+    onClose();
+  };
+  
   if (!product) return null;
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    e.currentTarget.src = '/placeholder-product.jpg';
+    e.currentTarget.src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+produit';
   };
+
+  // Fonction pour obtenir le vrai prix (pour produits de validation)
+  const getDisplayPrice = (product: any) => {
+    // Pour les produits de validation, utiliser originalPrice ou price
+    if (product.originalPrice && product.originalPrice > 0) {
+      return product.originalPrice
+    }
+    
+    if (product.price && product.price > 0) {
+      return product.price
+    }
+    
+    // Fallback sur sellPrice pour les produits CJ normaux
+    if (product.sellPrice && product.sellPrice > 0) {
+      return product.sellPrice
+    }
+    
+    return 0
+  }
+
+  // Fonction pour obtenir l'image principale
+  const getMainImage = (product: any) => {
+    // Essayer productImage en premier (pour produits CJ)
+    if (product.productImage) {
+      try {
+        // Si c'est déjà une URL directe
+        if (typeof product.productImage === 'string' && product.productImage.startsWith('http')) {
+          return product.productImage;
+        }
+        
+        // Si c'est un tableau JSON
+        if (typeof product.productImage === 'string' && product.productImage.startsWith('[')) {
+          const images = JSON.parse(product.productImage);
+          if (Array.isArray(images) && images.length > 0) {
+            return images[0];
+          }
+        }
+        
+        // Si c'est déjà un tableau
+        if (Array.isArray(product.productImage) && product.productImage.length > 0) {
+          return product.productImage[0];
+        }
+        
+        // Sinon utiliser tel quel
+        return product.productImage;
+      } catch (e) {
+        console.error('Erreur parsing productImage:', e);
+        return product.productImage;
+      }
+    }
+    
+    // Essayer le champ image standard
+    if (product.image) {
+      return product.image;
+    }
+    
+    // Essayer images (tableau)
+    if (product.images) {
+      try {
+        const images = JSON.parse(product.images);
+        if (Array.isArray(images) && images.length > 0) {
+          return images[0];
+        }
+      } catch (e) {
+        // Si ce n'est pas du JSON, utiliser directement
+        return product.images;
+      }
+    }
+    
+    return 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+produit';
+  }
 
   const formatPrice = (price: number | string) => {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
+  };
+
+  const formatSuggestedPrice = (price: string | number) => {
+    if (!price) return '0.00';
+    
+    const priceStr = String(price);
+    
+    // Si c'est une plage (ex: "76.13 - 85.41")
+    if (priceStr.includes(' - ')) {
+      return priceStr; // Retourner la plage telle quelle
+    }
+    
+    // Si c'est un nombre simple
+    const numPrice = parseFloat(priceStr);
     return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
   };
 
@@ -76,10 +213,13 @@ export function ProductDetailsModal({
       .replace(/&amp;/g, '&') // Remplacer &amp; par &
       .replace(/&lt;/g, '<') // Remplacer &lt; par <
       .replace(/&gt;/g, '>') // Remplacer &gt; par >
+
       .replace(/&quot;/g, '"') // Remplacer &quot; par "
       .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
       .trim();
   };
+
+
 
   // 🎨 Fonction pour extraire les couleurs des variantes
   const extractColorsFromVariants = (variants: any[]): string => {
@@ -109,68 +249,83 @@ export function ProductDetailsModal({
     return sizes.join(', ');
   };
 
-  // État pour la galerie d'images/couleurs
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
   
   // Extraire toutes les images du produit (chaque image = une couleur)
   const getAllImages = () => {
-    let images = [];
+    let images: string[] = [];
     
-    // Image principale
+    // Parser les images du produit
     if (product.productImage) {
-      let mainImage = product.productImage;
-      
-      if (Array.isArray(mainImage)) {
-        images = mainImage;
-      } else if (typeof mainImage === 'string' && mainImage.includes('[')) {
-        try {
-          const parsed = JSON.parse(mainImage);
+      try {
+        // Si c'est une chaîne qui ressemble à un tableau JSON
+        if (typeof product.productImage === 'string' && product.productImage.startsWith('[')) {
+          const parsed = JSON.parse(product.productImage);
           if (Array.isArray(parsed)) {
-            images = parsed;
+            images = parsed.filter(img => img && typeof img === 'string');
           } else {
-            images = [mainImage];
+            images = [product.productImage];
           }
-        } catch (e) {
-          images = [mainImage];
+        } else if (typeof product.productImage === 'string') {
+          images = [product.productImage];
+        } else if (Array.isArray(product.productImage)) {
+          images = product.productImage.filter((img: any) => img && typeof img === 'string');
         }
-      } else {
-        images = [mainImage];
+      } catch (e) {
+        console.error('Erreur parsing productImage:', e);
+        if (typeof product.productImage === 'string') {
+          images = [product.productImage];
+        }
       }
     }
     
+    // Si pas d'images du produit principal, essayer image standard
+    if (images.length === 0 && product.image) {
+      images = [product.image];
+    }
+    
     // Ajouter les images des variantes
-    if (product.variants && product.variants.length > 0) {
-      product.variants.forEach(variant => {
+    if (parsedVariants && parsedVariants.length > 0) {
+      parsedVariants.forEach((variant: any) => {
         if (variant.images && Array.isArray(variant.images)) {
-          images.push(...variant.images);
+          images.push(...variant.images.filter((img: any) => img && typeof img === 'string'));
+        } else if (variant.variantImage && typeof variant.variantImage === 'string') {
+          images.push(variant.variantImage);
         }
       });
     }
     
-    // Supprimer les doublons
-    return Array.from(new Set(images));
+    // Supprimer les doublons et filtrer les URLs valides
+    const uniqueImages = Array.from(new Set(images)).filter(img => 
+      img && 
+      typeof img === 'string' && 
+      (img.startsWith('http') || img.startsWith('/'))
+    );
+    
+    // Si aucune image valide, retourner un placeholder
+    return uniqueImages.length > 0 ? uniqueImages : ['https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+produit'];
   };
 
   // Extraire les couleurs des variantes (pour l'affichage)
-  const getColorsFromVariants = () => {
-    if (!product.variants || product.variants.length === 0) return [];
+  const getColorsFromVariants = (): string[] => {
+    if (!parsedVariants || parsedVariants.length === 0) return [];
     
-    const colors = Array.from(new Set(product.variants.map(v => {
+    const colors = Array.from(new Set(parsedVariants.map((v: any) => {
       const name = (v as any).variantNameEn || (v as any).variantName || '';
       const color = name.split('-')[0]?.trim();
       return color;
-    }).filter(Boolean)));
+    }).filter(Boolean))) as string[];
     
     return colors;
   };
 
   const allImages = getAllImages();
   const colors = getColorsFromVariants();
-  const currentImage = allImages[selectedImageIndex] || '/placeholder-product.jpg';
+  const currentImage = allImages[selectedImageIndex] || getMainImage(product);
   const currentColor = colors[selectedImageIndex] || 'Couleur principale';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Product Details" size="xl">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Product Details" size="xl">
       <div className="space-y-6">
         {/* Header avec galerie d'images et infos principales */}
         <div className="flex gap-6">
@@ -231,7 +386,7 @@ export function ProductDetailsModal({
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
                 <span className="text-lg font-semibold text-green-600">
-                  ${formatPrice(product.sellPrice)}
+                  ${formatPrice(getDisplayPrice(product))}
                 </span>
                 {product.suggestSellPrice && (
                   <span className="text-sm text-gray-500">
@@ -263,7 +418,7 @@ export function ProductDetailsModal({
             </div>
 
             {/* Sélecteurs comme CJ Dropshipping */}
-            {product.variants && product.variants.length > 0 && (
+            {parsedVariants && parsedVariants.length > 0 && (
               <div className="space-y-4">
                 {/* Affichage de la couleur sélectionnée */}
                 <div>
@@ -276,34 +431,34 @@ export function ProductDetailsModal({
                 </div>
 
                 {/* Sélecteur de tailles */}
-                {extractSizesFromVariants(product.variants) !== 'N/A' && (
+                {extractSizesFromVariants(parsedVariants) !== 'N/A' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tailles disponibles
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {extractSizesFromVariants(product.variants).split(', ').map((size, index) => (
+                      {extractSizesFromVariants(parsedVariants).split(', ').map((size, index) => (
                         <button
                           key={index}
-                          className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
+                          onClick={() => setSelectedSize(selectedSize === size.trim() ? '' : size.trim())}
+                          className={`px-4 py-2 text-sm border rounded-md transition-colors ${
+                            selectedSize === size.trim()
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                          }`}
                         >
                           {size.trim()}
                         </button>
                       ))}
                     </div>
+                    {selectedSize && (
+                      <p className="text-sm text-gray-600 mt-2">
+                        Taille sélectionnée: <span className="font-medium text-orange-600">{selectedSize}</span>
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-
-            {onImport && (
-              <Button 
-                onClick={() => onImport(product.pid)}
-                disabled={importing}
-                className="w-full"
-              >
-                {importing ? 'Importing...' : 'Import this product'}
-              </Button>
             )}
           </div>
         </div>
@@ -319,49 +474,110 @@ export function ProductDetailsModal({
         )}
 
         {/* === VARIANTES DISPONIBLES (comme CJ) === */}
-        {product.variants && product.variants.length > 0 && (
+        {parsedVariants && parsedVariants.length > 0 && (
           <div className="bg-green-50 p-4 rounded-lg">
-            <h4 className="text-lg font-semibold text-gray-900 mb-4">🎨 Available Variants</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
+            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              🎨 Available Variants ({parsedVariants.length})
+            </h4>
+            
+            {/* Résumé des variants */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-lg p-3 border">
                 <label className="text-sm font-medium text-gray-700">Total Variants</label>
-                <p className="text-sm text-gray-900 mt-1">{product.variants.length}</p>
+                <p className="text-lg font-bold text-blue-600 mt-1">{parsedVariants.length}</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Colors</label>
-                <p className="text-sm text-gray-900 mt-1">{extractColorsFromVariants(product.variants)}</p>
+              <div className="bg-white rounded-lg p-3 border">
+                <label className="text-sm font-medium text-gray-700">Colors Available</label>
+                <p className="text-sm text-gray-900 mt-1 font-medium">{extractColorsFromVariants(parsedVariants)}</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Sizes</label>
-                <p className="text-sm text-gray-900 mt-1">{extractSizesFromVariants(product.variants)}</p>
+              <div className="bg-white rounded-lg p-3 border">
+                <label className="text-sm font-medium text-gray-700">Sizes Available</label>
+                <p className="text-sm text-gray-900 mt-1 font-medium">{extractSizesFromVariants(parsedVariants)}</p>
               </div>
             </div>
             
-            {/* Afficher seulement les 5 premières variantes pour éviter l'écriture en boucle */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.variants.slice(0, 5).map((variant: any, index: number) => (
-                <div key={index} className="border rounded-lg p-3 bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{variant.variantNameEn || variant.variantName || `Variant ${index + 1}`}</span>
-                    {variant.variantSellPrice && (
-                      <span className="text-sm font-semibold text-green-600">
-                        ${formatPrice(variant.variantSellPrice)}
-                      </span>
-                    )}
-                  </div>
-                  {variant.variantSku && (
-                    <p className="text-xs text-gray-500">SKU: {variant.variantSku}</p>
-                  )}
-                  {variant.variantWeight && (
-                    <p className="text-xs text-gray-500">Weight: {formatWeight(variant.variantWeight)}</p>
-                  )}
-                </div>
-              ))}
-              {product.variants.length > 5 && (
-                <div className="col-span-full text-center text-sm text-gray-500 py-2">
-                  ... et {product.variants.length - 5} autres variantes
-                </div>
-              )}
+            {/* Tableau des variants (style CJ) */}
+            <div className="bg-white rounded-lg border overflow-hidden">
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-gray-700">Variant</th>
+                      <th className="text-left p-3 font-medium text-gray-700">VID</th>
+                      <th className="text-left p-3 font-medium text-gray-700">SKU</th>
+                      <th className="text-left p-3 font-medium text-gray-700">Price</th>
+                      <th className="text-left p-3 font-medium text-gray-700">Weight</th>
+                      <th className="text-left p-3 font-medium text-gray-700">Dimensions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedVariants.map((variant: any, index: number) => (
+                      <tr key={variant.vid || index} className="border-b hover:bg-gray-50">
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            {variant.variantImage && (
+                              <img 
+                                src={variant.variantImage} 
+                                alt={variant.variantNameEn || variant.variantName}
+                                className="w-8 h-8 rounded object-cover"
+                                onError={handleImageError}
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {variant.variantNameEn || variant.variantName || `Variant ${index + 1}`}
+                              </p>
+                              {variant.variantKey && (
+                                <p className="text-xs text-gray-500">{variant.variantKey}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className="text-xs font-mono text-gray-600">
+                            {variant.vid ? String(variant.vid).slice(-8) : 'N/A'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="text-xs font-mono text-blue-600">
+                            {variant.variantSku || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {variant.variantSellPrice ? (
+                            <span className="font-semibold text-green-600">
+                              ${formatPrice(variant.variantSellPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className="text-gray-700">
+                            {variant.variantWeight ? `${Math.round(variant.variantWeight)}g` : 'N/A'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {variant.variantLength && variant.variantWidth && variant.variantHeight ? (
+                            <span className="text-xs text-gray-600">
+                              {variant.variantLength}×{variant.variantWidth}×{variant.variantHeight}
+                            </span>
+                          ) : variant.variantStandard ? (
+                            <span className="text-xs text-gray-600">{variant.variantStandard}</span>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Informations supplémentaires des variants */}
+            <div className="mt-4 text-xs text-gray-600">
+              <p>💡 Tous les variants sont affichés ci-dessus. Chaque variant a ses propres spécifications (prix, poids, dimensions).</p>
             </div>
           </div>
         )}
@@ -403,11 +619,11 @@ export function ProductDetailsModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Base Price</label>
-              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.sellPrice)}</p>
+              <p className="text-sm text-gray-900 mt-1">${formatPrice(getDisplayPrice(product))}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Suggested Price</label>
-              <p className="text-sm text-gray-900 mt-1">${formatPrice(product.suggestSellPrice || 0)}</p>
+              <p className="text-sm text-gray-900 mt-1">${formatSuggestedPrice(product.suggestSellPrice || 0)}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Lists</label>
@@ -463,6 +679,27 @@ export function ProductDetailsModal({
               </div>
             )}
 
+            {product.materialNameEn && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Material</label>
+                <p className="text-sm text-gray-900 mt-1">{product.materialNameEn}</p>
+              </div>
+            )}
+
+            {product.packingNameEn && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Packaging</label>
+                <p className="text-sm text-gray-900 mt-1">{product.packingNameEn}</p>
+              </div>
+            )}
+
+            {product.productKeyEn && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Attributes</label>
+                <p className="text-sm text-gray-900 mt-1">{product.productKeyEn}</p>
+              </div>
+            )}
+
             {product.createrTime && (
               <div>
                 <label className="text-sm font-medium text-gray-700">Creation Date</label>
@@ -473,11 +710,11 @@ export function ProductDetailsModal({
         </div>
 
         {/* Tags */}
-        {product.tags && product.tags.length > 0 && (
+        {parsedTags && parsedTags.length > 0 && (
           <div>
             <h4 className="text-lg font-semibold text-gray-900 mb-2">Tags</h4>
             <div className="flex flex-wrap gap-2">
-              {product.tags.map((tag: string, index: number) => (
+              {parsedTags.map((tag: string, index: number) => (
                 <Badge key={index} variant="outline" className="text-xs">
                   {tag}
                 </Badge>
@@ -488,7 +725,7 @@ export function ProductDetailsModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             Close
           </Button>
           {onImport && (

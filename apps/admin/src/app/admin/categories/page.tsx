@@ -2,13 +2,14 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/contexts/ToastContext'
 import {
-    CheckCircle,
-    Edit,
-    Link,
-    Lock,
-    Plus,
-    Trash2
+  CheckCircle,
+  Edit,
+  Link,
+  Lock,
+  Plus,
+  Trash2
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -27,6 +28,7 @@ interface Category {
 }
 
 export default function CategoriesPage() {
+  const toast = useToast()
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [mappings, setMappings] = useState<any[]>([])
@@ -135,7 +137,7 @@ export default function CategoriesPage() {
 
   const handleDeleteCategory = async (categoryId: string, isDefault: boolean) => {
     if (isDefault) {
-      alert('Impossible de supprimer une catégorie par défaut')
+      toast.showToast({ type: 'warning', title: 'Suppression', description: 'Impossible de supprimer une catégorie par défaut' })
       return
     }
 
@@ -148,7 +150,7 @@ export default function CategoriesPage() {
       await loadData() // Recharger toutes les données
     } catch (error) {
       console.error('Erreur lors de la suppression de la catégorie:', error)
-      alert('Erreur lors de la suppression de la catégorie')
+      toast.showToast({ type: 'error', title: 'Suppression', description: 'Erreur lors de la suppression de la catégorie' })
     }
   }
 
@@ -250,7 +252,7 @@ export default function CategoriesPage() {
                       <CardTitle className="text-lg flex items-center gap-2">
                         {category.name}
                         {category.isDefault && (
-                          <Lock className="w-4 h-4 text-blue-500" title="Catégorie par défaut" />
+                          <Lock className="w-4 h-4 text-blue-500" aria-label="Catégorie par défaut" role="img" />
                         )}
                       </CardTitle>
                       <p className="text-sm text-gray-500">

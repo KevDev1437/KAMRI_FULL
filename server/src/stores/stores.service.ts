@@ -181,6 +181,18 @@ export class StoresService {
   // ✅ Importer les produits sélectionnés
   async importSelectedProducts(storeId: string) {
     if (storeId === 'cj-dropshipping') {
+      // Récupérer l'ID du fournisseur CJ Dropshipping
+      const cjSupplier = await this.prisma.supplier.findFirst({
+        where: { name: 'CJ Dropshipping' }
+      });
+
+      if (!cjSupplier) {
+        return {
+          message: 'Fournisseur CJ Dropshipping non trouvé',
+          imported: 0
+        };
+      }
+
       const selectedProducts = await this.prisma.cJProductStore.findMany({
         where: { status: 'selected' }
       });
@@ -196,7 +208,9 @@ export class StoresService {
 
       for (const cjProduct of selectedProducts) {
         try {
-          // Créer le produit KAMRI
+          console.log(`🔄 Import du produit: ${cjProduct.name}`);
+          
+          // Créer le produit KAMRI avec TOUTES les données CJ
           const product = await this.prisma.product.create({
             data: {
               name: cjProduct.name,
@@ -204,12 +218,31 @@ export class StoresService {
               price: cjProduct.price,
               originalPrice: cjProduct.originalPrice,
               image: cjProduct.image,
-              supplierId: 'cj-dropshipping',
+              supplierId: cjSupplier.id, // Utiliser l'ID réel du fournisseur
               externalCategory: cjProduct.category,
               source: 'cj-dropshipping',
               status: 'pending',
               badge: 'nouveau',
               stock: Math.floor(Math.random() * 50) + 10,
+              
+              // ✅ TOUTES LES DONNÉES DÉTAILLÉES CJ
+              productSku: cjProduct.productSku,
+              productWeight: cjProduct.productWeight,
+              packingWeight: cjProduct.packingWeight,
+              productType: cjProduct.productType,
+              productUnit: cjProduct.productUnit,
+              productKeyEn: cjProduct.productKeyEn,
+              materialNameEn: cjProduct.materialNameEn,
+              packingNameEn: cjProduct.packingNameEn,
+              suggestSellPrice: cjProduct.suggestSellPrice,
+              listedNum: cjProduct.listedNum,
+              supplierName: cjProduct.supplierName,
+              createrTime: cjProduct.createrTime,
+              variants: cjProduct.variants, // JSON des 48+ variants
+              cjReviews: cjProduct.reviews, // JSON des avis CJ
+              dimensions: cjProduct.dimensions,
+              brand: cjProduct.brand,
+              tags: cjProduct.tags, // JSON des tags
             },
           });
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
 import { CheckCircle, Clock, Package, Store as StoreIcon, TrendingUp, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -67,6 +68,7 @@ const getCleanImageUrl = (image: string | string[] | undefined): string | null =
 };
 
 export default function StoresPage() {
+  const toast = useToast();
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,7 +217,7 @@ export default function StoresPage() {
       const data = await apiClient<{ message: string }>(`/stores/${storeId}/import-selected`, {
         method: 'POST',
       });
-      alert(data.message);
+  toast.showToast({ type: 'info', title: 'Import', description: data.message });
       
       // 🔄 SYNCHRONISATION AUTOMATIQUE DU STATUT
       console.log('🔄 Synchronisation du statut après import...');
@@ -233,7 +235,7 @@ export default function StoresPage() {
       
     } catch (error) {
       console.error('Erreur lors de l\'import:', error);
-      alert(`Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}`);
+      toast.showToast({ type: 'error', title: 'Import', description: `Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}` });
     } finally {
       setSyncingStatus(false);
     }

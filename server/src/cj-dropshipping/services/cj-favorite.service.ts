@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DuplicatePreventionService } from '../../common/services/duplicate-prevention.service';
 import { CJAPIClient } from '../cj-api-client';
 
 @Injectable()
@@ -8,7 +9,8 @@ export class CJFavoriteService {
 
   constructor(
     private prisma: PrismaService,
-    private cjApiClient: CJAPIClient
+    private cjApiClient: CJAPIClient,
+    private duplicateService: DuplicatePreventionService
   ) {}
 
   /**
@@ -365,77 +367,65 @@ export class CJFavoriteService {
       this.logger.log('🔍 Catégorie externe CJ:', (cjProduct as any).categoryName);
       
       this.logger.log('💾 Sauvegarde dans la base de données...');
-      // ✅ NOUVELLE APPROCHE : STOCKER DANS LE MAGASIN CJ (upsert pour éviter les doublons)
-      const cjStoreProduct = await this.prisma.cJProductStore.upsert({
-        where: { cjProductId: pid },
-        update: {
-          name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
-          description: (cjProduct as any).description,
-          price: sellingPrice,
-          originalPrice: originalPrice,
-          image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
-          category: (cjProduct as any).categoryName,
-          status: 'available', // Remettre en disponible si déjà importé
-          isFavorite: isFavorite, // Marquer comme favori si spécifié
-          // 🔧 AJOUTER TOUTES LES DONNÉES DÉTAILLÉES
-          productSku: (cjProduct as any).productSku,
-          productWeight: (cjProduct as any).productWeight,
-          packingWeight: (cjProduct as any).packingWeight,
-          productType: (cjProduct as any).productType,
-          productUnit: (cjProduct as any).productUnit,
-          productKeyEn: (cjProduct as any).productKeyEn,
-          materialNameEn: (cjProduct as any).materialNameEn,
-          packingNameEn: (cjProduct as any).packingNameEn,
-          suggestSellPrice: (cjProduct as any).suggestSellPrice,
-          listedNum: (cjProduct as any).listedNum,
-          supplierName: (cjProduct as any).supplierName,
-          createrTime: (cjProduct as any).createrTime,
-          variants: JSON.stringify((cjProduct as any).variants || []),
-          reviews: JSON.stringify((cjProduct as any).reviews || []),
-          dimensions: (cjProduct as any).dimensions,
-          brand: (cjProduct as any).brand,
-          tags: JSON.stringify((cjProduct as any).tags || []),
-        } as any,
-        create: {
-          cjProductId: pid,
-          name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
-          description: (cjProduct as any).description,
-          price: sellingPrice,
-          originalPrice: originalPrice,
-          image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
-          category: (cjProduct as any).categoryName,
-          status: 'available',
-          isFavorite: isFavorite, // Marquer comme favori si spécifié
-          // 🔧 AJOUTER TOUTES LES DONNÉES DÉTAILLÉES
-          productSku: (cjProduct as any).productSku,
-          productWeight: (cjProduct as any).productWeight,
-          packingWeight: (cjProduct as any).packingWeight,
-          productType: (cjProduct as any).productType,
-          productUnit: (cjProduct as any).productUnit,
-          productKeyEn: (cjProduct as any).productKeyEn,
-          materialNameEn: (cjProduct as any).materialNameEn,
-          packingNameEn: (cjProduct as any).packingNameEn,
-          suggestSellPrice: (cjProduct as any).suggestSellPrice,
-          listedNum: (cjProduct as any).listedNum,
-          supplierName: (cjProduct as any).supplierName,
-          createrTime: (cjProduct as any).createrTime,
-          variants: JSON.stringify((cjProduct as any).variants || []),
-          reviews: JSON.stringify((cjProduct as any).reviews || []),
-          dimensions: (cjProduct as any).dimensions,
-          brand: (cjProduct as any).brand,
-          tags: JSON.stringify((cjProduct as any).tags || []),
-        } as any,
-      });
-
-      this.logger.log('✅ Produit ajouté au magasin CJ:', {
-        id: cjStoreProduct.id,
-        name: cjStoreProduct.name,
-        isFavorite: cjStoreProduct.isFavorite,
-        status: cjStoreProduct.status
+      
+      // ✅ NOUVELLE APPROCHE ANTI-DOUBLONS : Vérifier d'abord les doublons
+      this.logger.log('🔍 Vérification des doublons...');
+      const isDuplicateStore = await this.duplicateService.checkCJStoreDuplicate(pid);
+      
+      if (isDuplicateStore) {
+        this.logger.log(`⚠️ Produit ${pid} déjà dans le magasin CJ - Mise à jour au lieu de création`);
+      }
+      
+      // ✅ UTILISER UPSERT INTELLIGENT pour le magasin CJ
+      const storeProductData = {
+        cjProductId: pid,
+        name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
+        description: (cjProduct as any).description,
+        price: sellingPrice,
+        originalPrice: originalPrice,
+        image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
+        category: (cjProduct as any).categoryName,
+        status: 'available',
+        isFavorite: isFavorite,
+        // 🔧 AJOUTER TOUTES LES DONNÉES DÉTAILLÉES
+        productSku: (cjProduct as any).productSku,
+        productWeight: (cjProduct as any).productWeight,
+        packingWeight: (cjProduct as any).packingWeight,
+        productType: (cjProduct as any).productType,
+        productUnit: (cjProduct as any).productUnit,
+        productKeyEn: (cjProduct as any).productKeyEn,
+        materialNameEn: (cjProduct as any).materialNameEn,
+        packingNameEn: (cjProduct as any).packingNameEn,
+        suggestSellPrice: (cjProduct as any).suggestSellPrice,
+        listedNum: (cjProduct as any).listedNum,
+        supplierName: (cjProduct as any).supplierName,
+        createrTime: (cjProduct as any).createrTime,
+        variants: JSON.stringify((cjProduct as any).variants || []),
+        reviews: JSON.stringify((cjProduct as any).reviews || []),
+        dimensions: (cjProduct as any).dimensions,
+        brand: (cjProduct as any).brand,
+        tags: JSON.stringify((cjProduct as any).tags || []),
+      };
+      
+      const storeResult = await this.duplicateService.upsertCJStoreProduct(storeProductData);
+      
+      this.logger.log(`✅ Produit ${storeResult.isNew ? 'ajouté' : 'mis à jour'} dans le magasin CJ:`, {
+        id: storeResult.productId,
+        name: storeProductData.name,
+        isFavorite: storeProductData.isFavorite,
+        status: storeProductData.status,
+        action: storeResult.isNew ? 'NOUVEAU' : 'MISE_À_JOUR'
       });
       this.logger.log('🎉 Import terminé avec succès');
       this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
-      return cjStoreProduct;
+      
+      return {
+        success: true,
+        message: storeResult.isNew ? 'Produit ajouté au magasin CJ' : 'Produit mis à jour dans le magasin CJ',
+        product: storeResult.productId,
+        action: storeResult.isNew ? 'CREATED' : 'UPDATED',
+        isDuplicate: !storeResult.isNew
+      };
     } catch (error) {
       this.logger.error('❌ === ERREUR IMPORT PRODUIT ===');
       this.logger.error(`💥 Erreur import produit ${pid}: ${error instanceof Error ? error.message : String(error)}`);

@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
 import {
-  Edit,
-  Mail,
-  Plus,
-  Search,
-  Shield,
-  Trash2,
-  User,
-  UserCheck,
-  Users,
-  UserX
+    Edit,
+    Mail,
+    Plus,
+    Search,
+    Shield,
+    Trash2,
+    User,
+    UserCheck,
+    Users,
+    UserX
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -37,6 +38,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('Tous')
   const [statusFilter, setStatusFilter] = useState('Tous')
   const { isAuthenticated } = useAuth()
+  const toast = useToast()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -193,7 +195,7 @@ export default function UsersPage() {
         </div>
         <Button 
           className="kamri-button"
-          onClick={() => alert('Ajout d\'utilisateur - Fonctionnalité à venir')}
+          onClick={() => toast.showToast({ type: 'info', title: 'À venir', description: "Ajout d'utilisateur - Fonctionnalité à venir" })}
         >
           <Plus className="w-4 h-4 mr-2" />
           Ajouter un utilisateur
@@ -310,7 +312,7 @@ export default function UsersPage() {
                       variant="outline" 
                       size="sm"
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => alert('Suppression - Fonctionnalité à venir')}
+                      onClick={() => toast.showToast({ type: 'info', title: 'À venir', description: 'Suppression - Fonctionnalité à venir' })}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -336,7 +338,7 @@ export default function UsersPage() {
             </p>
             <Button 
               className="kamri-button"
-              onClick={() => alert('Ajout d\'utilisateur - Fonctionnalité à venir')}
+              onClick={() => toast.showToast({ type: 'info', title: 'À venir', description: "Ajout d'utilisateur - Fonctionnalité à venir" })}
             >
               <Plus className="w-4 h-4 mr-2" />
               Ajouter un utilisateur

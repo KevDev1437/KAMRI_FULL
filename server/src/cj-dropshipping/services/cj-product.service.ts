@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJProductSearchDto } from '../dto/cj-product-search.dto';
 import { CJProduct } from '../interfaces/cj-product.interface';
+import { DuplicatePreventionService } from '../../common/services/duplicate-prevention.service';
 
 @Injectable()
 export class CJProductService {
@@ -10,7 +11,8 @@ export class CJProductService {
 
   constructor(
     private prisma: PrismaService,
-    private cjApiClient: CJAPIClient
+    private cjApiClient: CJAPIClient,
+    private duplicateService: DuplicatePreventionService
   ) {}
 
   // Cache simple pour éviter les requêtes répétées
@@ -359,83 +361,179 @@ export class CJProductService {
   }
 
   /**
-   * Obtenir les détails d'un produit CJ
+   * Obtenir les détails d'un produit CJ (priorité: base locale → API CJ)
    */
-  async getProductDetails(pid: string): Promise<any> {
+  async getProductDetails(productId: string): Promise<any> {
     try {
-      this.logger.log(`📦 Récupération des détails du produit CJ: ${pid}`);
+      this.logger.log(`📦 Récupération des détails du produit CJ: ${productId}`);
+      
+      // 1️⃣ D'abord, essayer de trouver le produit dans la base locale
+      let localProduct = null;
+      
+      // Essayer par cjProductId 
+      localProduct = await this.prisma.cJProductStore.findFirst({
+        where: { cjProductId: productId }
+      });
+      
+      // Si pas trouvé, essayer par productSku
+      if (!localProduct) {
+        localProduct = await this.prisma.cJProductStore.findFirst({
+          where: { productSku: productId }
+        });
+      }
+      
+      // Si trouvé en local, utiliser ces données (plus rapide et fiable)
+      if (localProduct) {
+        this.logger.log(`✅ Produit trouvé en local: ${localProduct.name}`);
+        return this.mapLocalProductToDetails(localProduct);
+      }
+      
+      // 2️⃣ Si pas en local, faire l'appel API vers CJ
+      this.logger.log(`🌐 Produit non trouvé en local, appel API CJ...`);
       
       const client = await this.initializeClient();
-      
-      // Utiliser la même logique que le script test
-      const result = await client.makeRequest('GET', `/product/query?pid=${pid}`);
+      const result = await client.makeRequest('GET', `/product/query?pid=${productId}`);
       
       if (result.code !== 200) {
-        this.logger.error(`❌ Erreur détails produit ${pid}:`, result.message);
+        this.logger.error(`❌ Erreur détails produit ${productId}:`, result.message);
         throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
       }
       
       const cjProduct = result.data;
-      this.logger.log(`✅ Détails récupérés pour ${pid}`);
+      this.logger.log(`✅ Détails récupérés depuis l'API CJ pour ${productId}`);
       
-      // Mapper les données selon la structure attendue par le frontend
-      const mappedProduct = {
-        pid: (cjProduct as any).pid,
-        productName: (cjProduct as any).productNameEn || (cjProduct as any).productName,
-        productNameEn: (cjProduct as any).productNameEn || (cjProduct as any).productName,
-        productSku: (cjProduct as any).productSku,
-        sellPrice: (cjProduct as any).sellPrice,
-        productImage: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
-        images: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage : [(cjProduct as any).productImage],
-        categoryName: (cjProduct as any).categoryName,
-        description: this.cleanDescription((cjProduct as any).description || ''),
-        variants: (cjProduct as any).variants || [],
-        rating: (cjProduct as any).rating || 0,
-        totalReviews: (cjProduct as any).totalReviews || (cjProduct as any).reviews?.length || 0,
-        weight: (cjProduct as any).productWeight || (cjProduct as any).weight || 0,
-        dimensions: (cjProduct as any).dimensions || '',
-        brand: (cjProduct as any).brand || '',
-        tags: (cjProduct as any).tags || [],
-        reviews: (cjProduct as any).reviews || [],
-        // Champs supplémentaires de l'API
-        productWeight: (cjProduct as any).productWeight,
-        productUnit: (cjProduct as any).productUnit,
-        productType: (cjProduct as any).productType,
-        categoryId: (cjProduct as any).categoryId,
-        entryCode: (cjProduct as any).entryCode,
-        entryName: (cjProduct as any).entryName,
-        entryNameEn: (cjProduct as any).entryNameEn,
-        materialName: (cjProduct as any).materialName,
-        materialNameEn: (cjProduct as any).materialNameEn,
-        materialKey: (cjProduct as any).materialKey,
-        packingWeight: (cjProduct as any).packingWeight,
-        packingName: (cjProduct as any).packingName,
-        packingNameEn: (cjProduct as any).packingNameEn,
-        packingKey: (cjProduct as any).packingKey,
-        productKey: (cjProduct as any).productKey,
-        productKeyEn: (cjProduct as any).productKeyEn,
-        productProSet: (cjProduct as any).productProSet,
-        productProEnSet: (cjProduct as any).productProEnSet,
-        addMarkStatus: (cjProduct as any).addMarkStatus,
-        suggestSellPrice: (cjProduct as any).suggestSellPrice,
-        listedNum: (cjProduct as any).listedNum,
-        status: (cjProduct as any).status,
-        supplierName: (cjProduct as any).supplierName,
-        supplierId: (cjProduct as any).supplierId,
-        customizationVersion: (cjProduct as any).customizationVersion,
-        customizationJson1: (cjProduct as any).customizationJson1,
-        customizationJson2: (cjProduct as any).customizationJson2,
-        customizationJson3: (cjProduct as any).customizationJson3,
-        customizationJson4: (cjProduct as any).customizationJson4,
-        createrTime: (cjProduct as any).createrTime,
-        productVideo: (cjProduct as any).productVideo
-      };
+      return this.mapApiProductToDetails(cjProduct);
       
-      return mappedProduct;
     } catch (error) {
-      this.logger.error(`Erreur lors de la récupération des détails du produit ${pid}:`, error);
+      this.logger.error(`Erreur lors de la récupération des détails du produit ${productId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Mapper un produit local vers la structure de détails
+   */
+  private mapLocalProductToDetails(localProduct: any): any {
+    // Parser les variants JSON si c'est une string
+    let variants = [];
+    try {
+      variants = typeof localProduct.variants === 'string' 
+        ? JSON.parse(localProduct.variants) 
+        : (localProduct.variants || []);
+    } catch (e) {
+      this.logger.warn('Erreur parsing variants:', e);
+      variants = [];
+    }
+
+    return {
+      pid: localProduct.cjProductId,
+      productName: localProduct.name,
+      productNameEn: localProduct.name,
+      productSku: localProduct.productSku || localProduct.cjProductId,
+      sellPrice: localProduct.price,
+      productImage: this.extractFirstImage(localProduct.image),
+      images: this.parseImageArray(localProduct.image),
+      categoryName: localProduct.category,
+      description: this.cleanDescription(localProduct.description || ''),
+      variants: variants,
+      rating: 0, // Pas de données de review locales
+      totalReviews: 0,
+      weight: localProduct.productWeight || 0,
+      dimensions: localProduct.dimensions || '',
+      brand: localProduct.brand || '',
+      tags: localProduct.tags ? (typeof localProduct.tags === 'string' ? JSON.parse(localProduct.tags) : localProduct.tags) : [],
+      reviews: [],
+      
+      // Champs supplémentaires de l'API disponibles en local
+      productWeight: localProduct.productWeight,
+      productUnit: localProduct.productUnit,
+      productType: localProduct.productType,
+      entryCode: null, // Pas stocké localement
+      entryName: null,
+      entryNameEn: null,
+      materialName: null,
+      materialNameEn: this.parseJsonField(localProduct.materialNameEn),
+      materialKey: null,
+      packingWeight: localProduct.packingWeight,
+      packingName: null,
+      packingNameEn: this.parseJsonField(localProduct.packingNameEn),
+      packingKey: null,
+      productKey: null,
+      productKeyEn: localProduct.productKeyEn,
+      productProSet: null,
+      productProEnSet: null,
+      addMarkStatus: null,
+      suggestSellPrice: localProduct.suggestSellPrice,
+      listedNum: localProduct.listedNum,
+      status: '3', // Produit disponible
+      supplierName: localProduct.supplierName || 'CJ Dropshipping',
+      supplierId: null,
+      customizationVersion: null,
+      customizationJson1: null,
+      customizationJson2: null,
+      customizationJson3: null,
+      customizationJson4: null,
+      createrTime: localProduct.createrTime,
+      productVideo: null
+    };
+  }
+
+  /**
+   * Mapper un produit de l'API CJ vers la structure de détails  
+   */
+  private mapApiProductToDetails(cjProduct: any): any {
+    return {
+      pid: cjProduct.pid,
+      productName: cjProduct.productNameEn || cjProduct.productName,
+      productNameEn: cjProduct.productNameEn || cjProduct.productName,
+      productSku: cjProduct.productSku,
+      sellPrice: cjProduct.sellPrice,
+      productImage: Array.isArray(cjProduct.productImage) ? cjProduct.productImage[0] : cjProduct.productImage,
+      images: Array.isArray(cjProduct.productImage) ? cjProduct.productImage : [cjProduct.productImage],
+      categoryName: cjProduct.categoryName,
+      description: this.cleanDescription(cjProduct.description || ''),
+      variants: cjProduct.variants || [],
+      rating: cjProduct.rating || 0,
+      totalReviews: cjProduct.totalReviews || (cjProduct.reviews?.length || 0),
+      weight: cjProduct.productWeight || cjProduct.weight || 0,
+      dimensions: cjProduct.dimensions || '',
+      brand: cjProduct.brand || '',
+      tags: cjProduct.tags || [],
+      reviews: cjProduct.reviews || [],
+      
+      // Champs supplémentaires de l'API
+      productWeight: cjProduct.productWeight,
+      productUnit: cjProduct.productUnit,
+      productType: cjProduct.productType,
+      categoryId: cjProduct.categoryId,
+      entryCode: cjProduct.entryCode,
+      entryName: cjProduct.entryName,
+      entryNameEn: cjProduct.entryNameEn,
+      materialName: cjProduct.materialName,
+      materialNameEn: cjProduct.materialNameEn,
+      materialKey: cjProduct.materialKey,
+      packingWeight: cjProduct.packingWeight,
+      packingName: cjProduct.packingName,
+      packingNameEn: cjProduct.packingNameEn,
+      packingKey: cjProduct.packingKey,
+      productKey: cjProduct.productKey,
+      productKeyEn: cjProduct.productKeyEn,
+      productProSet: cjProduct.productProSet,
+      productProEnSet: cjProduct.productProEnSet,
+      addMarkStatus: cjProduct.addMarkStatus,
+      suggestSellPrice: cjProduct.suggestSellPrice,
+      listedNum: cjProduct.listedNum,
+      status: cjProduct.status,
+      supplierName: cjProduct.supplierName,
+      supplierId: cjProduct.supplierId,
+      customizationVersion: cjProduct.customizationVersion,
+      customizationJson1: cjProduct.customizationJson1,
+      customizationJson2: cjProduct.customizationJson2,
+      customizationJson3: cjProduct.customizationJson3,
+      customizationJson4: cjProduct.customizationJson4,
+      createrTime: cjProduct.createrTime,
+      productVideo: cjProduct.productVideo
+    };
   }
 
   /**
@@ -549,6 +647,78 @@ export class CJProductService {
   async syncInventory(productIds: string[]): Promise<{ updated: number; errors: number }> {
     // TODO: Implémenter la synchronisation de l'inventaire
     return { updated: 0, errors: 0 };
+  }
+
+  /**
+   * Extraire la première image d'un champ image (peut être string JSON ou URL simple)
+   */
+  private extractFirstImage(imageField: any): string {
+    if (!imageField) return '';
+    
+    // Si c'est déjà un array
+    if (Array.isArray(imageField)) {
+      return imageField[0] || '';
+    }
+    
+    // Si c'est une string qui ressemble à du JSON
+    if (typeof imageField === 'string') {
+      if (imageField.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(imageField);
+          return Array.isArray(parsed) ? (parsed[0] || '') : imageField;
+        } catch (e) {
+          return imageField;
+        }
+      }
+      return imageField;
+    }
+    
+    return String(imageField);
+  }
+
+  /**
+   * Parser le champ image en array d'URLs
+   */
+  private parseImageArray(imageField: any): string[] {
+    if (!imageField) return [];
+    
+    // Si c'est déjà un array
+    if (Array.isArray(imageField)) {
+      return imageField;
+    }
+    
+    // Si c'est une string qui ressemble à du JSON
+    if (typeof imageField === 'string') {
+      if (imageField.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(imageField);
+          return Array.isArray(parsed) ? parsed : [imageField];
+        } catch (e) {
+          return [imageField];
+        }
+      }
+      return [imageField];
+    }
+    
+    return [String(imageField)];
+  }
+
+  /**
+   * Parser un champ qui peut être string JSON ou valeur simple
+   */
+  private parseJsonField(field: any): any {
+    if (!field) return null;
+    
+    if (typeof field === 'string' && field.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(field);
+        return Array.isArray(parsed) ? parsed.join(', ') : parsed;
+      } catch (e) {
+        return field;
+      }
+    }
+    
+    return field;
   }
 }
 

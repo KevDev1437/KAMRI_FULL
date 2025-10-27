@@ -1,11 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SuppliersService } from '../suppliers/suppliers.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private suppliersService: SuppliersService
+  ) {}
 
   async getStats() {
+    // S'assurer que le fournisseur CJ Dropshipping existe et est connecté
+    try {
+      await this.suppliersService.ensureCJSupplierExists();
+    } catch (error) {
+      console.warn('Impossible de créer/vérifier le fournisseur CJ:', error);
+    }
     const [
       totalProducts,
       promoProducts,

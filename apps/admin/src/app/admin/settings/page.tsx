@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
 import {
     DollarSign,
@@ -61,6 +62,7 @@ export default function SettingsPage() {
   const [showApiEditModal, setShowApiEditModal] = useState(false)
   const { isAuthenticated } = useAuth()
   const { theme, accentColor, setTheme, setAccentColor } = useTheme()
+  const toast = useToast()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -91,11 +93,11 @@ export default function SettingsPage() {
       setIsSaving(true)
       const response = await apiClient.updateSettings(settings)
       if (response.data) {
-        alert('Paramètres sauvegardés avec succès !')
+        toast.showToast({ type: 'success', title: 'Paramètres', description: 'Paramètres sauvegardés avec succès !' })
       }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error)
-      alert('Erreur lors de la sauvegarde des paramètres')
+      toast.showToast({ type: 'error', title: 'Paramètres', description: 'Erreur lors de la sauvegarde des paramètres' })
     } finally {
       setIsSaving(false)
     }
@@ -113,11 +115,11 @@ export default function SettingsPage() {
       }
       const response = await apiClient.updateSettings(companyData)
       if (response.data) {
-        alert('Informations de l\'entreprise sauvegardées avec succès !')
+        toast.showToast({ type: 'success', title: 'Entreprise', description: 'Informations de l\'entreprise sauvegardées avec succès !' })
       }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde des informations de l\'entreprise:', error)
-      alert('Erreur lors de la sauvegarde des informations de l\'entreprise')
+      toast.showToast({ type: 'error', title: 'Entreprise', description: 'Erreur lors de la sauvegarde des informations de l\'entreprise' })
     } finally {
       setIsSaving(false)
     }
@@ -136,11 +138,11 @@ export default function SettingsPage() {
       }
       const response = await apiClient.updateSettings(apiData)
       if (response.data) {
-        alert('Configuration API sauvegardée avec succès !')
+        toast.showToast({ type: 'success', title: 'API', description: 'Configuration API sauvegardée avec succès !' })
       }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de la configuration API:', error)
-      alert('Erreur lors de la sauvegarde de la configuration API')
+      toast.showToast({ type: 'error', title: 'API', description: 'Erreur lors de la sauvegarde de la configuration API' })
     } finally {
       setIsSaving(false)
     }
@@ -163,7 +165,7 @@ export default function SettingsPage() {
         emailNotifications: true,
         smsNotifications: false
       })
-      alert('Paramètres réinitialisés !')
+      toast.showToast({ type: 'success', title: 'Paramètres', description: 'Paramètres réinitialisés !' })
     }
   }
 

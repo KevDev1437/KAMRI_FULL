@@ -4,6 +4,7 @@ import { ProductDetailsModal } from '@/components/cj/ProductDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJProduct, CJProductSearchFilters } from '@/types/cj.types';
 import { useEffect, useState } from 'react';
@@ -20,6 +21,7 @@ export default function CJProductsPage() {
     syncCategories,
     testConnection,
     syncFavorites,
+    getProductDetails,
   } = useCJDropshipping();
 
   const [products, setProducts] = useState<CJProduct[]>([]);
@@ -51,6 +53,8 @@ export default function CJProductsPage() {
   // États pour le modal de détails
   const [selectedProduct, setSelectedProduct] = useState<CJProduct | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const toast = useToast();
 
   // Charger les catégories et produits lors de la connexion
   useEffect(() => {
@@ -173,7 +177,7 @@ export default function CJProductsPage() {
     try {
       const result = await importProduct(pid);
       if (result.success) {
-        alert('✅ Produit importé avec succès !\n\n📊 Les statistiques des fournisseurs ont été mises à jour.');
+        toast.showToast({ type: 'success', title: 'Import', description: '✅ Produit importé avec succès !\n\n📊 Les statistiques des fournisseurs ont été mises à jour.' });
         
         // Marquer le produit comme importé visuellement
         setProducts(prev => prev.map(p => 
@@ -185,10 +189,10 @@ export default function CJProductsPage() {
           detail: { pid, product: result.product }
         }));
       } else {
-        alert(`❌ ${result.message}`);
+        toast.showToast({ type: 'error', title: 'Import', description: `❌ ${result.message}` });
       }
     } catch (err) {
-      alert('❌ Erreur lors de l\'import du produit');
+      toast.showToast({ type: 'error', title: 'Import', description: '❌ Erreur lors de l\'import du produit' });
     } finally {
       setImporting(null);
     }
@@ -217,12 +221,12 @@ export default function CJProductsPage() {
 
   const handleBulkImport = async () => {
     if (selectedProducts.size === 0) {
-      alert('❌ Veuillez sélectionner au moins un produit');
+      toast.showToast({ type: 'warning', title: 'Import en lot', description: '❌ Veuillez sélectionner au moins un produit' });
       return;
     }
 
     if (!selectedKamriCategory) {
-      alert('❌ Veuillez sélectionner une catégorie KAMRI');
+      toast.showToast({ type: 'warning', title: 'Import en lot', description: '❌ Veuillez sélectionner une catégorie KAMRI' });
       return;
     }
 
@@ -241,7 +245,7 @@ export default function CJProductsPage() {
         }
       }
 
-      alert(`✅ Import en lot terminé !\n✅ ${successCount} produits importés\n❌ ${errorCount} erreurs`);
+  toast.showToast({ type: 'success', title: 'Import en lot', description: `✅ Import en lot terminé !\n✅ ${successCount} produits importés\n❌ ${errorCount} erreurs` });
       
       // Marquer les produits comme importés
       setProducts(prev => prev.map(p => 
@@ -252,7 +256,7 @@ export default function CJProductsPage() {
       clearSelection();
       setShowBulkMapping(false);
     } catch (err) {
-      alert('❌ Erreur lors de l\'import en lot');
+      toast.showToast({ type: 'error', title: 'Import en lot', description: '❌ Erreur lors de l\'import en lot' });
     } finally {
       setBulkImporting(false);
     }
@@ -262,18 +266,36 @@ export default function CJProductsPage() {
     setSyncing(true);
     try {
       const result = await syncProducts();
-      alert(`✅ Synchronisation terminée: ${result.synced} produits mis à jour, ${result.errors} erreurs`);
+      toast.showToast({ type: 'success', title: 'Synchronisation', description: `✅ Synchronisation terminée: ${result.synced} produits mis à jour, ${result.errors} erreurs` });
     } catch (err) {
-      alert('❌ Erreur lors de la synchronisation');
+      toast.showToast({ type: 'error', title: 'Synchronisation', description: '❌ Erreur lors de la synchronisation' });
     } finally {
       setSyncing(false);
     }
   };
 
   // Fonctions pour le modal de détails
-  const handleShowDetails = (product: CJProduct) => {
-    setSelectedProduct(product);
-    setShowDetailsModal(true);
+  const handleShowDetails = async (product: CJProduct) => {
+    try {
+      setShowDetailsModal(true);
+      setSelectedProduct(product); // Afficher d'abord les données de base
+      setLoadingDetails(true);
+      
+      // Ensuite récupérer les détails complets
+      const detailedProduct = await getProductDetails(product.pid);
+      setSelectedProduct(detailedProduct);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des détails:', error);
+      toast.showToast({ 
+        title: 'Erreur', 
+        description: 'Erreur lors du chargement des détails du produit',
+        type: 'error' 
+      });
+      // Garder les données de base si l'API échoue
+      setSelectedProduct(product);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const handleCloseDetails = () => {
@@ -441,9 +463,9 @@ export default function CJProductsPage() {
                 await syncCategories();
                 const categoriesData = await getCategories();
                 setCategories(categoriesData);
-                alert('Catégories synchronisées avec succès !');
+                toast.showToast({ type: 'success', title: 'Catégories', description: 'Catégories synchronisées avec succès !' });
               } catch (error) {
-                alert('Erreur lors de la synchronisation des catégories');
+                toast.showToast({ type: 'error', title: 'Catégories', description: 'Erreur lors de la synchronisation des catégories' });
               }
             }}
             disabled={loadingCategories}
@@ -458,7 +480,7 @@ export default function CJProductsPage() {
               try {
                 setSyncing(true);
                 const result = await syncFavorites();
-                alert(`✅ ${result.message}`);
+                toast.showToast({ type: 'success', title: 'Favoris', description: `✅ ${result.message}` });
                 if (result.synced > 0) {
                   // Recharger les produits après synchronisation (remplacer au lieu d'ajouter)
                   const defaultProducts = await getDefaultProducts({
@@ -471,7 +493,7 @@ export default function CJProductsPage() {
                   setHasMoreProducts(true); // Réinitialiser la pagination
                 }
               } catch (error) {
-                alert('❌ Erreur lors de la synchronisation des favoris');
+                toast.showToast({ type: 'error', title: 'Favoris', description: '❌ Erreur lors de la synchronisation des favoris' });
               } finally {
                 setSyncing(false);
               }

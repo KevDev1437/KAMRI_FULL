@@ -1,23 +1,24 @@
-'use client'
+"use client"
 
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
 import {
-  Download,
-  Edit,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  Filter,
-  Globe,
-  MoreHorizontal,
-  Package,
-  Search,
-  Trash2
+    Download,
+    Edit,
+    ExternalLink,
+    Eye,
+    EyeOff,
+    Filter,
+    Globe,
+    MoreHorizontal,
+    Package,
+    Search,
+    Trash2
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -102,6 +103,7 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
   const { isAuthenticated } = useAuth()
+  const toast = useToast()
 
   // ✅ États pour la recherche CJ Dropshipping
   const [activeTab, setActiveTab] = useState<'local' | 'cj'>('local')
@@ -211,15 +213,15 @@ export default function ProductsPage() {
       })
 
       if (response.data?.success) {
-        alert('Produit importé avec succès !')
+        toast.showToast({ type: 'success', title: 'Import', description: 'Produit importé avec succès !' })
         // Recharger les produits locaux
         loadData()
       } else {
-        alert('Erreur lors de l\'import: ' + (response.data?.error || 'Erreur inconnue'))
+        toast.showToast({ type: 'error', title: 'Import', description: response.data?.error || 'Erreur inconnue' })
       }
     } catch (error) {
       console.error('Erreur import produit CJ:', error)
-      alert('Erreur lors de l\'import du produit')
+      toast.showToast({ type: 'error', title: 'Import', description: 'Erreur lors de l\'import du produit' })
     }
   }
 
@@ -610,7 +612,7 @@ export default function ProductsPage() {
                       variant="ghost"
                       size="icon"
                       className="absolute top-3 right-3 bg-white/90 hover:bg-white"
-                      onClick={() => alert(`Statut ${product.status === 'active' ? 'désactivé' : 'activé'}`)}
+                      onClick={() => toast.showToast({ type: 'info', title: 'Statut produit', description: `Statut ${product.status === 'active' ? 'désactivé' : 'activé'}` })}
                     >
                       {product.status === 'active' ? (
                         <Eye className="h-4 w-4 text-green-600" />
@@ -763,7 +765,7 @@ export default function ProductsPage() {
                               // Si plusieurs variantes, importer la première
                               importCJProduct(cjProduct, cjProduct.variants[0])
                             } else {
-                              alert('Aucune variante disponible pour ce produit')
+                              toast.showToast({ type: 'warning', title: 'Import', description: 'Aucune variante disponible pour ce produit' })
                             }
                           }}
                         >
@@ -773,7 +775,7 @@ export default function ProductsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => alert('Détails du produit - Fonctionnalité à venir')}
+                          onClick={() => toast.showToast({ type: 'info', title: 'À venir', description: 'Détails du produit - Fonctionnalité à venir' })}
                         >
                           <ExternalLink className="w-3 h-3" />
                         </Button>

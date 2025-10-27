@@ -1,6 +1,7 @@
 'use client'
 
 import { LoginModal } from '@/components/auth/LoginModal'
+import { DuplicateStatsCard } from '@/components/dashboard/DuplicateStatsCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
@@ -277,6 +278,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Statistiques Anti-Doublons */}
+      <DuplicateStatsCard />
 
       {/* Quick Actions */}
       <Card className="kamri-card">

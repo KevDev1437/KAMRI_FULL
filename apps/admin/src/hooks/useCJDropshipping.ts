@@ -1,19 +1,10 @@
+import type { CJConfig, CJWebhookLog } from '@/types/cj.types';
 import axios from 'axios';
 import { useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-export interface CJConfig {
-  id: string;
-  email: string;
-  apiKey: string;
-  tier: string;
-  enabled: boolean;
-  connected: boolean;
-  lastSync?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// CJConfig and CJWebhookLog types are imported from shared types to ensure consistency across the app
 
 export interface CJProduct {
   pid: string;
@@ -64,15 +55,7 @@ export interface CJOrder {
   updatedAt: string;
 }
 
-export interface CJWebhookLog {
-  id: string;
-  type: string;
-  messageId: string;
-  payload: any;
-  processed: boolean;
-  error?: string;
-  createdAt: Date;
-}
+// CJWebhookLog type is imported from shared types (`@/types/cj.types`) above
 
 export const useCJDropshipping = () => {
   const [loading, setLoading] = useState(false);
