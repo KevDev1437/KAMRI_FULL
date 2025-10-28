@@ -225,28 +225,121 @@ export function ProductDetailsModal({
   const extractColorsFromVariants = (variants: any[]): string => {
     if (!variants || variants.length === 0) return 'N/A';
     
+    // Debug: log des variants pour comprendre leur structure
+    console.log('🔍 Debug variants pour couleurs:', variants.map(v => ({
+      variantName: v.variantName,
+      variantNameEn: v.variantNameEn,
+      variantKey: v.variantKey,
+      variantValue: v.variantValue
+    })));
+    
     const colors = Array.from(new Set(variants.map(v => {
       const name = (v as any).variantNameEn || (v as any).variantName || '';
-      // Extraire la couleur (première partie avant le tiret)
-      const color = name.split('-')[0]?.trim();
+      
+      let color = null;
+      
+      // Format CJ: Couleur est généralement l'avant-dernier mot
+      // Ex: "neck Patchwork Lace Irregular Solid Color Jumpsuit White S"
+      // Couleur = "White", Taille = "S"
+      const words = name.trim().split(' ');
+      const validSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XXL', 'XXXL'];
+      
+      if (words.length >= 2 && validSizes.includes(words[words.length - 1].toUpperCase())) {
+        // Si le dernier mot est une taille, l'avant-dernier est probablement la couleur
+        color = words[words.length - 2];
+      }
+      // Format 1: "Couleur-Taille" (ex: "Red-M")
+      else if (name.includes('-')) {
+        color = name.split('-')[0]?.trim();
+      }
+      // Format 2: Couleur directe
+      else if (name.trim()) {
+        color = name.trim();
+      }
+      // Format 3: Dans variantValue ou variantKey
+      else {
+        const variantValue = v.variantValue || '';
+        const variantKey = v.variantKey || '';
+        
+        if (variantValue.trim()) {
+          color = variantValue.trim();
+        } else if (variantKey.trim()) {
+          color = variantKey.trim();
+        }
+      }
+      
       return color;
     }).filter(Boolean)));
     
-    return colors.join(', ');
+    console.log('🎨 Couleurs extraites:', colors);
+    return colors.length > 0 ? colors.join(', ') : 'N/A';
   };
 
   // 📏 Fonction pour extraire les tailles des variantes
   const extractSizesFromVariants = (variants: any[]): string => {
     if (!variants || variants.length === 0) return 'N/A';
     
+    // Debug: log des variants pour comprendre leur structure
+    console.log('🔍 Debug variants pour tailles:', variants.map(v => ({
+      variantName: v.variantName,
+      variantNameEn: v.variantNameEn,
+      variantKey: v.variantKey,
+      variantValue: v.variantValue
+    })));
+    
     const sizes = Array.from(new Set(variants.map(v => {
       const name = (v as any).variantNameEn || (v as any).variantName || '';
-      // Extraire la taille (deuxième partie après le tiret)
-      const size = name.split('-')[1]?.trim();
+      
+      // Essayer plusieurs formats de tailles
+      let size = null;
+      
+      // Format CJ: Taille à la fin du nom complet
+      // Ex: "neck Patchwork Lace Irregular Solid Color Jumpsuit White S"
+      const words = name.trim().split(' ');
+      const lastWord = words[words.length - 1];
+      const validSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XXL', 'XXXL'];
+      
+      if (validSizes.includes(lastWord.toUpperCase())) {
+        size = lastWord.toUpperCase();
+      }
+      // Format 1: "Couleur-Taille" (ex: "Red-M")
+      else if (name.includes('-') && name.split('-').length >= 2) {
+        const splitSize = name.split('-')[1]?.trim();
+        if (validSizes.includes(splitSize?.toUpperCase())) {
+          size = splitSize.toUpperCase();
+        }
+      }
+      // Format 2: Taille directe (ex: "M", "L", "XL")
+      else if (/^[A-Z]{1,3}$/.test(name.trim()) && validSizes.includes(name.trim().toUpperCase())) {
+        size = name.trim().toUpperCase();
+      }
+      // Format 3: Dans variantValue ou variantKey
+      else {
+        const variantValue = v.variantValue || '';
+        const variantKey = v.variantKey || '';
+        
+        // Chercher des tailles standard dans variantValue
+        if (/^[A-Z]{1,3}$/.test(variantValue.trim()) && validSizes.includes(variantValue.trim().toUpperCase())) {
+          size = variantValue.trim().toUpperCase();
+        }
+        // Ou dans variantKey
+        else if (/^[A-Z]{1,3}$/.test(variantKey.trim()) && validSizes.includes(variantKey.trim().toUpperCase())) {
+          size = variantKey.trim().toUpperCase();
+        }
+        // Ou extraction de patterns de taille dans le texte
+        else {
+          const sizeMatch = (name + ' ' + variantValue + ' ' + variantKey).match(/\b(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL)\b/i);
+          if (sizeMatch) {
+            size = sizeMatch[1].toUpperCase();
+          }
+        }
+      }
+      
       return size;
     }).filter(Boolean)));
     
-    return sizes.join(', ');
+    console.log('🎯 Tailles extraites:', sizes);
+    return sizes.length > 0 ? sizes.join(', ') : 'N/A';
   };
 
 
