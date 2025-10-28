@@ -107,8 +107,36 @@ model Product {
   reviews       Review[]
   wishlist      Wishlist[]
   cjMapping     CJProductMapping?
+  productVariants ProductVariant[] // ✅ Relation vers les variants (évite conflit avec variants JSON)
 
   @@map("products")
+}
+
+// ✅ Modèle séparé pour les variants de produits
+model ProductVariant {
+  id            String    @id @default(cuid())
+  productId     String
+  cjVariantId   String?   @unique // ID CJ de la variante
+  name          String?
+  sku           String?
+  price         Float?
+  weight        Float?
+  dimensions    String?   // JSON des dimensions {length, width, height}
+  image         String?   // URL de l'image de la variante
+  status        String?   // Statut de la variante
+  properties    String?   // JSON des propriétés {key, value1, value2, value3}
+  stock         Int?      // Stock disponible
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime? // Dernière synchronisation avec CJ
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([cjVariantId])
+  @@index([productId])
+  @@map("product_variants")
 }
 
 model Image {
@@ -402,7 +430,28 @@ model CJOrderMapping {
   @@map("cj_order_mappings")
 }
 
-// Logs webhooks CJ
+// Logs webhooks CJ améliorés
+model WebhookLog {
+  id               String    @id @default(cuid())
+  messageId        String    @unique
+  type             String    // PRODUCT, VARIANT, STOCK, ORDER, LOGISTIC, etc.
+  payload          String    // JSON string du payload original
+  status           String    @default("RECEIVED") // RECEIVED, PROCESSED, ERROR
+  result           String?   // JSON string du résultat de traitement
+  error            String?   // Message d'erreur si échec
+  processingTimeMs Int?      // Temps de traitement en millisecondes
+  receivedAt       DateTime  @default(now())
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([type, status])
+  @@index([receivedAt])
+  @@index([messageId])
+  @@map("webhook_logs")
+}
+
+// Garder l'ancien modèle pour compatibilité (à supprimer plus tard)
 model CJWebhookLog {
   id        String   @id @default(cuid())
   type      String   // PRODUCT, STOCK, ORDER, LOGISTICS

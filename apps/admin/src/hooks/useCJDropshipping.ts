@@ -1,4 +1,4 @@
-import type { CJConfig, CJWebhookLog } from '@/types/cj.types';
+import type { CJConfig } from '@/types/cj.types';
 import axios from 'axios';
 import { useState } from 'react';
 
@@ -362,11 +362,12 @@ export const useCJDropshipping = () => {
     }
   };
 
-  const getWebhookLogs = async (): Promise<CJWebhookLog[]> => {
+  const getWebhookLogs = async (): Promise<any> => {
     setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/webhooks/logs');
+      // L'API retourne { logs, total, page, limit }
       return data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erreur lors de la récupération des logs de webhooks');

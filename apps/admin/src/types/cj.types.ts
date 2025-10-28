@@ -113,16 +113,6 @@ export interface CJShippingAddress {
   zipCode?: string;
 }
 
-export interface CJWebhookLog {
-  id: string;
-  type: 'PRODUCT' | 'STOCK' | 'ORDER' | 'LOGISTICS';
-  messageId: string;
-  payload: any;
-  processed: boolean;
-  error?: string;
-  createdAt: Date;
-}
-
 export interface CJStats {
   products: {
     total: number;
@@ -155,5 +145,20 @@ export interface CJImportResult {
   cjProductId: string;
   success: boolean;
   message?: string;
+}
+
+export interface CJWebhookLog {
+  id: string;
+  messageId: string;
+  type: string;
+  payload: string;
+  status: 'RECEIVED' | 'PROCESSED' | 'ERROR';
+  result?: string;
+  error?: string;
+  processingTimeMs?: number;
+  receivedAt: Date;
+  processedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 

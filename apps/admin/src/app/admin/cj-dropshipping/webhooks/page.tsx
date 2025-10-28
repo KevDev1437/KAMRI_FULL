@@ -26,10 +26,13 @@ export default function CJWebhooksPage() {
 
   const loadWebhookLogs = async () => {
     try {
-      const logs = await getWebhookLogs();
-      setWebhookLogs(logs);
+      const response = await getWebhookLogs();
+      // L'API retourne { logs: [], total, page, limit }
+      const logs = response?.logs || response || [];
+      setWebhookLogs(Array.isArray(logs) ? logs : []);
     } catch (err) {
       console.error('Erreur lors du chargement des logs:', err);
+      setWebhookLogs([]);
     }
   };
 
@@ -152,7 +155,11 @@ export default function CJWebhooksPage() {
               <h3 className="font-medium mb-2">URL du webhook</h3>
               <div className="bg-gray-100 p-3 rounded-lg">
                 <code className="text-sm">
-                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/cj-dropshipping/webhooks
+                  {(() => {
+                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+                    const cleanUrl = baseUrl.replace(/\/api$/, ''); // Remove trailing /api if present
+                    return `${cleanUrl}/api/cj-dropshipping/webhooks`;
+                  })()}
                 </code>
               </div>
             </div>
@@ -196,14 +203,14 @@ export default function CJWebhooksPage() {
           
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {webhookLogs.filter(log => log.processed).length}
+              {webhookLogs.filter(log => log.status === 'PROCESSED').length}
             </div>
             <div className="text-sm text-gray-600">Traités</div>
           </div>
           
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">
-              {webhookLogs.filter(log => log.error).length}
+              {webhookLogs.filter(log => log.status === 'ERROR' || log.error).length}
             </div>
             <div className="text-sm text-gray-600">Erreurs</div>
           </div>
@@ -211,7 +218,7 @@ export default function CJWebhooksPage() {
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-600">
               {webhookLogs.filter(log => 
-                new Date(log.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+                new Date(log.receivedAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
               ).length}
             </div>
             <div className="text-sm text-gray-600">Récents (24h)</div>
@@ -248,16 +255,18 @@ export default function CJWebhooksPage() {
                   
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${
-                      log.processed ? 'bg-green-500' : 'bg-yellow-500'
+                      log.status === 'PROCESSED' ? 'bg-green-500' : 
+                      log.status === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'
                     }`}></span>
                     <span className="text-sm text-gray-600">
-                      {log.processed ? 'Traité' : 'En attente'}
+                      {log.status === 'PROCESSED' ? 'Traité' : 
+                       log.status === 'ERROR' ? 'Erreur' : 'En attente'}
                     </span>
                   </div>
                 </div>
 
                 <div className="text-sm text-gray-500 mb-2">
-                  {formatDate(log.createdAt)}
+                  {formatDate(log.receivedAt)}
                 </div>
 
                 {log.error && (

@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Get,
@@ -8,9 +9,11 @@ import {
     Param,
     Post,
     Put,
-    Query
+    Query,
+    Req
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 // 🔧 ANCIEN SERVICE SUPPRIMÉ - Remplacé par CJMainService
 import { UpdateCJConfigDto } from './dto/cj-config.dto';
@@ -20,6 +23,7 @@ import { CJWebhookDto } from './dto/cj-webhook.dto';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 // 🔧 NOUVEAUX SERVICES REFACTORISÉS
 import { CJMainService } from './services/cj-main.service';
+import { CJWebhookService } from './services/cj-webhook.service';
 
 @ApiTags('cj-dropshipping')
 @Controller('api/cj-dropshipping')
@@ -30,6 +34,7 @@ export class CJDropshippingController {
   
   constructor(
     private readonly cjMainService: CJMainService, // 🔧 SERVICE REFACTORISÉ
+    private readonly cjWebhookService: CJWebhookService, // ✅ SERVICE WEBHOOK
     private readonly prisma: PrismaService
   ) {}
 
@@ -230,17 +235,56 @@ export class CJDropshippingController {
   // ===== WEBHOOKS =====
 
   @Post('webhooks')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.OK) // ✅ Réponse 200 OK requise par CJ
   @ApiOperation({ summary: 'Recevoir les webhooks CJ Dropshipping' })
-  @ApiResponse({ status: 200, description: 'Webhook traité' })
-  async handleWebhook(@Body() dto: CJWebhookDto) {
-    // Cast le type en CJWebhookPayload
-    const payload: CJWebhookPayload = {
-      type: dto.type as 'PRODUCT' | 'VARIANT' | 'STOCK' | 'ORDER' | 'LOGISTIC' | 'SOURCINGCREATE' | 'ORDERSPLIT',
-      messageId: dto.messageId,
-      params: dto.params,
-    };
-    return this.cjMainService.handleWebhook(payload.type, payload);
+  @ApiResponse({ status: 200, description: 'Webhook traité avec succès' })
+  @ApiResponse({ status: 400, description: 'Payload invalide' })
+  @ApiResponse({ status: 500, description: 'Erreur de traitement' })
+  async handleWebhook(@Body() dto: CJWebhookDto, @Req() request: Request) {
+    const startTime = Date.now();
+    
+    // ✅ Validation HTTPS (en production)
+    if (process.env.NODE_ENV === 'production' && request.protocol !== 'https') {
+      throw new BadRequestException('HTTPS requis pour les webhooks');
+    }
+
+    try {
+      // Cast le type en CJWebhookPayload
+      const payload: CJWebhookPayload = {
+        messageId: dto.messageId,
+        type: dto.type as any,
+        params: dto.params
+      };
+
+      // ✅ Traitement via le service webhook amélioré
+      const result = await this.cjWebhookService.processWebhook(payload);
+      
+      // ✅ Vérifier le timeout de 3 secondes
+      const processingTime = Date.now() - startTime;
+      if (processingTime > 3000) {
+        this.logger.warn(`⚠️  Webhook traité en ${processingTime}ms (> 3s limite CJ)`);
+      }
+
+      // ✅ Retourner toujours 200 OK comme requis par CJ
+      return {
+        success: result.success,
+        messageId: result.messageId,
+        processingTimeMs: processingTime,
+        ...(result.error && { error: result.error })
+      };
+
+    } catch (error) {
+      // ✅ Logger l'erreur mais retourner 200 pour éviter les retry CJ
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      this.logger.error(`❌ Erreur webhook [${dto.messageId}]:`, errorMessage);
+      
+      return {
+        success: false,
+        messageId: dto.messageId,
+        error: errorMessage,
+        processingTimeMs: Date.now() - startTime
+      };
+    }
   }
 
   @Post('webhooks/configure')
