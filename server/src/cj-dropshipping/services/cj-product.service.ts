@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DuplicatePreventionService } from '../../common/services/duplicate-prevention.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJProductSearchDto } from '../dto/cj-product-search.dto';
 import { CJProduct } from '../interfaces/cj-product.interface';
-import { DuplicatePreventionService } from '../../common/services/duplicate-prevention.service';
 
 @Injectable()
 export class CJProductService {
@@ -15,10 +15,55 @@ export class CJProductService {
     private duplicateService: DuplicatePreventionService
   ) {}
 
-  // Cache simple pour éviter les requêtes répétées
+  // ✅ AMÉLIORATION : Cache multi-niveaux avec TTL configurable
   private defaultProductsCache: { data: CJProduct[]; timestamp: number } | null = null;
-  private searchCache: Map<string, { data: CJProduct[]; timestamp: number }> = new Map();
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  
+  private readonly searchCache = new Map<string, { 
+    data: CJProduct[]; 
+    timestamp: number; 
+    ttl: number;
+    searchParams: any;
+  }>();
+  
+  private readonly detailsCache = new Map<string, { 
+    data: any; 
+    timestamp: number; 
+    ttl: number;
+  }>();
+  
+  private readonly stockCache = new Map<string, { 
+    data: any; 
+    timestamp: number; 
+    ttl: number;
+  }>();
+  
+  private readonly categoriesCache = new Map<string, { 
+    data: any; 
+    timestamp: number; 
+    ttl: number;
+  }>();
+  
+  // Configuration des TTL (Time To Live) en millisecondes
+  private readonly CACHE_TTL = {
+    SEARCH: 5 * 60 * 1000,      // 5 minutes pour les recherches
+    DETAILS: 15 * 60 * 1000,    // 15 minutes pour les détails
+    STOCK: 2 * 60 * 1000,       // 2 minutes pour le stock (plus volatile)
+    CATEGORIES: 60 * 60 * 1000,  // 1 heure pour les catégories
+  };
+  
+  // Statistiques de cache
+  private cacheStats = {
+    searchHits: 0,
+    searchMisses: 0,
+    detailsHits: 0,
+    detailsMisses: 0,
+    stockHits: 0,
+    stockMisses: 0,
+    categoriesHits: 0,
+    categoriesMisses: 0,
+  };
+
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (legacy)
 
   /**
    * Initialiser le client CJ avec la configuration
@@ -160,114 +205,60 @@ export class CJProductService {
   }
 
   /**
-   * Rechercher des produits
+   * Rechercher des produits avec cache amélioré
    */
   async searchProducts(query: CJProductSearchDto): Promise<CJProduct[]> {
     this.logger.log('🔍 === DÉBUT RECHERCHE PRODUITS CJ ===');
     this.logger.log('📝 Paramètres de recherche:', JSON.stringify(query, null, 2));
     
-    // 🔍 RECHERCHE CJ DROPSHIPPING : Toujours sur l'API CJ pour découvrir de nouveaux produits
-    this.logger.log('🔍 Recherche sur l\'API CJ Dropshipping...');
+    // Créer une clé de cache basée sur les paramètres de recherche
+    const cacheKey = `search_${JSON.stringify(query)}`;
     
-    // 🚨 PROTECTION : Éviter les appels inutiles pendant le rate limiting
-    const hasToken = this.cjApiClient['accessToken'];
-    const tokenExpiry = this.cjApiClient['tokenExpiry'];
-    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
-    
-    if (!isTokenValid) {
-      this.logger.log('🔑 Token CJ invalide - Connexion requise');
-      throw new Error('Token CJ invalide - Veuillez vous reconnecter');
+    // Vérifier le cache d'abord
+    const cachedProducts = this.getCachedSearch(cacheKey);
+    if (cachedProducts) {
+      this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ (CACHE) ===');
+      return cachedProducts;
     }
     
     try {
-      this.logger.log('🚀 Initialisation du client CJ...');
+      this.logger.log('🔄 Initialisation du client CJ...');
       const client = await this.initializeClient();
       this.logger.log('✅ Client CJ initialisé avec succès');
 
-      this.logger.log('📡 Récupération de PLUSIEURS pages de l\'API CJ...');
+      // ✅ CORRECTION: Recherche simple sans trop de filtres
+      this.logger.log('� Appel API CJ avec paramètres minimaux...');
       
-      // Récupérer PLUSIEURS pages de l'API CJ UNE SEULE FOIS pour avoir plus de produits à filtrer
-      const allProducts: CJProduct[] = [];
-      const maxPages = 3; // 3 pages = 600 produits max
+      const result = await client.searchProducts(query.keyword || query.productNameEn, {
+        pageNum: query.pageNum || 1,
+        pageSize: Math.min(query.pageSize || 20, 200), // Max 200 selon doc CJ
+        categoryId: query.categoryId,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        countryCode: query.countryCode,
+        // Utiliser les nouveaux paramètres de la doc CJ
+        ...query.productType && { productType: query.productType },
+        ...query.deliveryTime && { deliveryTime: query.deliveryTime },
+        ...query.verifiedWarehouse && { verifiedWarehouse: query.verifiedWarehouse },
+        ...query.startInventory && { startInventory: query.startInventory },
+        ...query.endInventory && { endInventory: query.endInventory },
+        ...query.isFreeShipping !== undefined && { isFreeShipping: query.isFreeShipping },
+        ...query.searchType !== undefined && { searchType: query.searchType },
+        ...query.sort && { sort: query.sort },
+        ...query.orderBy && { orderBy: query.orderBy },
+      });
       
-      // Vérifier si on a déjà des produits en cache pour cette recherche
-      const cacheKey = `search_${query.keyword}_${query.categoryId}_${query.minPrice}_${query.maxPrice}`;
-      const cachedProducts = this.getCachedProducts(cacheKey);
+      const products = result.list || [];
       
-      if (cachedProducts && cachedProducts.length > 0) {
-        this.logger.log(`📦 Utilisation du cache: ${cachedProducts.length} produits`);
-        allProducts.push(...cachedProducts);
-      } else {
-        // Récupérer les produits depuis l'API CJ
-        for (let page = 1; page <= maxPages; page++) {
-          this.logger.log(`📄 Récupération page ${page}/${maxPages}...`);
-          
-          const result = await client.searchProducts(query.keyword, {
-            pageNum: page,
-            pageSize: 100, // 100 produits par page (limite API CJ)
-            countryCode: query.countryCode,
-            categoryId: query.categoryId,
-            minPrice: query.minPrice,
-            maxPrice: query.maxPrice,
-            sortBy: query.sortBy,
-          });
-          
-          allProducts.push(...result.list);
-          this.logger.log(`📦 Page ${page}: ${result.list.length} produits récupérés`);
-          
-          if (result.list.length < 100) {
-            this.logger.log('📄 Dernière page atteinte');
-            break; // Dernière page
-          }
-          
-          // Attendre entre les pages pour éviter le rate limiting
-          if (page < maxPages) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-        
-        // Mettre en cache les produits récupérés
-        this.setCachedProducts(cacheKey, allProducts);
-      }
+      // Mettre en cache les résultats
+      this.setCachedSearch(cacheKey, products, query);
       
-      this.logger.log(`📦 Total reçu : ${allProducts.length} produits de l'API CJ`);
-      
-      // Filtrage côté serveur
-      let filteredProducts = allProducts;
-      
-      if (query.keyword && query.keyword.trim()) {
-        this.logger.log(`🔍 Filtrage par mot-clé: "${query.keyword}"`);
-        const keyword = query.keyword.toLowerCase();
-        
-        filteredProducts = allProducts.filter(product => {
-          const name = (product.productName || '').toLowerCase();
-          const nameEn = (product.productNameEn || '').toLowerCase();
-          const sku = (product.productSku || '').toLowerCase();
-          const category = (product.categoryName || '').toLowerCase();
-          
-          return name.includes(keyword) ||
-                 nameEn.includes(keyword) ||
-                 sku.includes(keyword) ||
-                 category.includes(keyword);
-        });
-        
-        this.logger.log(`✅ ${filteredProducts.length} produits après filtrage par mot-clé`);
-      }
-      
-      // Appliquer la pagination sur les résultats filtrés
-      const pageNum = query.pageNum || 1;
-      const pageSize = query.pageSize || 20;
-      const start = (pageNum - 1) * pageSize;
-      const end = start + pageSize;
-      
-      const paginatedProducts = filteredProducts.slice(start, end);
-      
-      this.logger.log(`📄 Pagination: page ${pageNum}, ${pageSize} produits par page`);
-      this.logger.log(`📦 Résultat final: ${paginatedProducts.length} produits retournés`);
+      this.logger.log(`📈 Résultat API CJ : ${products.length} produits reçus`);
+      this.logger.log(`📊 Total disponible : ${result.total || 0} produits`);
       this.logger.log('🎉 Recherche terminée avec succès');
       this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ ===');
       
-      return paginatedProducts;
+      return products;
     } catch (error) {
       this.logger.error('❌ === ERREUR RECHERCHE PRODUITS CJ ===');
       this.logger.error('💥 Erreur détaillée:', error);
@@ -277,27 +268,6 @@ export class CJProductService {
       this.logger.error('🔍 === FIN ERREUR RECHERCHE PRODUITS CJ ===');
       throw error;
     }
-  }
-
-  /**
-   * Obtenir les produits en cache
-   */
-  private getCachedProducts(cacheKey: string): CJProduct[] | null {
-    const cached = this.searchCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
-      return cached.data;
-    }
-    return null;
-  }
-
-  /**
-   * Mettre en cache les produits
-   */
-  private setCachedProducts(cacheKey: string, products: CJProduct[]): void {
-    this.searchCache.set(cacheKey, {
-      data: products,
-      timestamp: Date.now()
-    });
   }
 
   /**
@@ -360,14 +330,174 @@ export class CJProductService {
     }
   }
 
+  // ===== MÉTHODES AVANCÉES POUR LES CATÉGORIES =====
+
   /**
-   * Obtenir les détails d'un produit CJ (priorité: base locale → API CJ)
+   * Recherche avancée de catégories avec filtres et pagination
+   */
+  async searchCategories(params: {
+    parentId?: string;
+    level?: number;
+    keyword?: string;
+    countryCode?: string;
+    includeEmpty?: boolean;
+    includeProductCount?: boolean;
+    pageNum?: number;
+    pageSize?: number;
+  }): Promise<any> {
+    this.logger.log('🔍 === DÉBUT RECHERCHE CATÉGORIES AVANCÉE ===');
+    this.logger.log('📝 Paramètres:', params);
+    
+    // Vérifier le cache d'abord
+    const cacheKey = `categories_search_${JSON.stringify(params)}`;
+    const cached = this.categoriesCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL.CATEGORIES) {
+      this.cacheStats.categoriesHits++;
+      this.logger.log(`📦 Cache HIT pour recherche catégories: ${cacheKey}`);
+      return cached.data;
+    } else {
+      this.cacheStats.categoriesMisses++;
+    }
+
+    try {
+      const client = await this.initializeClient();
+      const result = await client.searchCategories(params);
+      
+      // Mettre en cache
+      this.categoriesCache.set(cacheKey, {
+        data: result,
+        timestamp: Date.now(),
+        ttl: this.CACHE_TTL.CATEGORIES
+      });
+      
+      this.logger.log('🎉 Recherche catégories terminée avec succès');
+      this.logger.log('🔍 === FIN RECHERCHE CATÉGORIES AVANCÉE ===');
+      
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR RECHERCHE CATÉGORIES ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR RECHERCHE CATÉGORIES ===');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les catégories populaires
+   */
+  async getPopularCategories(limit: number = 10): Promise<any[]> {
+    this.logger.log(`🔥 Récupération des ${limit} catégories populaires...`);
+    
+    const cacheKey = `popular_categories_${limit}`;
+    const cached = this.categoriesCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL.CATEGORIES) {
+      this.cacheStats.categoriesHits++;
+      return cached.data;
+    } else {
+      this.cacheStats.categoriesMisses++;
+    }
+
+    try {
+      const client = await this.initializeClient();
+      const categories = await client.getPopularCategories(limit);
+      
+      // Mettre en cache
+      this.categoriesCache.set(cacheKey, {
+        data: categories,
+        timestamp: Date.now(),
+        ttl: this.CACHE_TTL.CATEGORIES
+      });
+      
+      this.logger.log(`✅ ${categories.length} catégories populaires récupérées`);
+      return categories;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération catégories populaires:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les sous-catégories d'une catégorie
+   */
+  async getSubCategories(parentId: string): Promise<any[]> {
+    this.logger.log(`📂 Récupération des sous-catégories pour ${parentId}...`);
+    
+    const cacheKey = `sub_categories_${parentId}`;
+    const cached = this.categoriesCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL.CATEGORIES) {
+      this.cacheStats.categoriesHits++;
+      return cached.data;
+    } else {
+      this.cacheStats.categoriesMisses++;
+    }
+
+    try {
+      const client = await this.initializeClient();
+      const subCategories = await client.getSubCategories(parentId);
+      
+      // Mettre en cache
+      this.categoriesCache.set(cacheKey, {
+        data: subCategories,
+        timestamp: Date.now(),
+        ttl: this.CACHE_TTL.CATEGORIES
+      });
+      
+      this.logger.log(`✅ ${subCategories.length} sous-catégories trouvées`);
+      return subCategories;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération sous-catégories:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir le chemin d'une catégorie (breadcrumb)
+   */
+  async getCategoryPath(categoryId: string): Promise<any[]> {
+    this.logger.log(`🗂️ Récupération du chemin pour la catégorie ${categoryId}...`);
+    
+    const cacheKey = `category_path_${categoryId}`;
+    const cached = this.categoriesCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL.CATEGORIES) {
+      this.cacheStats.categoriesHits++;
+      return cached.data;
+    } else {
+      this.cacheStats.categoriesMisses++;
+    }
+
+    try {
+      const client = await this.initializeClient();
+      const path = await client.getCategoryPath(categoryId);
+      
+      // Mettre en cache
+      this.categoriesCache.set(cacheKey, {
+        data: path,
+        timestamp: Date.now(),
+        ttl: this.CACHE_TTL.CATEGORIES
+      });
+      
+      this.logger.log(`✅ Chemin de ${path.length} niveaux récupéré`);
+      return path;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération chemin catégorie:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les détails d'un produit CJ avec cache (priorité: cache → base locale → API CJ)
    */
   async getProductDetails(productId: string): Promise<any> {
     try {
       this.logger.log(`📦 Récupération des détails du produit CJ: ${productId}`);
       
-      // 1️⃣ D'abord, essayer de trouver le produit dans la base locale
+      // 1️⃣ Vérifier le cache d'abord
+      const cachedDetails = this.getCachedDetails(productId);
+      if (cachedDetails) {
+        return cachedDetails;
+      }
+      
+      // 2️⃣ Essayer de trouver le produit dans la base locale
       let localProduct = null;
       
       // Essayer par cjProductId 
@@ -385,27 +515,65 @@ export class CJProductService {
       // Si trouvé en local, utiliser ces données (plus rapide et fiable)
       if (localProduct) {
         this.logger.log(`✅ Produit trouvé en local: ${localProduct.name}`);
-        return this.mapLocalProductToDetails(localProduct);
+        const details = this.mapLocalProductToDetails(localProduct);
+        
+        // Mettre en cache les détails locaux
+        this.setCachedDetails(productId, details);
+        
+        return details;
       }
       
-      // 2️⃣ Si pas en local, faire l'appel API vers CJ
+      // 3️⃣ Si pas en local, faire l'appel API vers CJ avec l'endpoint correct
       this.logger.log(`🌐 Produit non trouvé en local, appel API CJ...`);
       
       const client = await this.initializeClient();
-      const result = await client.makeRequest('GET', `/product/query?pid=${productId}`);
+      // ✅ CORRECTION: Utiliser l'endpoint /product/detail/{pid} selon la doc CJ
+      const cjProduct = await client.getProductDetails(productId);
       
-      if (result.code !== 200) {
-        this.logger.error(`❌ Erreur détails produit ${productId}:`, result.message);
-        throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
-      }
+      const details = this.mapApiProductToDetails(cjProduct);
       
-      const cjProduct = result.data;
+      // Mettre en cache les détails API
+      this.setCachedDetails(productId, details);
+      
       this.logger.log(`✅ Détails récupérés depuis l'API CJ pour ${productId}`);
       
-      return this.mapApiProductToDetails(cjProduct);
+      return details;
       
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération des détails du produit ${productId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer le stock des variantes d'un produit avec cache (selon doc CJ)
+   */
+  async getProductVariantStock(pid: string, variantId?: string, countryCode?: string): Promise<any> {
+    try {
+      this.logger.log(`📦 Récupération du stock des variantes: ${pid}`);
+      this.logger.log(`📝 Paramètres: variantId=${variantId}, countryCode=${countryCode}`);
+      
+      // Créer une clé de cache incluant tous les paramètres
+      const stockKey = `stock_${pid}_${variantId || 'all'}_${countryCode || 'default'}`;
+      
+      // Vérifier le cache d'abord
+      const cachedStock = this.getCachedStock(stockKey);
+      if (cachedStock) {
+        return cachedStock;
+      }
+      
+      const client = await this.initializeClient();
+      const stockData = await client.getProductVariantStock(pid, variantId, countryCode);
+      
+      // Mettre en cache les données de stock
+      this.setCachedStock(stockKey, stockData);
+      
+      this.logger.log(`✅ Stock des variantes récupéré pour ${pid}`);
+      
+      return stockData;
+      
+    } catch (error) {
+      this.logger.error(`Erreur lors de la récupération du stock des variantes ${pid}:`, error);
       throw error;
     }
   }
@@ -704,7 +872,7 @@ export class CJProductService {
   }
 
   /**
-   * Parser un champ qui peut être string JSON ou valeur simple
+   * Parser les champs JSON qui peuvent être des chaînes
    */
   private parseJsonField(field: any): any {
     if (!field) return null;
@@ -719,6 +887,161 @@ export class CJProductService {
     }
     
     return field;
+  }
+
+  // ✅ NOUVELLES MÉTHODES DE CACHE AMÉLIORÉES
+
+  /**
+   * Obtenir une entrée du cache de recherche
+   */
+  private getCachedSearch(cacheKey: string): CJProduct[] | null {
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      this.cacheStats.searchHits++;
+      this.logger.log(`📦 Cache HIT pour recherche: ${cacheKey}`);
+      return cached.data;
+    }
+    
+    if (cached) {
+      this.searchCache.delete(cacheKey); // Nettoyer le cache expiré
+    }
+    
+    this.cacheStats.searchMisses++;
+    this.logger.log(`❌ Cache MISS pour recherche: ${cacheKey}`);
+    return null;
+  }
+
+  /**
+   * Mettre en cache une recherche
+   */
+  private setCachedSearch(cacheKey: string, products: CJProduct[], searchParams: any): void {
+    this.searchCache.set(cacheKey, {
+      data: products,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL.SEARCH,
+      searchParams
+    });
+    this.logger.log(`💾 Mise en cache recherche: ${cacheKey} (${products.length} produits)`);
+  }
+
+  /**
+   * Obtenir les détails d'un produit depuis le cache
+   */
+  private getCachedDetails(pid: string): any | null {
+    const cached = this.detailsCache.get(pid);
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      this.cacheStats.detailsHits++;
+      this.logger.log(`📦 Cache HIT pour détails: ${pid}`);
+      return cached.data;
+    }
+    
+    if (cached) {
+      this.detailsCache.delete(pid);
+    }
+    
+    this.cacheStats.detailsMisses++;
+    return null;
+  }
+
+  /**
+   * Mettre en cache les détails d'un produit
+   */
+  private setCachedDetails(pid: string, details: any): void {
+    this.detailsCache.set(pid, {
+      data: details,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL.DETAILS
+    });
+    this.logger.log(`💾 Mise en cache détails: ${pid}`);
+  }
+
+  /**
+   * Obtenir le stock depuis le cache
+   */
+  private getCachedStock(stockKey: string): any | null {
+    const cached = this.stockCache.get(stockKey);
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      this.cacheStats.stockHits++;
+      this.logger.log(`📦 Cache HIT pour stock: ${stockKey}`);
+      return cached.data;
+    }
+    
+    if (cached) {
+      this.stockCache.delete(stockKey);
+    }
+    
+    this.cacheStats.stockMisses++;
+    return null;
+  }
+
+  /**
+   * Mettre en cache le stock
+   */
+  private setCachedStock(stockKey: string, stock: any): void {
+    this.stockCache.set(stockKey, {
+      data: stock,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL.STOCK
+    });
+    this.logger.log(`💾 Mise en cache stock: ${stockKey}`);
+  }
+
+  /**
+   * Nettoyer tous les caches expirés
+   */
+  public cleanExpiredCache(): void {
+    const now = Date.now();
+    
+    // Nettoyer le cache de recherche
+    for (const [key, value] of this.searchCache.entries()) {
+      if (now - value.timestamp > value.ttl) {
+        this.searchCache.delete(key);
+      }
+    }
+    
+    // Nettoyer le cache des détails
+    for (const [key, value] of this.detailsCache.entries()) {
+      if (now - value.timestamp > value.ttl) {
+        this.detailsCache.delete(key);
+      }
+    }
+    
+    // Nettoyer le cache du stock
+    for (const [key, value] of this.stockCache.entries()) {
+      if (now - value.timestamp > value.ttl) {
+        this.stockCache.delete(key);
+      }
+    }
+    
+    // Nettoyer le cache des catégories
+    for (const [key, value] of this.categoriesCache.entries()) {
+      if (now - value.timestamp > value.ttl) {
+        this.categoriesCache.delete(key);
+      }
+    }
+    
+    this.logger.log('🧹 Nettoyage des caches expirés terminé');
+  }
+
+  /**
+   * Obtenir les statistiques du cache
+   */
+  public getCacheStats(): any {
+    return {
+      ...this.cacheStats,
+      cacheSizes: {
+        search: this.searchCache.size,
+        details: this.detailsCache.size,
+        stock: this.stockCache.size,
+        categories: this.categoriesCache.size
+      },
+      hitRates: {
+        search: this.cacheStats.searchHits / (this.cacheStats.searchHits + this.cacheStats.searchMisses) * 100,
+        details: this.cacheStats.detailsHits / (this.cacheStats.detailsHits + this.cacheStats.detailsMisses) * 100,
+        stock: this.cacheStats.stockHits / (this.cacheStats.stockHits + this.cacheStats.stockMisses) * 100,
+        categories: this.cacheStats.categoriesHits / (this.cacheStats.categoriesHits + this.cacheStats.categoriesMisses) * 100,
+      }
+    };
   }
 }
 

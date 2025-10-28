@@ -27,14 +27,18 @@ export default function CJProductsPage() {
   const [products, setProducts] = useState<CJProduct[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CJProductSearchFilters>({
-    keyword: '',
     pageNum: 1,
-    pageSize: 100, // 100 produits par page (limite API CJ)
+    pageSize: 100, // 100 produits par page (limite API CJ augmentée à 200)
+    searchType: 0, // 0=Tous les produits
+    sort: 'desc',
+    orderBy: 'createAt',
+    // Paramètres legacy pour compatibilité
+    keyword: '',
     minPrice: undefined,
     maxPrice: undefined,
     countryCode: 'US',
     sortBy: 'relevance',
-    categoryId: undefined, // Ajouter le filtre de catégorie
+    categoryId: undefined,
   });
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
@@ -427,6 +431,160 @@ export default function CJProductsPage() {
             </select>
           </div>
         </div>
+
+        {/* Filtres avancés selon la documentation CJ */}
+        <details className="mb-4">
+          <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+            🔧 Filtres avancés (selon documentation CJ)
+          </summary>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type de produit
+              </label>
+              <select
+                value={filters.productType || 'ALL'}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  productType: e.target.value === 'ALL' ? undefined : e.target.value as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tous les types</option>
+                <option value="ORDINARY_PRODUCT">Produit ordinaire</option>
+                <option value="SERVICE_PRODUCT">Produit de service</option>
+                <option value="PACKAGING_PRODUCT">Produit d'emballage</option>
+                <option value="SUPPLIER_PRODUCT">Produit fournisseur</option>
+                <option value="SUPPLIER_SHIPPED_PRODUCT">Expédié par fournisseur</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Délai de livraison
+              </label>
+              <select
+                value={filters.deliveryTime || 'ALL'}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  deliveryTime: e.target.value === 'ALL' ? undefined : e.target.value as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tous les délais</option>
+                <option value="24">⚡ 24 heures</option>
+                <option value="48">🚀 48 heures</option>
+                <option value="72">📦 72 heures</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Inventaire vérifié
+              </label>
+              <select
+                value={filters.verifiedWarehouse || 'ALL'}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  verifiedWarehouse: e.target.value === 'ALL' ? undefined : Number(e.target.value) as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tous les inventaires</option>
+                <option value="1">✅ Vérifié</option>
+                <option value="2">⚠️ Non vérifié</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Livraison gratuite
+              </label>
+              <select
+                value={filters.isFreeShipping || 'ALL'}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  isFreeShipping: e.target.value === 'ALL' ? undefined : Number(e.target.value) as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tous</option>
+                <option value="1">🆓 Livraison gratuite</option>
+                <option value="0">💰 Livraison payante</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Stock minimum
+              </label>
+              <Input
+                type="number"
+                value={filters.startInventory || ''}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  startInventory: e.target.value ? Number(e.target.value) : undefined 
+                }))}
+                placeholder="ex: 10"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Stock maximum
+              </label>
+              <Input
+                type="number"
+                value={filters.endInventory || ''}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  endInventory: e.target.value ? Number(e.target.value) : undefined 
+                }))}
+                placeholder="ex: 1000"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type de recherche
+              </label>
+              <select
+                value={filters.searchType || 0}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  searchType: Number(e.target.value) as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={0}>🔍 Tous les produits</option>
+                <option value={2}>📈 Produits tendance</option>
+                <option value={21}>🔥 Plus de tendances</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Support pickup
+              </label>
+              <select
+                value={filters.isSelfPickup || 'ALL'}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  isSelfPickup: e.target.value === 'ALL' ? undefined : Number(e.target.value) as any
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tous</option>
+                <option value="1">🏪 Pickup supporté</option>
+                <option value="0">🚚 Livraison uniquement</option>
+              </select>
+            </div>
+
+          </div>
+        </details>
 
         <div className="flex gap-4 flex-wrap">
           <Button

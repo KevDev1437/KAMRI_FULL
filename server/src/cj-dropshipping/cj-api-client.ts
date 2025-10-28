@@ -434,6 +434,24 @@ export class CJAPIClient {
       maxPrice?: number;
       countryCode?: string;
       sortBy?: string;
+      // Nouveaux paramètres selon la documentation CJ
+      productType?: string;
+      deliveryTime?: string;
+      verifiedWarehouse?: number;
+      startInventory?: number;
+      endInventory?: number;
+      isFreeShipping?: number;
+      searchType?: number;
+      sort?: string;
+      orderBy?: string;
+      isSelfPickup?: number;
+      supplierId?: string;
+      customizationVersion?: number;
+      brandOpenId?: number;
+      minListedNum?: number;
+      maxListedNum?: number;
+      createTimeFrom?: string;
+      createTimeTo?: string;
     } = {}
   ): Promise<{ list: CJProduct[]; total: number; pageNum: number; pageSize: number }> {
     this.logger.log('🔍 === DÉBUT CLIENT API CJ searchProducts ===');
@@ -452,24 +470,41 @@ export class CJAPIClient {
 
     this.logger.log('📊 Paramètres finaux:', JSON.stringify(params, null, 2));
 
-    // Utiliser des paramètres moins restrictifs pour obtenir plus de résultats
-    const requestParams = {
-      pageNum: params.pageNum,
-      pageSize: params.pageSize,
-      sortBy: params.sortBy,
-      productName: params.keyword, // ← CORRECTION: Utiliser productName au lieu de keyword
-      minPrice: params.minPrice,
-      maxPrice: params.maxPrice,
-      categoryId: params.categoryId,
-      searchType: 0, // 0=All products selon la doc CJ
-      // Paramètres moins restrictifs pour obtenir plus de résultats
-      productType: 'ORDINARY_PRODUCT', // Produits ordinaires
-      // Désactiver les filtres trop restrictifs
-      // isFreeShipping: 1, // Commenté pour inclure tous les produits
-      // verifiedWarehouse: 1, // Commenté pour inclure tous les produits
-      sort: 'desc', // Tri décroissant
-      orderBy: 'createAt', // Trier par date de création
+    // ✅ CORRECTION: Utiliser les paramètres exacts de la documentation CJ
+    const requestParams: any = {
+      pageNum: options.pageNum || 1,
+      pageSize: Math.min(options.pageSize || 20, 200), // Max 200 selon doc CJ
+      searchType: options.searchType || 0, // 0=All products
+      sort: options.sort || 'desc',
+      orderBy: options.orderBy || 'createAt',
     };
+
+    // Ajouter les paramètres seulement s'ils sont définis (éviter undefined)
+    if (keyword) {
+      // Rechercher dans les deux champs de nom selon la doc CJ
+      requestParams.productName = keyword;
+      requestParams.productNameEn = keyword;
+    }
+    
+    // Paramètres optionnels selon la documentation CJ
+    if (options.categoryId) requestParams.categoryId = options.categoryId;
+    if (options.minPrice !== undefined) requestParams.minPrice = options.minPrice;
+    if (options.maxPrice !== undefined) requestParams.maxPrice = options.maxPrice;
+    if (options.countryCode) requestParams.countryCode = options.countryCode;
+    if (options.productType) requestParams.productType = options.productType;
+    if (options.deliveryTime) requestParams.deliveryTime = options.deliveryTime;
+    if (options.verifiedWarehouse) requestParams.verifiedWarehouse = options.verifiedWarehouse;
+    if (options.startInventory) requestParams.startInventory = options.startInventory;
+    if (options.endInventory) requestParams.endInventory = options.endInventory;
+    if (options.isFreeShipping !== undefined) requestParams.isFreeShipping = options.isFreeShipping;
+    if (options.isSelfPickup !== undefined) requestParams.isSelfPickup = options.isSelfPickup;
+    if (options.supplierId) requestParams.supplierId = options.supplierId;
+    if (options.customizationVersion) requestParams.customizationVersion = options.customizationVersion;
+    if (options.brandOpenId) requestParams.brandOpenId = options.brandOpenId;
+    if (options.minListedNum) requestParams.minListedNum = options.minListedNum;
+    if (options.maxListedNum) requestParams.maxListedNum = options.maxListedNum;
+    if (options.createTimeFrom) requestParams.createTimeFrom = options.createTimeFrom;
+    if (options.createTimeTo) requestParams.createTimeTo = options.createTimeTo;
     
     this.logger.log('📡 Paramètres de requête API:', JSON.stringify(requestParams, null, 2));
     this.logger.log('🌐 URL complète: GET /product/list');
@@ -513,15 +548,15 @@ export class CJAPIClient {
   }
 
   /**
-   * Obtenir les détails d'un produit
+   * Obtenir les détails complets d'un produit (selon doc CJ - endpoint /product/detail/{pid})
    */
   async getProductDetails(pid: string): Promise<CJProduct> {
     this.logger.log('🔍 === DÉBUT getProductDetails ===');
     this.logger.log('📝 PID:', pid);
     
     try {
-      // Construire l'URL avec les paramètres de requête
-      const endpoint = `/product/query?pid=${pid}`;
+      // ✅ CORRECTION: Utiliser l'endpoint correct selon la doc CJ
+      const endpoint = `/product/detail/${pid}`;
       this.logger.log('🌐 Endpoint final:', endpoint);
       
       const response = await this.makeRequest('GET', endpoint);
@@ -769,6 +804,235 @@ export class CJAPIClient {
       this.logger.error('❌ Erreur récupération arbre:', error);
       throw error;
     }
+  }
+
+  /**
+   * Recherche avancée de catégories avec filtres et pagination
+   */
+  async searchCategories(params: {
+    parentId?: string;
+    level?: number;
+    keyword?: string;
+    countryCode?: string;
+    includeEmpty?: boolean;
+    includeProductCount?: boolean;
+    pageNum?: number;
+    pageSize?: number;
+  }): Promise<any> {
+    this.logger.log('🔍 Recherche avancée de catégories CJ...', params);
+    
+    try {
+      // Récupérer toutes les catégories d'abord
+      const hierarchicalCategories = await this.getCategories();
+      
+      // Aplatir la structure hiérarchique
+      const allCategories = this.flattenCategories(hierarchicalCategories);
+      
+      // Appliquer les filtres
+      let filteredCategories = allCategories;
+      
+      // Filtrer par parent ID
+      if (params.parentId) {
+        filteredCategories = filteredCategories.filter(cat => 
+          cat.parentId === params.parentId
+        );
+      }
+      
+      // Filtrer par niveau
+      if (params.level) {
+        filteredCategories = filteredCategories.filter(cat => cat.level === params.level);
+      }
+      
+      // Filtrer par mot-clé
+      if (params.keyword) {
+        const keyword = params.keyword.toLowerCase();
+        filteredCategories = filteredCategories.filter(cat => 
+          cat.categoryName?.toLowerCase().includes(keyword) ||
+          cat.categoryNameEn?.toLowerCase().includes(keyword)
+        );
+      }
+      
+      // Appliquer la pagination
+      const pageNum = params.pageNum || 1;
+      const pageSize = params.pageSize || 50;
+      const total = filteredCategories.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const startIndex = (pageNum - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedCategories = filteredCategories.slice(startIndex, endIndex);
+      
+      this.logger.log(`✅ ${paginatedCategories.length} catégories trouvées (page ${pageNum}/${totalPages})`);
+      
+      return {
+        code: 200,
+        success: true,
+        message: 'Catégories récupérées avec succès',
+        data: {
+          list: paginatedCategories,
+          total,
+          pageNum,
+          pageSize,
+          totalPages,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1
+        }
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur recherche catégories:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les catégories populaires (basé sur le nombre de produits)
+   */
+  async getPopularCategories(limit: number = 10): Promise<any[]> {
+    this.logger.log(`🔥 Récupération des ${limit} catégories populaires...`);
+    
+    try {
+      const categories = await this.getCategories();
+      
+      // Trier par nombre de produits (simulation - dans un vrai système, ceci viendrait de l'API)
+      const popularCategories = categories
+        .filter(cat => cat.productCount && cat.productCount > 0)
+        .sort((a, b) => (b.productCount || 0) - (a.productCount || 0))
+        .slice(0, limit);
+      
+      this.logger.log(`✅ ${popularCategories.length} catégories populaires récupérées`);
+      return popularCategories;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération catégories populaires:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les sous-catégories d'une catégorie parent
+   */
+  async getSubCategories(parentId: string): Promise<any[]> {
+    this.logger.log(`📂 Récupération des sous-catégories pour ${parentId}...`);
+    
+    try {
+      const allCategories = await this.getCategories();
+      const subCategories = this.filterCategoriesByParent(allCategories, parentId);
+      
+      this.logger.log(`✅ ${subCategories.length} sous-catégories trouvées`);
+      return subCategories;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération sous-catégories:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Méthode utilitaire pour filtrer les catégories par parent
+   */
+  private filterCategoriesByParent(categories: any[], parentId: string): any[] {
+    return categories.filter(cat => cat.parentId === parentId || cat.parentCategoryId === parentId);
+  }
+
+  /**
+   * Obtenir le chemin complet d'une catégorie (breadcrumb)
+   */
+  async getCategoryPath(categoryId: string): Promise<any[]> {
+    this.logger.log(`🗂️ Récupération du chemin pour la catégorie ${categoryId}...`);
+    
+    try {
+      const allCategories = await this.getCategories();
+      const categoryMap = new Map();
+      
+      // Créer une map pour un accès rapide
+      allCategories.forEach(cat => {
+        categoryMap.set(cat.categoryId || cat.id, cat);
+      });
+      
+      const path = [];
+      let currentCategory = categoryMap.get(categoryId);
+      
+      // Remonter la hiérarchie
+      while (currentCategory) {
+        path.unshift(currentCategory);
+        const parentId = currentCategory.parentId || currentCategory.parentCategoryId;
+        currentCategory = parentId ? categoryMap.get(parentId) : null;
+      }
+      
+      this.logger.log(`✅ Chemin de ${path.length} niveaux récupéré`);
+      return path;
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération chemin catégorie:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer le stock des variantes d'un produit (selon doc CJ)
+   */
+  async getProductVariantStock(pid: string, variantId?: string, countryCode?: string): Promise<any> {
+    this.logger.log('🔍 === DÉBUT getProductVariantStock ===');
+    this.logger.log('📝 Paramètres:', { pid, variantId, countryCode });
+    
+    try {
+      const params: any = { pid };
+      if (variantId) params.variantId = variantId;
+      if (countryCode) params.countryCode = countryCode;
+      
+      const queryString = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryString.append(key, String(value));
+        }
+      });
+      
+      const endpoint = `/product/variant-stock?${queryString.toString()}`;
+      this.logger.log('🌐 Endpoint:', endpoint);
+      
+      const response = await this.makeRequest('GET', endpoint);
+      
+      this.logger.log('✅ Stock variante récupéré');
+      this.logger.log('📊 Structure:', {
+        hasData: !!response.data,
+        dataType: typeof response.data,
+      });
+      
+      this.logger.log('🔍 === FIN getProductVariantStock ===');
+      return response.data;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR getProductVariantStock ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR getProductVariantStock ===');
+      throw error;
+    }
+  }
+
+  /**
+   * Convertir la structure hiérarchique des catégories en liste plate
+   */
+  private flattenCategories(categories: any[], level: number = 1, parentId: string = ''): any[] {
+    const flatCategories: any[] = [];
+    
+    for (const category of categories) {
+      // Ajouter la catégorie actuelle avec informations de niveau
+      const flatCategory = {
+        ...category,
+        level,
+        parentId: parentId || null,
+        path: parentId ? `${parentId}/${category.categoryId}` : category.categoryId
+      };
+      
+      flatCategories.push(flatCategory);
+      
+      // Ajouter récursivement les sous-catégories
+      if (category.subCategories && category.subCategories.length > 0) {
+        const subCategories = this.flattenCategories(
+          category.subCategories, 
+          level + 1, 
+          category.categoryId
+        );
+        flatCategories.push(...subCategories);
+      }
+    }
+    
+    return flatCategories;
   }
 
   /**

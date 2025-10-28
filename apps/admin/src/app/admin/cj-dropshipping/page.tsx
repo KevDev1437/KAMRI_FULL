@@ -215,6 +215,12 @@ export default function CJDropshippingPage() {
             >
               Configuration webhooks
             </Button>
+            <Button
+              onClick={() => window.location.href = '/admin/cj-dropshipping/cache'}
+              className="w-full bg-cyan-600 hover:bg-cyan-700"
+            >
+              Gestion du cache
+            </Button>
           </div>
         </Card>
       </div>

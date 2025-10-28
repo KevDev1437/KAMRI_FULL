@@ -211,6 +211,27 @@ export const useCJDropshipping = () => {
     }
   };
 
+  const getProductVariantStock = async (pid: string, variantId?: string, countryCode?: string): Promise<any> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (variantId) params.append('variantId', variantId);
+      if (countryCode) params.append('countryCode', countryCode);
+      
+      const queryString = params.toString();
+      const url = `/products/${pid}/variant-stock${queryString ? `?${queryString}` : ''}`;
+      
+      const { data } = await api.get(url);
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération du stock des variantes');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const importProduct = async (pid: string, categoryId?: string, margin?: number): Promise<any> => {
     setLoading(true);
     setError(null);
@@ -441,6 +462,82 @@ export const useCJDropshipping = () => {
     }
   };
 
+  // ===== NOUVELLES MÉTHODES DE CATÉGORIES AVANCÉES =====
+
+  // Fonction pour rechercher des catégories avec filtres
+  const searchCategories = async (params: {
+    keyword?: string;
+    level?: number;
+    language?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.keyword) queryParams.append('keyword', params.keyword);
+      if (params.level) queryParams.append('level', params.level.toString());
+      if (params.language) queryParams.append('language', params.language);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+
+      const { data } = await api.get(`/categories/search?${queryParams.toString()}`);
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la recherche de catégories');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour récupérer les catégories populaires
+  const getPopularCategories = async (limit?: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams = limit ? `?limit=${limit}` : '';
+      const { data } = await api.get(`/categories/popular${queryParams}`);
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération des catégories populaires');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour récupérer les sous-catégories
+  const getSubCategories = async (parentId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get(`/categories/${parentId}/subcategories`);
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération des sous-catégories');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour récupérer le chemin d'une catégorie (breadcrumb)
+  const getCategoryPath = async (categoryId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get(`/categories/${categoryId}/path`);
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération du chemin de la catégorie');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const syncFavorites = async () => {
     setLoading(true);
     setError(null);
@@ -449,6 +546,36 @@ export const useCJDropshipping = () => {
       return data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erreur lors de la synchronisation des favoris');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== GESTION DU CACHE =====
+
+  const getCacheStats = async (): Promise<any> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/cache/stats');
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération des statistiques du cache');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cleanExpiredCache = async (): Promise<any> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.post('/cache/clean');
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors du nettoyage du cache');
       throw err;
     } finally {
       setLoading(false);
@@ -481,6 +608,15 @@ export const useCJDropshipping = () => {
     getCategoriesTree,
     syncCategories,
     syncFavorites,
+    getProductVariantStock,
+    // ✨ NOUVELLES MÉTHODES DE CACHE
+    getCacheStats,
+    cleanExpiredCache,
+    // ✨ NOUVELLES MÉTHODES DE CATÉGORIES AVANCÉES
+    searchCategories,
+    getPopularCategories,
+    getSubCategories,
+    getCategoryPath,
   };
 };
 

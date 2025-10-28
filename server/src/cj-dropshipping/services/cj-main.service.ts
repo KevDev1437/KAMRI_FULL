@@ -61,8 +61,30 @@ export class CJMainService {
     return this.cjProductService.syncCategories();
   }
 
+  // ===== NOUVELLES MÉTHODES AVANCÉES POUR LES CATÉGORIES =====
+
+  async searchCategories(params: any) {
+    return this.cjProductService.searchCategories(params);
+  }
+
+  async getPopularCategories(limit: number = 10) {
+    return this.cjProductService.getPopularCategories(limit);
+  }
+
+  async getSubCategories(parentId: string) {
+    return this.cjProductService.getSubCategories(parentId);
+  }
+
+  async getCategoryPath(categoryId: string) {
+    return this.cjProductService.getCategoryPath(categoryId);
+  }
+
   async getProductDetails(pid: string) {
     return this.cjProductService.getProductDetails(pid);
+  }
+
+  async getProductVariantStock(pid: string, variantId?: string, countryCode?: string) {
+    return this.cjProductService.getProductVariantStock(pid, variantId, countryCode);
   }
 
   async getImportedProducts(filters?: any) {
@@ -219,6 +241,22 @@ export class CJMainService {
         },
       }),
     };
+  }
+
+  // ===== GESTION DU CACHE =====
+
+  /**
+   * Obtenir les statistiques du cache
+   */
+  async getCacheStats(): Promise<any> {
+    return this.cjProductService.getCacheStats();
+  }
+
+  /**
+   * Nettoyer le cache expiré
+   */
+  async cleanExpiredCache(): Promise<void> {
+    return this.cjProductService.cleanExpiredCache();
   }
 }
 

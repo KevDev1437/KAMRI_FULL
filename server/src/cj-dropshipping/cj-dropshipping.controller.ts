@@ -150,12 +150,8 @@ export class CJDropshippingController {
       this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
       this.logger.error('🔍 === FIN ERREUR CONTROLLER searchProducts ===');
       
-      // Retourner une réponse d'erreur structurée au lieu de throw
-      return {
-        error: true,
-        message: error instanceof Error ? error.message : 'Erreur inconnue',
-        details: error
-      };
+      // ✅ CORRECTION: Rethrow l'erreur au lieu de retourner un objet
+      throw error;
     }
   }
 
@@ -175,6 +171,89 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Synchronisation effectuée' })
   async syncProducts(@Body() filters?: any) {
     return this.cjMainService.syncProducts(filters);
+  }
+
+  @Get('products/:pid/details')
+  @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ' })
+  @ApiResponse({ status: 200, description: 'Détails du produit avec variants, stock, images' })
+  async getProductDetails(@Param('pid') pid: string) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER getProductDetails ===');
+    this.logger.log('📝 PID:', pid);
+    
+    try {
+      const result = await this.cjMainService.getProductDetails(pid);
+      this.logger.log('✅ Controller getProductDetails terminé avec succès');
+      this.logger.log('🔍 === FIN CONTROLLER getProductDetails ===');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER getProductDetails ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductDetails ===');
+      throw error;
+    }
+  }
+
+  @Get('products/:pid/variant-stock')
+  @ApiOperation({ summary: 'Obtenir le stock des variantes d\'un produit CJ' })
+  @ApiResponse({ status: 200, description: 'Stock des variantes' })
+  async getProductVariantStock(
+    @Param('pid') pid: string,
+    @Query('variantId') variantId?: string,
+    @Query('countryCode') countryCode?: string
+  ) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER getProductVariantStock ===');
+    this.logger.log('📝 Paramètres:', { pid, variantId, countryCode });
+    
+    try {
+      const result = await this.cjMainService.getProductVariantStock(pid, variantId, countryCode);
+      this.logger.log('✅ Controller getProductVariantStock terminé avec succès');
+      this.logger.log('🔍 === FIN CONTROLLER getProductVariantStock ===');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER getProductVariantStock ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductVariantStock ===');
+      throw error;
+    }
+  }
+
+  // ===== GESTION DU CACHE =====
+
+  @Get('cache/stats')
+  @ApiOperation({ summary: 'Obtenir les statistiques du cache CJ' })
+  @ApiResponse({ status: 200, description: 'Statistiques du cache' })
+  async getCacheStats() {
+    this.logger.log('📊 Récupération des statistiques du cache');
+    try {
+      const stats = await this.cjMainService.getCacheStats();
+      this.logger.log('✅ Statistiques du cache récupérées');
+      return {
+        success: true,
+        data: stats,
+        message: '📊 Statistiques du cache récupérées'
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur lors de la récupération des stats cache:', error);
+      throw error;
+    }
+  }
+
+  @Post('cache/clean')
+  @ApiOperation({ summary: 'Nettoyer le cache expiré CJ' })
+  @ApiResponse({ status: 200, description: 'Cache nettoyé' })
+  async cleanCache() {
+    this.logger.log('🧹 Nettoyage du cache expiré');
+    try {
+      await this.cjMainService.cleanExpiredCache();
+      this.logger.log('✅ Cache nettoyé avec succès');
+      return {
+        success: true,
+        message: '🧹 Cache expiré nettoyé avec succès'
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur lors du nettoyage du cache:', error);
+      throw error;
+    }
   }
 
   // ===== INVENTAIRE =====
@@ -488,35 +567,73 @@ export class CJDropshippingController {
     return this.cjMainService.syncCategories();
   }
 
-  // ===== DÉTAILS PRODUIT =====
+  // ===== CATÉGORIES AVANCÉES =====
 
-  @Get('products/:pid/details')
-  @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ' })
-  @ApiResponse({ status: 200, description: 'Détails du produit récupérés' })
-  async getProductDetails(@Param('pid') pid: string) {
+  @Get('categories/search')
+  @ApiOperation({ summary: 'Recherche avancée de catégories avec filtres et pagination' })
+  @ApiResponse({ status: 200, description: 'Résultats de recherche de catégories' })
+  async searchCategories(@Query() query: any) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER searchCategories ===');
+    this.logger.log('📝 Paramètres:', query);
+    
     try {
-      this.logger.log(`🔍 === DÉBUT CONTROLLER getProductDetails ===`);
-      this.logger.log(`📝 PID reçu: ${pid}`);
-      
-      const productDetails = await this.cjMainService.getProductDetails(pid);
-      
-      this.logger.log(`✅ Controller getProductDetails terminé avec succès`);
-      this.logger.log(`📊 Données retournées:`, {
-        pid: productDetails.pid,
-        name: productDetails.productName,
-        sku: productDetails.productSku,
-        price: productDetails.sellPrice,
-        hasImage: !!productDetails.productImage,
-        variantsCount: productDetails.variants?.length || 0,
-        reviewsCount: productDetails.reviews?.length || 0
-      });
-      this.logger.log(`🔍 === FIN CONTROLLER getProductDetails ===`);
-      
-      return productDetails;
+      const result = await this.cjMainService.searchCategories(query);
+      this.logger.log('✅ Controller searchCategories terminé avec succès');
+      return result;
     } catch (error) {
-      this.logger.error(`❌ Erreur controller getProductDetails: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('❌ === ERREUR CONTROLLER searchCategories ===');
+      this.logger.error('💥 Erreur:', error);
       throw error;
     }
   }
+
+  @Get('categories/popular')
+  @ApiOperation({ summary: 'Obtenir les catégories populaires' })
+  @ApiResponse({ status: 200, description: 'Liste des catégories populaires' })
+  async getPopularCategories(@Query('limit') limit?: number) {
+    this.logger.log(`🔥 Récupération des catégories populaires (limit: ${limit || 10})`);
+    
+    try {
+      const result = await this.cjMainService.getPopularCategories(limit || 10);
+      this.logger.log('✅ Catégories populaires récupérées');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ Erreur catégories populaires:', error);
+      throw error;
+    }
+  }
+
+  @Get('categories/:parentId/subcategories')
+  @ApiOperation({ summary: 'Obtenir les sous-catégories d\'une catégorie parent' })
+  @ApiResponse({ status: 200, description: 'Liste des sous-catégories' })
+  async getSubCategories(@Param('parentId') parentId: string) {
+    this.logger.log(`📂 Récupération des sous-catégories pour ${parentId}`);
+    
+    try {
+      const result = await this.cjMainService.getSubCategories(parentId);
+      this.logger.log('✅ Sous-catégories récupérées');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ Erreur sous-catégories:', error);
+      throw error;
+    }
+  }
+
+  @Get('categories/:categoryId/path')
+  @ApiOperation({ summary: 'Obtenir le chemin complet d\'une catégorie (breadcrumb)' })
+  @ApiResponse({ status: 200, description: 'Chemin de la catégorie' })
+  async getCategoryPath(@Param('categoryId') categoryId: string) {
+    this.logger.log(`🗂️ Récupération du chemin pour la catégorie ${categoryId}`);
+    
+    try {
+      const result = await this.cjMainService.getCategoryPath(categoryId);
+      this.logger.log('✅ Chemin de catégorie récupéré');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ Erreur chemin catégorie:', error);
+      throw error;
+    }
+  }
+
 }
 

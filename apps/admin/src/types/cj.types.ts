@@ -130,13 +130,59 @@ export interface CJStats {
 }
 
 export interface CJProductSearchFilters {
-  keyword?: string;
+  // Paramètres de base
   pageNum?: number;
   pageSize?: number;
+  
+  // Identifiants
+  pid?: string;
+  productSku?: string;
   categoryId?: string;
+  
+  // Noms de produits
+  productName?: string;
+  productNameEn?: string;
+  
+  // Types et catégories
+  productType?: 'ORDINARY_PRODUCT' | 'SERVICE_PRODUCT' | 'PACKAGING_PRODUCT' | 'SUPPLIER_PRODUCT' | 'SUPPLIER_SHIPPED_PRODUCT';
+  
+  // Localisation
+  countryCode?: string;
+  
+  // Livraison
+  deliveryTime?: '24' | '48' | '72';
+  isFreeShipping?: 0 | 1;
+  isSelfPickup?: 0 | 1;
+  
+  // Inventaire
+  verifiedWarehouse?: 1 | 2;
+  startInventory?: number;
+  endInventory?: number;
+  
+  // Prix
   minPrice?: number;
   maxPrice?: number;
-  countryCode?: string;
+  
+  // Dates
+  createTimeFrom?: string;
+  createTimeTo?: string;
+  
+  // Marques et fournisseurs
+  brandOpenId?: number;
+  supplierId?: string;
+  
+  // Recherche et tri
+  searchType?: 0 | 2 | 21;
+  minListedNum?: number;
+  maxListedNum?: number;
+  sort?: 'desc' | 'asc';
+  orderBy?: 'createAt' | 'listedNum';
+  
+  // Personnalisation
+  customizationVersion?: 1 | 2 | 3 | 4 | 5;
+  
+  // Compatibilité legacy
+  keyword?: string;
   sortBy?: string;
 }
 
