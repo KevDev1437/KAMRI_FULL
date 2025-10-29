@@ -277,4 +277,75 @@ export class StoresService {
 
     throw new Error(`Magasin ${storeId} non trouvé`);
   }
+
+  // ✅ Mettre à jour un produit du magasin (édition depuis la modale)
+  async updateStoreProduct(
+    storeId: string,
+    productId: string,
+    updateData: Partial<{
+      name: string;
+      description: string;
+      price: number;
+      originalPrice?: number;
+      image?: string;
+      category?: string;
+      status?: string;
+      isFavorite?: boolean;
+      productSku?: string;
+      productWeight?: string;
+      packingWeight?: string;
+      productType?: string;
+      productUnit?: string;
+      productKeyEn?: string;
+      materialNameEn?: string;
+      packingNameEn?: string;
+      suggestSellPrice?: string;
+      listedNum?: number;
+      supplierName?: string;
+      dimensions?: string;
+      brand?: string;
+      tags?: string; // JSON string
+      variants?: string; // JSON string
+      reviews?: string; // JSON string
+    }>
+  ) {
+    if (storeId !== 'cj-dropshipping') {
+      throw new Error(`Magasin ${storeId} non trouvé`);
+    }
+
+    // Vérifier l'existence du produit
+    const existing = await this.prisma.cJProductStore.findUnique({ where: { id: productId } });
+    if (!existing) {
+      throw new Error('Produit non trouvé');
+    }
+
+    // Whitelist des champs autorisés pour éviter toute régression
+    const allowedFields: (keyof typeof updateData)[] = [
+      'name', 'description', 'price', 'originalPrice', 'image', 'category', 'status', 'isFavorite',
+      'productSku', 'productWeight', 'packingWeight', 'productType', 'productUnit', 'productKeyEn',
+      'materialNameEn', 'packingNameEn', 'suggestSellPrice', 'listedNum', 'supplierName', 'dimensions',
+      'brand', 'tags', 'variants', 'reviews'
+    ];
+
+    const data: Record<string, any> = {};
+    for (const key of allowedFields) {
+      const value = (updateData as any)[key];
+      if (value !== undefined) {
+        data[key as string] = value;
+      }
+    }
+
+    // Pas de mise à jour inutile
+    if (Object.keys(data).length === 0) {
+      return existing;
+    }
+
+    // Mise à jour sécurisée
+    const updated = await this.prisma.cJProductStore.update({
+      where: { id: productId },
+      data
+    });
+
+    return updated;
+  }
 }

@@ -418,7 +418,7 @@ export default function StoresPage() {
           </CardContent>
         </Card>
       ) : (
-        <>
+        <div>
           {/* Liste des magasins */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.isArray(stores) && stores.map((store) => (
@@ -496,5 +496,4 @@ export default function StoresPage() {
         </>
       )}
     </div>
-  );
 }
