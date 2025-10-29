@@ -1,5 +1,6 @@
 'use client';
 
+import ProductEditModal from '@/components/stores/ProductEditModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,6 @@ import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
 import { CheckCircle, Clock, Package, Store as StoreIcon, TrendingUp, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import ProductEditModal from '@/components/stores/ProductEditModal';
 
 interface Store {
   id: string;
