@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
 import { CheckCircle, Clock, Package, Store as StoreIcon, TrendingUp, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import ProductEditModal from '@/components/stores/ProductEditModal';
 
 interface Store {
   id: string;
@@ -78,6 +79,8 @@ export default function StoresPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categories, setCategories] = useState<string[]>([]);
   const [syncingStatus, setSyncingStatus] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<StoreProduct | null>(null);
 
   // Récupérer les magasins
   const fetchStores = useCallback(async () => {
@@ -283,6 +286,23 @@ export default function StoresPage() {
     setCategoryFilter('all');
   };
 
+  const handleOpenEditModal = (product: StoreProduct) => {
+    setProductToEdit(product);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setProductToEdit(null);
+  };
+
+  const handleSaveEditModal = async () => {
+    // Après sauvegarde côté modal, on rafraîchit la liste
+    if (selectedStoreId) {
+      await fetchStoreProducts(selectedStoreId);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -410,6 +430,13 @@ export default function StoresPage() {
                       >
                         {product.status === 'selected' ? 'Désélectionner' : 'Sélectionner'}
                       </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => handleOpenEditModal(product)}
+                      >
+                        Modifier
+                      </Button>
                     </CardContent>
                   </Card>
                 ))
@@ -493,6 +520,17 @@ export default function StoresPage() {
               </div>
             )}
           </div>
-        </>
+        </div>
+      )}
+      {editModalOpen && productToEdit && selectedStoreId && (
+        <ProductEditModal
+          isOpen={editModalOpen}
+          onClose={handleCloseEditModal}
+          product={productToEdit}
+          storeId={selectedStoreId}
+          onSave={handleSaveEditModal}
+        />
       )}
     </div>
+  );
+}

@@ -3,13 +3,13 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '../ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Textarea } from '../ui/textarea';
 import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
 import { Edit, Heart, Package, Save, X } from 'lucide-react';
@@ -55,7 +55,7 @@ interface ProductEditModalProps {
 }
 
 export default function ProductEditModal({ isOpen, onClose, product, storeId, onSave }: ProductEditModalProps) {
-  const { toast } = useToast();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<StoreProduct>(product);
 
