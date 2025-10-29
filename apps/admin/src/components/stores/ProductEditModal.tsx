@@ -58,10 +58,56 @@ export default function ProductEditModal({ isOpen, onClose, product, storeId, on
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<StoreProduct>(product);
+  const [origDescriptionHtml, setOrigDescriptionHtml] = useState<string | undefined>(product.description);
 
   // Réinitialiser le formulaire quand le produit change
   useEffect(() => {
-    setFormData(product);
+    // Extraire les images présentes dans la description et fusionner avec product.image
+    const imgsFromDesc = extractImageUrlsFromDescription(product.description);
+    const imgsFromField: string[] = [];
+    try {
+      if (product.image) {
+        if (Array.isArray(product.image)) imgsFromField.push(...product.image as string[]);
+        else if (typeof product.image === 'string') {
+          const s = product.image.trim();
+          if (s.startsWith('[') && s.endsWith(']')) {
+            const parsed = JSON.parse(s);
+            if (Array.isArray(parsed)) imgsFromField.push(...parsed);
+          } else {
+            imgsFromField.push(s);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const mergedImages = Array.from(new Set([...imgsFromField, ...imgsFromDesc].filter(Boolean)));
+
+    // Supprimer les balises <img> de la description affichée dans le textarea pour éviter d'afficher le HTML brut
+    const removeImageTags = (html?: string) => {
+      if (!html) return html || '';
+      return html.replace(/<img[^>]*>/gi, '');
+    };
+
+    // Retirer toutes les autres balises pour afficher du texte brut dans le textarea
+    const stripHtmlTags = (html?: string) => {
+      if (!html) return '';
+      const withoutImgs = removeImageTags(html);
+      // supprimer toutes les balises HTML
+      const stripped = withoutImgs.replace(/<[^>]+>/g, '');
+      // décoder quelques entités communes
+      return stripped.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+    };
+
+    setOrigDescriptionHtml(product.description);
+
+    setFormData({
+      ...product,
+      // textarea contiendra du texte brut (plus lisible pour édition)
+      description: stripHtmlTags(product.description),
+      image: mergedImages.length > 0 ? mergedImages : product.image,
+    });
   }, [product]);
 
   // Fonction utilitaire pour nettoyer les URLs d'images
@@ -168,6 +214,60 @@ export default function ProductEditModal({ isOpen, onClose, product, storeId, on
 
   const productImage = getCleanImageUrl(formData.image);
 
+  // Extraire src des balises <img> présentes dans la description
+  const extractImageUrlsFromDescription = (desc?: string): string[] => {
+    if (!desc) return [];
+    const urls: string[] = [];
+    try {
+      const regex = /<img[^>]+src=["']?([^\s"'>]+)["']?/gi;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(desc)) !== null) {
+        if (match[1]) urls.push(match[1]);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return urls;
+  };
+
+  // Récupérer toutes les images disponibles (formData.image peut être string/json/array)
+  const getAllImages = (): string[] => {
+    const imgs: string[] = [];
+    try {
+      if (formData.image) {
+        if (Array.isArray(formData.image)) imgs.push(...formData.image as string[]);
+        else if (typeof formData.image === 'string') {
+          const s = formData.image.trim();
+          if (s.startsWith('[') && s.endsWith(']')) {
+            const parsed = JSON.parse(s);
+            if (Array.isArray(parsed)) imgs.push(...parsed);
+          } else {
+            imgs.push(s);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore parsing errors
+    }
+
+    // ajouter les images extraites depuis la description
+    imgs.push(...extractImageUrlsFromDescription(formData.description));
+
+    // filtrer doublons et valeurs vides
+    return Array.from(new Set(imgs.filter(Boolean)));
+  };
+
+  const allImages = getAllImages();
+
+  // Sanitize minimalement le HTML: retirer <script> et attributs event (on*) et javascript: URI
+  const sanitizeHTML = (html = ''): string => {
+    return html
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/on\w+=["'][\s\S]*?["']/gi, '')
+      .replace(/javascript:\/\//gi, '')
+      .replace(/javascript:/gi, '');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -191,37 +291,64 @@ export default function ProductEditModal({ isOpen, onClose, product, storeId, on
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                {productImage && (
-                  <img
-                    src={productImage}
-                    alt={formData.name}
-                    className="w-24 h-24 object-cover rounded-lg border"
-                  />
-                )}
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-semibold text-lg">{formData.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={formData.status === 'available' ? 'default' : 
-                                  formData.status === 'selected' ? 'secondary' : 'outline'}>
-                      {formData.status}
-                    </Badge>
-                    {formData.isFavorite && (
-                      <Badge variant="outline" className="text-red-500">
-                        <Heart className="h-3 w-3 mr-1" />
-                        Favori
-                      </Badge>
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    {allImages && allImages.length > 0 ? (
+                      <div className="flex gap-2">
+                          <div className="grid grid-cols-3 gap-2 max-w-[240px]">
+                            {allImages.slice(0, 6).map((src, idx) => (
+                              <img
+                                key={idx}
+                                src={src}
+                                alt={`${formData.name} ${idx+1}`}
+                                className="w-20 h-20 object-cover rounded border"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ))}
+                          </div>
+                      </div>
+                    ) : (
+                      productImage && (
+                        <img
+                          src={productImage}
+                          alt={formData.name}
+                          className="w-24 h-24 object-cover rounded-lg border"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>Prix: ${formData.price}</span>
-                    {formData.originalPrice && (
-                      <span className="line-through">${formData.originalPrice}</span>
+
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-semibold text-lg">{formData.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={formData.status === 'available' ? 'default' : 
+                                    formData.status === 'selected' ? 'secondary' : 'outline'}>
+                        {formData.status}
+                      </Badge>
+                      {formData.isFavorite && (
+                        <Badge variant="outline" className="text-red-500">
+                          <Heart className="h-3 w-3 mr-1" />
+                          Favori
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Prix: ${formData.price}</span>
+                      {formData.originalPrice && (
+                        <span className="line-through">${formData.originalPrice}</span>
+                      )}
+                      {formData.category && <span>Catégorie: {formData.category}</span>}
+                    </div>
+
+                    {/* Aperçu rendu de la description (sanitisé) */}
+                    {origDescriptionHtml && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHTML(origDescriptionHtml || '') }} />
+                      </div>
                     )}
-                    {formData.category && <span>Catégorie: {formData.category}</span>}
                   </div>
                 </div>
-              </div>
             </CardContent>
           </Card>
 
