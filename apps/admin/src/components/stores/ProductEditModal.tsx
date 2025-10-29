@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
-import { Edit, Heart, Package, Save, Star, TrendingUp, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Edit, Heart, Package, Save, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface StoreProduct {
   id: string;

@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { StoresService } from './stores.service';
 import { UpdateStoreProductDto } from './dto/update-store-product.dto';
+import { StoresService } from './stores.service';
 
 @ApiTags('stores')
 @Controller('api/stores')
