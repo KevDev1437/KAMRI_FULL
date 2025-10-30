@@ -1,8 +1,8 @@
 'use client'
 
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 import { Search, Settings, User } from 'lucide-react'
 
 export function Header() {

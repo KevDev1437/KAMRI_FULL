@@ -4,14 +4,16 @@ import { apiClient } from '@/lib/apiClient';
 import { useEffect, useState } from 'react';
 
 export interface StoreNotification {
-  storeId: string;
-  storeName: string;
-  availableProductsCount: number;
+  id: string;
+  name: string;
+  count: number;
+  type: 'store';
 }
 
 export interface NotificationSummary {
   total: number;
-  stores: StoreNotification[];
+  items: StoreNotification[];
+  storesCount: number;
 }
 
 /**
@@ -21,7 +23,8 @@ export interface NotificationSummary {
 export function useStoreNotifications() {
   const [notifications, setNotifications] = useState<NotificationSummary>({
     total: 0,
-    stores: [],
+    items: [],
+    storesCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,47 +35,67 @@ export function useStoreNotifications() {
       
       // Récupérer la liste des magasins
       const storesResponse = await apiClient('/stores') as any;
-      const stores = storesResponse.data || [];
+      const stores = Array.isArray(storesResponse) ? storesResponse : [];
+      
+      console.log('📊 Magasins récupérés pour notifications:', stores.length);
 
       // Pour chaque magasin, compter les produits disponibles
       const storeNotifications: StoreNotification[] = await Promise.all(
         stores.map(async (store: any) => {
           try {
-            const productsResponse = await apiClient(`/stores/${store.id}/products`) as any;
-            const products = productsResponse.data || [];
+            let products: any[] = [];
+            
+            // Les magasins CJ utilisent un endpoint spécial
+            if (store.id === 'cj-dropshipping' || store.id === 'cj-favorites') {
+              const response = await apiClient(`/cj-dropshipping/stores/${store.id}/products`) as any;
+              // La réponse CJ est { products: [...], categories: [...] }
+              products = response.products || [];
+            } else {
+              // Magasins normaux
+              const response = await apiClient(`/stores/${store.id}/products`) as any;
+              // Peut être directement un tableau ou un objet { products: [...] }
+              products = Array.isArray(response) ? response : (response.products || []);
+            }
             
             // Compter les produits avec status "available"
             const availableCount = products.filter(
               (p: any) => p.status === 'available'
             ).length;
 
+            console.log(`🏪 ${store.name}: ${availableCount} produits disponibles sur ${products.length} total`);
+
             return {
-              storeId: store.id,
-              storeName: store.name || 'Magasin sans nom',
-              availableProductsCount: availableCount,
+              id: store.id,
+              name: store.name || 'Magasin sans nom',
+              count: availableCount,
+              type: 'store' as const,
             };
           } catch (err) {
-            console.warn(`Erreur lors de la récupération des produits du magasin ${store.id}:`, err);
+            console.error(`❌ Erreur récupération produits magasin ${store.id}:`, err);
             return {
-              storeId: store.id,
-              storeName: store.name || 'Magasin sans nom',
-              availableProductsCount: 0,
+              id: store.id,
+              name: store.name || 'Magasin sans nom',
+              count: 0,
+              type: 'store' as const,
             };
           }
         })
       );
 
-      // Filtrer uniquement les magasins avec produits disponibles
-      const storesWithProducts = storeNotifications.filter(s => s.availableProductsCount > 0);
-      const totalCount = storesWithProducts.reduce((sum, s) => sum + s.availableProductsCount, 0);
+      // Filtrer uniquement les magasins avec des produits
+      const itemsWithProducts = storeNotifications.filter(item => item.count > 0);
+      const totalCount = itemsWithProducts.reduce((sum, item) => sum + item.count, 0);
+
+      console.log(`🔔 Notifications: ${totalCount} produits au total (${itemsWithProducts.length} magasins)`);
 
       setNotifications({
         total: totalCount,
-        stores: storesWithProducts,
+        items: itemsWithProducts,
+        storesCount: itemsWithProducts.length,
       });
       setLoading(false);
     } catch (err) {
-      console.error('Erreur lors de la récupération des notifications:', err);
+      console.error('❌ Erreur lors de la récupération des notifications:', err);
       setError('Impossible de charger les notifications');
       setLoading(false);
     }

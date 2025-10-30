@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useStoreNotifications } from '@/hooks/useStoreNotifications';
-import { Bell, Package, RefreshCw, Store, X } from 'lucide-react';
+import { Bell, RefreshCw, Store, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -13,9 +13,9 @@ export function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
-  const handleStoreClick = (storeId: string) => {
+  const handleItemClick = (id: string, type: 'store') => {
     setIsOpen(false);
-    router.push(`/admin/stores?store=${storeId}`);
+    router.push(`/admin/stores?store=${id}`);
   };
 
   return (
@@ -48,7 +48,7 @@ export function NotificationDropdown() {
           <Card className="absolute right-0 top-12 w-96 z-50 shadow-xl border-slate-200">
             <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-slate-700" />
+                <Store className="w-5 h-5 text-slate-700" />
                 <h3 className="font-semibold text-slate-900">
                   Produits disponibles
                 </h3>
@@ -78,12 +78,12 @@ export function NotificationDropdown() {
             </div>
 
             <CardContent className="p-0 max-h-96 overflow-y-auto">
-              {loading && notifications.stores.length === 0 ? (
+              {loading && (!notifications.items || notifications.items.length === 0) ? (
                 <div className="p-6 text-center text-slate-500">
                   <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-slate-400" />
                   <p className="text-sm">Chargement des notifications...</p>
                 </div>
-              ) : notifications.stores.length === 0 ? (
+              ) : !notifications.items || notifications.items.length === 0 ? (
                 <div className="p-6 text-center text-slate-500">
                   <Bell className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                   <p className="text-sm font-medium">Aucune notification</p>
@@ -93,23 +93,23 @@ export function NotificationDropdown() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {notifications.stores.map((store) => (
+                  {notifications.items.map((item) => (
                     <button
-                      key={store.storeId}
-                      onClick={() => handleStoreClick(store.storeId)}
+                      key={item.id}
+                      onClick={() => handleItemClick(item.id, item.type)}
                       className="w-full p-4 hover:bg-slate-50 transition-colors text-left flex items-center justify-between group"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-100">
                           <Store className="w-5 h-5 text-blue-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-slate-900 truncate group-hover:text-blue-600">
-                            {store.storeName}
+                            {item.name}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {store.availableProductsCount}{' '}
-                            {store.availableProductsCount === 1
+                            {item.count}{' '}
+                            {item.count === 1
                               ? 'produit disponible'
                               : 'produits disponibles'}
                           </p>
@@ -119,7 +119,7 @@ export function NotificationDropdown() {
                         variant="default"
                         className="ml-2 bg-blue-500 hover:bg-blue-600"
                       >
-                        {store.availableProductsCount}
+                        {item.count}
                       </Badge>
                     </button>
                   ))}
@@ -127,11 +127,16 @@ export function NotificationDropdown() {
               )}
             </CardContent>
 
-            {notifications.stores.length > 0 && (
+            {notifications.items.length > 0 && (
               <div className="p-3 border-t bg-slate-50 text-center">
                 <p className="text-xs text-slate-600">
                   Total : <strong>{notifications.total}</strong>{' '}
-                  {notifications.total === 1 ? 'produit' : 'produits'} en attente
+                  {notifications.total === 1 ? 'produit' : 'produits'} disponible{notifications.total === 1 ? '' : 's'}
+                  {notifications.storesCount > 0 && (
+                    <span className="ml-2 text-slate-500">
+                      ({notifications.storesCount} {notifications.storesCount === 1 ? 'magasin' : 'magasins'})
+                    </span>
+                  )}
                 </p>
               </div>
             )}

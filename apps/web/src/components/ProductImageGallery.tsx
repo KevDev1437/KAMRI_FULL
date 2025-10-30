@@ -47,7 +47,8 @@ export default function ProductImageGallery({ images, mainImage, productName }: 
               onError={(e) => {
                 console.log('❌ Erreur de chargement d\'image:', e.currentTarget.src);
                 e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling.style.display = 'flex';
+                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
               }}
             />
           ) : null;
@@ -89,7 +90,8 @@ export default function ProductImageGallery({ images, mainImage, productName }: 
                   onError={(e) => {
                     console.log('❌ Erreur de chargement d\'image miniature:', e.currentTarget.src);
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling.style.display = 'flex';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
                   }}
                 />
               ) : null}
@@ -101,7 +103,6 @@ export default function ProductImageGallery({ images, mainImage, productName }: 
             </button>
           );
         })}
-        ))}
       </div>
     </div>
   );
