@@ -192,6 +192,9 @@ export default function CJProductsPage() {
         window.dispatchEvent(new CustomEvent('cjProductImported', {
           detail: { pid, product: result.product }
         }));
+        
+        // Rafraîchir les notifications du header
+        window.dispatchEvent(new Event('refreshStoreNotifications'));
       } else {
         toast.showToast({ type: 'error', title: 'Import', description: `❌ ${result.message}` });
       }
@@ -256,6 +259,11 @@ export default function CJProductsPage() {
         selectedProducts.has(p.pid) ? { ...p, imported: true } : p
       ));
 
+      // Rafraîchir les notifications du header
+      if (successCount > 0) {
+        window.dispatchEvent(new Event('refreshStoreNotifications'));
+      }
+
       // Vider la sélection
       clearSelection();
       setShowBulkMapping(false);
@@ -271,6 +279,11 @@ export default function CJProductsPage() {
     try {
       const result = await syncProducts();
       toast.showToast({ type: 'success', title: 'Synchronisation', description: `✅ Synchronisation terminée: ${result.synced} produits mis à jour, ${result.errors} erreurs` });
+      
+      // Rafraîchir les notifications du header si des produits ont été synchronisés
+      if (result.synced > 0) {
+        window.dispatchEvent(new Event('refreshStoreNotifications'));
+      }
     } catch (err) {
       toast.showToast({ type: 'error', title: 'Synchronisation', description: '❌ Erreur lors de la synchronisation' });
     } finally {
@@ -649,6 +662,9 @@ export default function CJProductsPage() {
                   setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
                   setCurrentPage(1); // Reset pagination
                   setHasMoreProducts(true); // Réinitialiser la pagination
+                  
+                  // Rafraîchir les notifications du header
+                  window.dispatchEvent(new Event('refreshStoreNotifications'));
                 }
               } catch (error) {
                 toast.showToast({ type: 'error', title: 'Favoris', description: '❌ Erreur lors de la synchronisation des favoris' });

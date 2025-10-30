@@ -236,6 +236,9 @@ export default function StoresPage() {
         detail: { storeId, action: 'import' }
       }));
       
+      // Rafraîchir les notifications du header
+      window.dispatchEvent(new Event('refreshStoreNotifications'));
+      
     } catch (error) {
       console.error('Erreur lors de l\'import:', error);
       toast.showToast({ type: 'error', title: 'Import', description: `Erreur lors de l'import: ${error instanceof Error ? error.message : String(error)}` });
