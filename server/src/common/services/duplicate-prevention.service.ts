@@ -23,7 +23,7 @@ export class DuplicatePreventionService {
   /**
    * Vérifier si un produit CJ existe déjà
    */
-  async checkCJProductDuplicate(cjProductId: string, productSku?: string): Promise<DuplicateCheckResult> {
+  async checkCJProductDuplicate(cjProductId: string, productSku?: string, productData?: any): Promise<DuplicateCheckResult> {
     this.logger.log(`🔍 Vérification doublons pour CJ Product ID: ${cjProductId}`);
 
     try {
@@ -72,7 +72,56 @@ export class DuplicatePreventionService {
         }
       }
 
-      // 3️⃣ Aucun doublon détecté
+      // 3️⃣ Recherche par similarité : nom + prix (détection de doublons potentiels)
+      // Cette vérification permet de détecter les produits identiques avec des cjProductId différents
+      if (productData?.name && productData?.price) {
+        const normalizedName = productData.name.trim().toLowerCase();
+        
+        // SQLite ne supporte pas mode: 'insensitive', on doit récupérer tous les produits et filtrer
+        const allCJProducts = await this.prisma.product.findMany({
+          where: {
+            source: 'cj-dropshipping',
+            price: {
+              // Tolérance de 0.01 pour les prix (arrondis)
+              gte: productData.price - 0.01,
+              lte: productData.price + 0.01
+            }
+          },
+          include: {
+            category: true,
+            supplier: true,
+            cjMapping: true
+          }
+        });
+        
+        // Filtrer par similarité de nom (insensible à la casse)
+        const similarProduct = allCJProducts.find(p => {
+          const existingName = p.name.trim().toLowerCase();
+          // Vérifier si les noms sont similaires (contient ou similaire)
+          return existingName.includes(normalizedName) || normalizedName.includes(existingName);
+        });
+
+        if (similarProduct) {
+          // Comparer plus précisément le nom (au moins 80% de similitude)
+          const existingName = similarProduct.name.trim().toLowerCase();
+          const similarity = this.calculateSimilarity(normalizedName, existingName);
+          
+          if (similarity > 0.8) {
+            this.logger.warn(`⚠️ Produit similaire détecté (similarité: ${Math.round(similarity * 100)}%): ${similarProduct.id}`);
+            this.logger.warn(`   Produit existant: "${similarProduct.name}" (Prix: ${similarProduct.price})`);
+            this.logger.warn(`   Produit à importer: "${productData.name}" (Prix: ${productData.price})`);
+            
+            return {
+              isDuplicate: true,
+              existingProduct: similarProduct,
+              action: 'SKIP', // Ne pas mettre à jour, juste ignorer le doublon
+              reason: `Produit similaire déjà importé (similarité: ${Math.round(similarity * 100)}%) - ${similarProduct.id}`
+            };
+          }
+        }
+      }
+
+      // 4️⃣ Aucun doublon détecté
       this.logger.log(`✅ Aucun doublon détecté pour ${cjProductId}`);
       return {
         isDuplicate: false,
@@ -111,10 +160,67 @@ export class DuplicatePreventionService {
   }
 
   /**
+   * Calculer la similarité entre deux chaînes (algorithme de Jaro-Winkler simplifié)
+   */
+  private calculateSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    // Calculer la distance de Levenshtein
+    const distance = this.levenshteinDistance(longer, shorter);
+    const similarity = (longer.length - distance) / longer.length;
+    
+    return similarity;
+  }
+
+  /**
+   * Distance de Levenshtein entre deux chaînes
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
    * Upsert intelligent d'un produit CJ
    */
   async upsertCJProduct(productData: any, duplicateCheck: DuplicateCheckResult): Promise<ImportStatusResult> {
     try {
+      // Si c'est un doublon à ignorer (SKIP), retourner directement
+      if (duplicateCheck.action === 'SKIP' && duplicateCheck.existingProduct) {
+        this.logger.log(`⏭️ Doublon ignoré: ${duplicateCheck.reason}`);
+        return {
+          status: 'duplicate',
+          productId: duplicateCheck.existingProduct.id,
+          changes: [`Doublon ignoré - ${duplicateCheck.reason}`]
+        };
+      }
+      
       if (duplicateCheck.action === 'UPDATE' && duplicateCheck.existingProduct) {
         // 🔄 MISE À JOUR du produit existant
         this.logger.log(`🔄 Mise à jour du produit existant: ${duplicateCheck.existingProduct.id}`);

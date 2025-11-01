@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -144,17 +143,6 @@ export class ProductsService {
 
     // ✅ Transformer les données pour le frontend
     return this.processProductImages(product);
-  }
-
-  async update(id: string, updateProductDto: UpdateProductDto) {
-    return this.prisma.product.update({
-      where: { id },
-      data: updateProductDto,
-      include: {
-        category: true,
-        images: true,
-      },
-    });
   }
 
   async remove(id: string) {

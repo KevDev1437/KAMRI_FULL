@@ -4,13 +4,11 @@ import {
     Get,
     Param,
     Post,
-    Put,
     Query,
     UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { UpdateStoreProductDto } from './dto/update-store-product.dto';
 import { StoresService } from './stores.service';
 
 @ApiTags('stores')
@@ -69,16 +67,5 @@ export class StoresController {
   @ApiResponse({ status: 200, description: 'Produits sélectionnés importés' })
   importSelectedProducts(@Param('storeId') storeId: string) {
     return this.storesService.importSelectedProducts(storeId);
-  }
-
-  @Put(':storeId/products/:productId')
-  @ApiOperation({ summary: 'Modifier un produit du magasin' })
-  @ApiResponse({ status: 200, description: 'Produit modifié avec succès' })
-  updateStoreProduct(
-    @Param('storeId') storeId: string,
-    @Param('productId') productId: string,
-    @Body() updateData: UpdateStoreProductDto,
-  ) {
-    return this.storesService.updateStoreProduct(storeId, productId, updateData);
   }
 }

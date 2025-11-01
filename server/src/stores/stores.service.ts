@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DuplicatePreventionService } from '../common/services/duplicate-prevention.service';
 
 @Injectable()
 export class StoresService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private duplicateService: DuplicatePreventionService
+  ) {}
 
   // ✅ Obtenir tous les magasins disponibles
   async getAllStores() {
@@ -210,40 +214,82 @@ export class StoresService {
         try {
           console.log(`🔄 Import du produit: ${cjProduct.name}`);
           
-          // Créer le produit KAMRI avec TOUTES les données CJ
-          const product = await this.prisma.product.create({
-            data: {
-              name: cjProduct.name,
-              description: cjProduct.description,
-              price: cjProduct.price,
-              originalPrice: cjProduct.originalPrice,
-              image: cjProduct.image,
-              supplierId: cjSupplier.id, // Utiliser l'ID réel du fournisseur
-              externalCategory: cjProduct.category,
-              source: 'cj-dropshipping',
-              status: 'pending',
-              badge: 'nouveau',
-              stock: Math.floor(Math.random() * 50) + 10,
-              
-              // ✅ TOUTES LES DONNÉES DÉTAILLÉES CJ
-              productSku: cjProduct.productSku,
-              productWeight: cjProduct.productWeight,
-              packingWeight: cjProduct.packingWeight,
-              productType: cjProduct.productType,
-              productUnit: cjProduct.productUnit,
-              productKeyEn: cjProduct.productKeyEn,
-              materialNameEn: cjProduct.materialNameEn,
-              packingNameEn: cjProduct.packingNameEn,
-              suggestSellPrice: cjProduct.suggestSellPrice,
-              listedNum: cjProduct.listedNum,
-              supplierName: cjProduct.supplierName,
-              createrTime: cjProduct.createrTime,
-              variants: cjProduct.variants, // JSON des 48+ variants
-              cjReviews: cjProduct.reviews, // JSON des avis CJ
-              dimensions: cjProduct.dimensions,
-              brand: cjProduct.brand,
-              tags: cjProduct.tags, // JSON des tags
-            },
+          // Préparer les données du produit pour la vérification anti-doublons
+          const productDataForCheck = {
+            name: cjProduct.name,
+            price: cjProduct.price,
+            description: cjProduct.description
+          };
+          
+          // ✅ NOUVELLE LOGIQUE ANTI-DOUBLONS : Vérifier avant de créer
+          const duplicateCheck = await this.duplicateService.checkCJProductDuplicate(
+            cjProduct.cjProductId || '', 
+            cjProduct.productSku,
+            productDataForCheck
+          );
+          
+          if (duplicateCheck.isDuplicate && duplicateCheck.existingProduct) {
+            console.log(`⚠️ Produit déjà existant (doublon détecté): ${duplicateCheck.reason}`);
+            // Marquer le produit du magasin comme importé même si c'est un doublon
+            await this.prisma.cJProductStore.update({
+              where: { id: cjProduct.id },
+              data: { status: 'imported' }
+            });
+            
+            // Créer le mapping pour le produit existant
+            await this.prisma.cJProductMapping.create({
+              data: {
+                productId: duplicateCheck.existingProduct.id,
+                cjProductId: cjProduct.cjProductId || '',
+                cjSku: cjProduct.productSku || ''
+              }
+            });
+            
+            continue; // Passer au produit suivant
+          }
+          
+          // Préparer les données du produit pour l'upsert intelligent
+          const productData = {
+            name: cjProduct.name,
+            description: cjProduct.description,
+            price: cjProduct.price,
+            originalPrice: cjProduct.originalPrice,
+            image: cjProduct.image,
+            supplierId: cjSupplier.id, // Utiliser l'ID réel du fournisseur
+            externalCategory: cjProduct.category,
+            source: 'cj-dropshipping',
+            status: 'pending',
+            badge: 'nouveau',
+            stock: Math.floor(Math.random() * 50) + 10,
+            
+            // ✅ CRUCIAL : Ajouter cjProductId pour la protection anti-doublons
+            cjProductId: cjProduct.cjProductId || '', // ✅ Champ manquant !
+            
+            // ✅ TOUTES LES DONNÉES DÉTAILLÉES CJ
+            productSku: cjProduct.productSku,
+            productWeight: cjProduct.productWeight,
+            packingWeight: cjProduct.packingWeight,
+            productType: cjProduct.productType,
+            productUnit: cjProduct.productUnit,
+            productKeyEn: cjProduct.productKeyEn,
+            materialNameEn: cjProduct.materialNameEn,
+            packingNameEn: cjProduct.packingNameEn,
+            suggestSellPrice: cjProduct.suggestSellPrice,
+            listedNum: cjProduct.listedNum,
+            supplierName: cjProduct.supplierName,
+            createrTime: cjProduct.createrTime,
+            variants: cjProduct.variants, // JSON des 48+ variants
+            cjReviews: cjProduct.reviews, // JSON des avis CJ
+            dimensions: cjProduct.dimensions,
+            brand: cjProduct.brand,
+            tags: cjProduct.tags, // JSON des tags
+          };
+          
+          // ✅ UTILISER UPSERT INTELLIGENT avec le service anti-doublons
+          const importResult = await this.duplicateService.upsertCJProduct(productData, duplicateCheck);
+          
+          const product = await this.prisma.product.findUnique({
+            where: { id: importResult.productId }
           });
 
           // Marquer comme importé
@@ -278,74 +324,4 @@ export class StoresService {
     throw new Error(`Magasin ${storeId} non trouvé`);
   }
 
-  // ✅ Mettre à jour un produit du magasin (édition depuis la modale)
-  async updateStoreProduct(
-    storeId: string,
-    productId: string,
-    updateData: Partial<{
-      name: string;
-      description: string;
-      price: number;
-      originalPrice?: number;
-      image?: string;
-      category?: string;
-      status?: string;
-      isFavorite?: boolean;
-      productSku?: string;
-      productWeight?: string;
-      packingWeight?: string;
-      productType?: string;
-      productUnit?: string;
-      productKeyEn?: string;
-      materialNameEn?: string;
-      packingNameEn?: string;
-      suggestSellPrice?: string;
-      listedNum?: number;
-      supplierName?: string;
-      dimensions?: string;
-      brand?: string;
-      tags?: string; // JSON string
-      variants?: string; // JSON string
-      reviews?: string; // JSON string
-    }>
-  ) {
-    if (storeId !== 'cj-dropshipping') {
-      throw new Error(`Magasin ${storeId} non trouvé`);
-    }
-
-    // Vérifier l'existence du produit
-    const existing = await this.prisma.cJProductStore.findUnique({ where: { id: productId } });
-    if (!existing) {
-      throw new Error('Produit non trouvé');
-    }
-
-    // Whitelist des champs autorisés pour éviter toute régression
-    const allowedFields: (keyof typeof updateData)[] = [
-      'name', 'description', 'price', 'originalPrice', 'image', 'category', 'status', 'isFavorite',
-      'productSku', 'productWeight', 'packingWeight', 'productType', 'productUnit', 'productKeyEn',
-      'materialNameEn', 'packingNameEn', 'suggestSellPrice', 'listedNum', 'supplierName', 'dimensions',
-      'brand', 'tags', 'variants', 'reviews'
-    ];
-
-    const data: Record<string, any> = {};
-    for (const key of allowedFields) {
-      const value = (updateData as any)[key];
-      if (value !== undefined) {
-        data[key as string] = value;
-      }
-    }
-
-    // Pas de mise à jour inutile
-    if (Object.keys(data).length === 0) {
-      return existing;
-    }
-
-    // Mise à jour sécurisée
-    const updated = await this.prisma.cJProductStore.update({
-      where: { id: productId },
-      data
-    });
-
-    return updated;
-  }
 }
