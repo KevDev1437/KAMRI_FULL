@@ -213,5 +213,14 @@ export class ProductsController {
   publishProduct(@Param('id') id: string) {
     return this.productsService.publishProduct(id);
   }
+
+  @Post('draft/update-mappings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour automatiquement les produits draft sans catégorie qui ont un mapping' })
+  @ApiResponse({ status: 200, description: 'Produits mis à jour avec succès' })
+  async updateDraftProductsWithMapping() {
+    return this.productsService.updateDraftProductsWithMapping();
+  }
 }
 

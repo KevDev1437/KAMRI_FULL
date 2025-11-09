@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
-import { Check, Eye, Package, X } from 'lucide-react'
+import { Check, Eye, Package, X, Edit } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface Product {
@@ -251,7 +251,11 @@ export default function ProductValidationPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Validation des Produits</h1>
           <p className="text-gray-600 mt-2">
-            {pendingProducts.length} produit(s) catégorisés prêts pour validation
+            {pendingProducts.length} produit(s) en draft prêts pour validation
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            💡 Tous les produits passent par le statut "draft" avant publication. 
+            Vous pouvez les éditer dans la page <a href="/admin/products/draft" className="text-primary-600 hover:underline">Draft</a>.
           </p>
         </div>
       </div>
@@ -308,8 +312,8 @@ export default function ProductValidationPage() {
                   <CardTitle className="text-lg font-semibold line-clamp-1">
                     {product.name}
                   </CardTitle>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                    En attente
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    Draft
                   </span>
                 </div>
               </CardHeader>
@@ -437,27 +441,41 @@ export default function ProductValidationPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-4">
+                <div className="flex gap-2 pt-4 flex-wrap">
                   <Button
                     onClick={() => handleShowDetails(product)}
                     variant="outline"
-                    className="px-3"
+                    className="flex-1 min-w-[100px]"
+                    title="Voir les détails du produit"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4 mr-2" />
+                    Détails
+                  </Button>
+                  
+                  <Button
+                    onClick={() => window.location.href = `/admin/products/draft`}
+                    variant="outline"
+                    className="flex-1 min-w-[100px]"
+                    title="Éditer le produit dans la page Draft"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Éditer
                   </Button>
                   
                   <Button
                     onClick={() => approveProduct(product.id)}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    className="flex-1 min-w-[100px] bg-green-600 hover:bg-green-700"
+                    title="Publier le produit (draft → active)"
                   >
                     <Check className="h-4 w-4 mr-2" />
-                    Approuver
+                    Publier
                   </Button>
                   
                   <Button
                     onClick={() => rejectProduct(product.id)}
                     variant="destructive"
-                    className="flex-1"
+                    className="flex-1 min-w-[100px]"
+                    title="Rejeter le produit (draft → rejected)"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Rejeter

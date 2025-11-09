@@ -131,12 +131,12 @@ export class CategoriesService {
       },
     });
 
-    // Mettre à jour tous les produits de cette catégorie externe
+    // ✅ Unifié : Mettre à jour tous les produits draft de cette catégorie externe
     const updatedProducts = await this.prisma.product.updateMany({
       where: {
         supplierId: data.supplierId,
         externalCategory: data.externalCategory,
-        status: 'pending',
+        status: 'draft', // ✅ Unifié : uniquement draft
         categoryId: null, // Seulement ceux qui n'ont pas encore de catégorie
       },
       data: {
@@ -145,9 +145,164 @@ export class CategoriesService {
     });
 
     console.log(`✅ Mapping créé/mis à jour: ${data.externalCategory} → ${data.internalCategory} (ID: ${category.id})`);
-    console.log(`📦 ${updatedProducts.count} produits mis à jour avec la catégorie`);
+    console.log(`📦 ${updatedProducts.count} produits draft mis à jour avec la catégorie`);
 
-    return mapping;
+    // ✅ NOUVEAU : Créer automatiquement les produits depuis CJProductStore vers Product (draft)
+    const createdProducts = await this.createProductsFromCJStore(data.supplierId, data.externalCategory, category.id);
+
+    console.log(`📦 ${createdProducts.count} nouveaux produits créés depuis CJProductStore vers draft`);
+
+    return {
+      ...mapping,
+      updatedProducts: updatedProducts.count,
+      createdProducts: createdProducts.count
+    };
+  }
+
+  /**
+   * Créer automatiquement les produits depuis CJProductStore vers Product (draft)
+   * lorsqu'un mapping de catégorie est créé
+   */
+  private async createProductsFromCJStore(supplierId: string, externalCategory: string, categoryId: string) {
+    console.log(`🔄 [CREATE-FROM-STORE] Création produits depuis CJProductStore pour catégorie: ${externalCategory}`);
+
+    // Récupérer tous les produits CJProductStore avec cette catégorie externe qui ne sont pas encore importés
+    const cjStoreProducts = await this.prisma.cJProductStore.findMany({
+      where: {
+        category: externalCategory,
+        status: 'available' // Seulement ceux qui ne sont pas encore importés
+      }
+    });
+
+    console.log(`📋 [CREATE-FROM-STORE] ${cjStoreProducts.length} produit(s) trouvé(s) dans CJProductStore`);
+
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (const cjProduct of cjStoreProducts) {
+      try {
+        // Vérifier si le produit n'est pas déjà dans Product
+        const existingProduct = await this.prisma.product.findFirst({
+          where: {
+            cjProductId: cjProduct.cjProductId
+          }
+        });
+
+        if (existingProduct) {
+          console.log(`⚠️ [CREATE-FROM-STORE] Produit déjà dans Product: ${cjProduct.name}`);
+          skippedCount++;
+          continue;
+        }
+
+        // Nettoyer le nom et la description
+        const cleanedName = this.cleanProductName(cjProduct.name || '');
+        const cleanedDescription = this.cleanProductDescription(cjProduct.description || '');
+
+        // Calculer le prix avec marge par défaut (30%)
+        const margin = 30;
+        const originalPrice = cjProduct.originalPrice || cjProduct.price;
+        const calculatedPrice = originalPrice * (1 + margin / 100);
+
+        // Créer le produit dans Product (draft)
+        const product = await this.prisma.product.create({
+          data: {
+            name: cleanedName,
+            description: cleanedDescription,
+            price: calculatedPrice,
+            originalPrice: originalPrice,
+            image: cjProduct.image,
+            categoryId: categoryId, // ✅ Utiliser la catégorie mappée
+            supplierId: supplierId,
+            externalCategory: externalCategory,
+            source: 'cj-dropshipping',
+            status: 'draft', // ✅ Statut draft
+            margin: margin,
+            stock: 0,
+            
+            // Données CJ détaillées
+            cjProductId: cjProduct.cjProductId,
+            productSku: cjProduct.productSku,
+            productWeight: cjProduct.productWeight,
+            packingWeight: cjProduct.packingWeight,
+            productType: cjProduct.productType,
+            productUnit: cjProduct.productUnit,
+            productKeyEn: cjProduct.productKeyEn,
+            materialNameEn: cjProduct.materialNameEn,
+            packingNameEn: cjProduct.packingNameEn,
+            suggestSellPrice: cjProduct.suggestSellPrice,
+            listedNum: cjProduct.listedNum,
+            supplierName: cjProduct.supplierName,
+            createrTime: cjProduct.createrTime,
+            variants: cjProduct.variants,
+            cjReviews: cjProduct.reviews,
+            dimensions: cjProduct.dimensions,
+            brand: cjProduct.brand,
+            tags: cjProduct.tags,
+            
+            // Créer le mapping CJ
+            cjMapping: {
+              create: {
+                cjProductId: cjProduct.cjProductId,
+                cjSku: cjProduct.productSku || cjProduct.cjProductId
+              }
+            }
+          }
+        });
+
+        // Marquer comme importé dans CJProductStore
+        await this.prisma.cJProductStore.update({
+          where: { id: cjProduct.id },
+          data: { status: 'imported' }
+        });
+
+        console.log(`✅ [CREATE-FROM-STORE] Produit créé: ${product.name} (ID: ${product.id})`);
+        createdCount++;
+
+      } catch (error) {
+        console.error(`❌ [CREATE-FROM-STORE] Erreur lors de la création du produit ${cjProduct.name}:`, error);
+        skippedCount++;
+      }
+    }
+
+    console.log(`✅ [CREATE-FROM-STORE] ${createdCount} produit(s) créé(s), ${skippedCount} ignoré(s)`);
+
+    return {
+      count: createdCount,
+      skipped: skippedCount,
+      total: cjStoreProducts.length
+    };
+  }
+
+  /**
+   * Nettoyer le nom d'un produit
+   */
+  private cleanProductName(name: string): string {
+    if (!name) return '';
+    return name
+      .trim()
+      .replace(/\s+/g, ' ') // Espaces multiples
+      .replace(/[^\w\s-]/gi, '') // Caractères spéciaux (sauf tirets)
+      .substring(0, 200); // Limite de longueur
+  }
+
+  /**
+   * Nettoyer la description d'un produit
+   */
+  private cleanProductDescription(description: string): string {
+    if (!description) return '';
+    
+    // Supprimer les balises HTML
+    let cleaned = description
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim();
+    
+    return cleaned;
   }
 
   async updateCategoryMapping(id: string, data: {

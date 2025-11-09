@@ -244,6 +244,42 @@ export default function DraftProductsPage() {
     }
   }
 
+  const handleUpdateMappings = async () => {
+    if (!confirm('Mettre à jour automatiquement les produits draft sans catégorie qui ont un mapping ?')) {
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await apiClient.updateDraftProductsWithMapping()
+
+      if (response.data) {
+        const { total, updated } = response.data
+        toast.showToast({
+          type: 'success',
+          title: 'Succès',
+          description: `${updated} produit(s) mis à jour sur ${total} trouvé(s)`
+        })
+        loadData() // Recharger les produits
+      } else {
+        toast.showToast({
+          type: 'error',
+          title: 'Erreur',
+          description: response.error || 'Impossible de mettre à jour les produits'
+        })
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des mappings:', error)
+      toast.showToast({
+        type: 'error',
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour les produits'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const calculatePrice = (originalPrice?: number, margin?: number) => {
     if (!originalPrice || !margin) return 0
     return originalPrice * (1 + margin / 100)
@@ -311,18 +347,26 @@ export default function DraftProductsPage() {
             Éditez et publiez vos produits avant de les rendre visibles dans le catalogue
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadData}>
-            <Package className="w-4 h-4 mr-2" />
-            Actualiser
-          </Button>
-          <Link href="/admin/products">
-            <Button variant="outline">
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={loadData}>
               <Package className="w-4 h-4 mr-2" />
-              Voir tous les produits
+              Actualiser
             </Button>
-          </Link>
-        </div>
+            <Button 
+              variant="outline" 
+              onClick={handleUpdateMappings}
+              title="Mettre à jour automatiquement les produits draft sans catégorie qui ont un mapping"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Mettre à jour les catégories
+            </Button>
+            <Link href="/admin/products">
+              <Button variant="outline">
+                <Package className="w-4 h-4 mr-2" />
+                Voir tous les produits
+              </Button>
+            </Link>
+          </div>
       </div>
 
       {/* Stats */}

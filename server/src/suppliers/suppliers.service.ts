@@ -323,7 +323,7 @@ export class SuppliersService {
               supplierId: cjSupplier.id,
               externalCategory: cjProduct.category,
               source: 'cj-dropshipping',
-              status: 'pending', // Statut pour validation
+              status: 'draft', // ✅ Unifié : tous les produits passent par draft
               cjProductId: cjProduct.cjProductId, // ✅ Nouvel ID unique CJ
               productSku: cjProduct.productSku,
               suggestSellPrice: cjProduct.suggestSellPrice,

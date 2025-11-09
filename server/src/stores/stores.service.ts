@@ -9,6 +9,45 @@ export class StoresService {
     private duplicateService: DuplicatePreventionService
   ) {}
 
+  /**
+   * Mapper automatiquement une catégorie externe vers une catégorie interne
+   */
+  private async mapExternalCategory(externalCategory: string, supplierId: string): Promise<string | null> {
+    if (!externalCategory || !supplierId) {
+      return null;
+    }
+
+    console.log(`🔍 [STORES-MAP] Recherche mapping pour: "${externalCategory}" (Supplier: ${supplierId})`);
+
+    // Vérifier s'il existe un mapping pour cette catégorie externe
+    const existingMapping = await this.prisma.categoryMapping.findFirst({
+      where: {
+        supplierId: supplierId,
+        externalCategory: externalCategory
+      }
+    });
+
+    if (existingMapping) {
+      console.log(`✅ [STORES-MAP] Mapping trouvé: ${externalCategory} → ${existingMapping.internalCategory}`);
+      
+      // Vérifier si internalCategory est un ID valide
+      const category = await this.prisma.category.findUnique({
+        where: { id: existingMapping.internalCategory }
+      });
+
+      if (category) {
+        console.log(`✅ [STORES-MAP] Catégorie interne trouvée: ${category.name} (ID: ${category.id})`);
+        return category.id;
+      } else {
+        console.warn(`⚠️ [STORES-MAP] Catégorie interne non trouvée pour ID: ${existingMapping.internalCategory}`);
+      }
+    } else {
+      console.log(`❌ [STORES-MAP] Aucun mapping trouvé pour "${externalCategory}"`);
+    }
+
+    return null;
+  }
+
   // ✅ Obtenir tous les magasins disponibles
   async getAllStores() {
     const stores = [];
@@ -248,6 +287,17 @@ export class StoresService {
             continue; // Passer au produit suivant
           }
           
+          // ✅ NOUVEAU : Vérifier le mapping de catégorie automatiquement
+          let categoryId: string | null = null;
+          if (cjProduct.category) {
+            categoryId = await this.mapExternalCategory(cjProduct.category, cjSupplier.id);
+            if (categoryId) {
+              console.log(`✅ [IMPORT] Catégorie mappée automatiquement: ${cjProduct.category} → ${categoryId}`);
+            } else {
+              console.log(`⚠️ [IMPORT] Aucun mapping trouvé pour "${cjProduct.category}", produit créé sans catégorie`);
+            }
+          }
+
           // Préparer les données du produit pour l'upsert intelligent
           const productData = {
             name: cjProduct.name,
@@ -257,8 +307,9 @@ export class StoresService {
             image: cjProduct.image,
             supplierId: cjSupplier.id, // Utiliser l'ID réel du fournisseur
             externalCategory: cjProduct.category,
+            categoryId: categoryId, // ✅ Utiliser la catégorie mappée si elle existe
             source: 'cj-dropshipping',
-            status: 'pending',
+            status: 'draft', // ✅ Unifié : tous les produits passent par draft
             badge: 'nouveau',
             stock: Math.floor(Math.random() * 50) + 10,
             

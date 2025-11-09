@@ -154,10 +154,8 @@ export class ProductsService {
   }
 
   async approve(id: string) {
-    return this.prisma.product.update({
-      where: { id },
-      data: { status: 'active' },
-    });
+    // ✅ Unifié : utiliser publishProduct pour draft → active
+    return this.publishProduct(id);
   }
 
   async reject(id: string) {
@@ -168,9 +166,10 @@ export class ProductsService {
   }
 
   async getPendingProducts() {
+    // ✅ Unifié : retourner uniquement les produits draft
     return this.prisma.product.findMany({
       where: { 
-        status: { in: ['pending', 'draft'] } // ✅ Inclure les produits draft (CJ)
+        status: 'draft' // ✅ Unifié : uniquement draft
       },
       include: {
         category: true,
@@ -184,10 +183,10 @@ export class ProductsService {
   }
 
   async getProductsReadyForValidation(categoryId?: string) {
-    // Récupérer tous les produits pending et draft
+    // ✅ Unifié : récupérer uniquement les produits draft
     const products = await this.prisma.product.findMany({
       where: { 
-        status: { in: ['pending', 'draft'] } // ✅ Inclure les produits draft (CJ)
+        status: 'draft' // ✅ Unifié : uniquement draft
       },
       include: {
         category: true,
@@ -240,7 +239,7 @@ export class ProductsService {
   // ✅ Nouvelle méthode pour obtenir les produits par source
   async getProductsBySource(source?: string) {
     const whereClause: any = {
-      status: { in: ['pending', 'draft'] }
+      status: 'draft' // ✅ Unifié : uniquement draft
     };
 
     if (source) {
@@ -262,15 +261,12 @@ export class ProductsService {
 
   // ✅ Nouvelle méthode pour obtenir les statistiques de validation
   async getValidationStats() {
-    const [pending, draft] = await Promise.all([
-      this.prisma.product.count({ where: { status: 'pending' } }),
-      this.prisma.product.count({ where: { status: 'draft' } }),
-    ]);
+    // ✅ Unifié : compter uniquement les produits draft
+    const draft = await this.prisma.product.count({ where: { status: 'draft' } });
 
     return {
-      pending,
       draft,
-      total: pending + draft,
+      total: draft, // ✅ Unifié : uniquement draft
     };
   }
 
@@ -555,6 +551,45 @@ export class ProductsService {
    * Préparer un produit CJ pour publication
    * Crée un Product (draft) depuis CJProductStore
    */
+  /**
+   * Mapper automatiquement une catégorie externe vers une catégorie interne
+   */
+  private async mapExternalCategory(externalCategory: string, supplierId: string): Promise<string | null> {
+    if (!externalCategory || !supplierId) {
+      return null;
+    }
+
+    console.log(`🔍 [MAP-CATEGORY] Recherche mapping pour: "${externalCategory}" (Supplier: ${supplierId})`);
+
+    // Vérifier s'il existe un mapping pour cette catégorie externe
+    const existingMapping = await this.prisma.categoryMapping.findFirst({
+      where: {
+        supplierId: supplierId,
+        externalCategory: externalCategory
+      }
+    });
+
+    if (existingMapping) {
+      console.log(`✅ [MAP-CATEGORY] Mapping trouvé: ${externalCategory} → ${existingMapping.internalCategory}`);
+      
+      // Vérifier si internalCategory est un ID valide
+      const category = await this.prisma.category.findUnique({
+        where: { id: existingMapping.internalCategory }
+      });
+
+      if (category) {
+        console.log(`✅ [MAP-CATEGORY] Catégorie interne trouvée: ${category.name} (ID: ${category.id})`);
+        return category.id;
+      } else {
+        console.warn(`⚠️ [MAP-CATEGORY] Catégorie interne non trouvée pour ID: ${existingMapping.internalCategory}`);
+      }
+    } else {
+      console.log(`❌ [MAP-CATEGORY] Aucun mapping trouvé pour "${externalCategory}"`);
+    }
+
+    return null;
+  }
+
   async prepareCJProductForPublication(
     cjStoreProductId: string,
     prepareData: PrepareProductDto,
@@ -586,21 +621,33 @@ export class ProductsService {
       throw new BadRequestException('Ce produit CJ est déjà dans le catalogue');
     }
 
-    // 3. Nettoyage automatique (Niveau 1)
+    // 3. ✅ NOUVEAU : Vérifier le mapping de catégorie automatiquement
+    let categoryId = prepareData.categoryId;
+    if (prepareData.supplierId && cjProduct.category) {
+      const mappedCategoryId = await this.mapExternalCategory(cjProduct.category, prepareData.supplierId);
+      if (mappedCategoryId) {
+        console.log(`✅ [PREPARE] Catégorie mappée automatiquement: ${cjProduct.category} → ${mappedCategoryId}`);
+        categoryId = mappedCategoryId; // Utiliser la catégorie mappée si elle existe
+      } else {
+        console.log(`⚠️ [PREPARE] Aucun mapping trouvé, utilisation de la catégorie fournie: ${prepareData.categoryId}`);
+      }
+    }
+
+    // 4. Nettoyage automatique (Niveau 1)
     const cleanedName = this.cleanProductName(cjProduct.name);
     const cleanedDescription = this.cleanProductDescription(cjProduct.description || '');
     const margin = prepareData.margin || 30;
     const originalPrice = cjProduct.originalPrice || cjProduct.price;
     const calculatedPrice = this.calculatePriceWithMargin(originalPrice, margin);
 
-    // 4. Préparer les données pour Product
+    // 5. Préparer les données pour Product
     const productData: any = {
       name: cleanedName,
       description: cleanedDescription,
       price: calculatedPrice,
       originalPrice: originalPrice,
       image: cjProduct.image,
-      categoryId: prepareData.categoryId,
+      categoryId: categoryId, // ✅ Utiliser la catégorie mappée ou celle fournie
       supplierId: prepareData.supplierId,
       externalCategory: cjProduct.category,
       source: 'cj-dropshipping',
@@ -873,6 +920,57 @@ export class ProductsService {
     }
 
     return product;
+  }
+
+  /**
+   * Mettre à jour automatiquement les produits draft sans catégorie qui ont un mapping
+   */
+  async updateDraftProductsWithMapping() {
+    console.log('🔄 [UPDATE-DRAFT] Mise à jour des produits draft sans catégorie...');
+
+    // Récupérer tous les produits draft sans catégorie
+    const draftProductsWithoutCategory = await this.prisma.product.findMany({
+      where: {
+        status: 'draft',
+        categoryId: null,
+        externalCategory: { not: null },
+        supplierId: { not: null }
+      },
+      include: {
+        supplier: true
+      }
+    });
+
+    console.log(`📋 [UPDATE-DRAFT] ${draftProductsWithoutCategory.length} produit(s) draft sans catégorie trouvé(s)`);
+
+    let updatedCount = 0;
+
+    for (const product of draftProductsWithoutCategory) {
+      if (!product.externalCategory || !product.supplierId) {
+        continue;
+      }
+
+      // Vérifier le mapping
+      const mappedCategoryId = await this.mapExternalCategory(product.externalCategory, product.supplierId);
+
+      if (mappedCategoryId) {
+        // Mettre à jour le produit avec la catégorie mappée
+        await this.prisma.product.update({
+          where: { id: product.id },
+          data: { categoryId: mappedCategoryId }
+        });
+
+        console.log(`✅ [UPDATE-DRAFT] Produit ${product.id} mis à jour avec catégorie: ${mappedCategoryId}`);
+        updatedCount++;
+      }
+    }
+
+    console.log(`✅ [UPDATE-DRAFT] ${updatedCount} produit(s) mis à jour avec succès`);
+
+    return {
+      total: draftProductsWithoutCategory.length,
+      updated: updatedCount
+    };
   }
 }
 

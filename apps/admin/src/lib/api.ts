@@ -446,6 +446,13 @@ export class ApiClient {
     });
   }
 
+  // Mettre à jour automatiquement les produits draft sans catégorie qui ont un mapping
+  async updateDraftProductsWithMapping() {
+    return this.fetchWithAuth('/products/draft/update-mappings', {
+      method: 'POST',
+    });
+  }
+
   // ✅ MÉTHODES CJ DROPSHIPPING
   async searchCJProducts(params: {
     productName?: string;
