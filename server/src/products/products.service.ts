@@ -972,5 +972,56 @@ export class ProductsService {
       updated: updatedCount
     };
   }
+
+  // ===== NOTIFICATIONS DE MISE À JOUR DE PRODUITS =====
+
+  async getUpdateNotifications(unreadOnly: boolean = false, limit: number = 50) {
+    const where: any = {};
+    if (unreadOnly) {
+      where.isRead = false;
+    }
+
+    const notifications = await this.prisma.productUpdateNotification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+
+    // Parser les changements JSON
+    const formattedNotifications = notifications.map(notif => ({
+      ...notif,
+      changes: notif.changes ? JSON.parse(notif.changes) : []
+    }));
+
+    return {
+      notifications: formattedNotifications,
+      total: await this.prisma.productUpdateNotification.count({ where }),
+      unreadCount: await this.prisma.productUpdateNotification.count({ where: { isRead: false } })
+    };
+  }
+
+  async markNotificationAsRead(id: string) {
+    return this.prisma.productUpdateNotification.update({
+      where: { id },
+      data: {
+        isRead: true,
+        readAt: new Date()
+      }
+    });
+  }
+
+  async markAllNotificationsAsRead() {
+    const result = await this.prisma.productUpdateNotification.updateMany({
+      where: { isRead: false },
+      data: {
+        isRead: true,
+        readAt: new Date()
+      }
+    });
+
+    return {
+      updated: result.count
+    };
+  }
 }
 

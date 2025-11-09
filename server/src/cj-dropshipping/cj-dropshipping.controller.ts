@@ -12,7 +12,7 @@ import {
     Query,
     Req
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 // 🔧 ANCIEN SERVICE SUPPRIMÉ - Remplacé par CJMainService
@@ -313,18 +313,70 @@ export class CJDropshippingController {
 
   // ===== WEBHOOKS =====
 
+  @Get('webhooks')
+  @ApiOperation({ summary: 'Endpoint de test pour CJ Dropshipping (vérification URL)' })
+  @ApiResponse({ status: 200, description: 'Endpoint accessible' })
+  async testWebhookEndpoint(@Req() request: Request) {
+    this.logger.log('✅ Test endpoint webhook appelé par CJ Dropshipping');
+    return {
+      code: 200,
+      result: true,
+      message: 'Webhook endpoint is accessible',
+      data: {
+        endpoint: '/api/cj-dropshipping/webhooks',
+        method: 'POST',
+        status: 'ready'
+      },
+      requestId: 'test-' + Date.now()
+    };
+  }
+
   @Post('webhooks')
   @HttpCode(HttpStatus.OK) // ✅ Réponse 200 OK requise par CJ
   @ApiOperation({ summary: 'Recevoir les webhooks CJ Dropshipping' })
-  @ApiResponse({ status: 200, description: 'Webhook traité avec succès' })
-  @ApiResponse({ status: 400, description: 'Payload invalide' })
-  @ApiResponse({ status: 500, description: 'Erreur de traitement' })
-  async handleWebhook(@Body() dto: CJWebhookDto, @Req() request: Request) {
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Webhook reçu et traité (format conforme CJ)',
+    schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'number', example: 200 },
+        result: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Success' },
+        data: { type: 'object' },
+        requestId: { type: 'string' }
+      }
+    }
+  })
+  async handleWebhook(@Body() dto: any, @Req() request: Request) {
     const startTime = Date.now();
     
-    // ✅ Validation HTTPS (en production)
+    // ✅ Gérer les requêtes de test de CJ Dropshipping (sans body ou body vide)
+    if (!dto || !dto.messageId) {
+      this.logger.log('✅ Test de connexion webhook par CJ Dropshipping');
+      return {
+        code: 200,
+        result: true,
+        message: 'Webhook endpoint is ready',
+        data: {
+          endpoint: '/api/cj-dropshipping/webhooks',
+          status: 'ready',
+          timestamp: new Date().toISOString()
+        },
+        requestId: 'test-' + Date.now()
+      };
+    }
+    
+    // ✅ VALIDATION HTTPS STRICTE
     if (process.env.NODE_ENV === 'production' && request.protocol !== 'https') {
-      throw new BadRequestException('HTTPS requis pour les webhooks');
+      this.logger.error('❌ Webhook reçu en HTTP (HTTPS requis)');
+      return {
+        code: 200,
+        result: false,
+        message: 'HTTPS required in production',
+        data: null,
+        requestId: dto.messageId || 'unknown'
+      };
     }
 
     try {
@@ -344,40 +396,206 @@ export class CJDropshippingController {
         this.logger.warn(`⚠️  Webhook traité en ${processingTime}ms (> 3s limite CJ)`);
       }
 
-      // ✅ Retourner toujours 200 OK comme requis par CJ
+      this.logger.log(`✅ Webhook traité en ${processingTime}ms`);
+
+      // ✅ FORMAT CONFORME À LA DOC CJ
       return {
-        success: result.success,
-        messageId: result.messageId,
-        processingTimeMs: processingTime,
-        ...(result.error && { error: result.error })
+        code: 200,
+        result: true,
+        message: 'Success',
+        data: {
+          messageId: payload.messageId,
+          type: payload.type,
+          processingTimeMs: processingTime,
+          processed: true,
+          details: result
+        },
+        requestId: payload.messageId
       };
 
-    } catch (error) {
-      // ✅ Logger l'erreur mais retourner 200 pour éviter les retry CJ
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-      this.logger.error(`❌ Erreur webhook [${dto.messageId}]:`, errorMessage);
+    } catch (error: any) {
+      const processingTime = Date.now() - startTime;
       
+      this.logger.error('❌ Erreur traitement webhook:', error);
+
+      // ✅ TOUJOURS RETOURNER 200 OK (requis par CJ)
       return {
-        success: false,
-        messageId: dto.messageId,
-        error: errorMessage,
-        processingTimeMs: Date.now() - startTime
+        code: 200,
+        result: false,
+        message: error.message || 'Processing error',
+        data: {
+          messageId: dto.messageId,
+          type: dto.type,
+          processingTimeMs: processingTime,
+          error: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        },
+        requestId: dto.messageId
       };
     }
   }
 
   @Post('webhooks/configure')
-  @ApiOperation({ summary: 'Configurer les webhooks CJ' })
-  @ApiResponse({ status: 200, description: 'Webhooks configurés' })
-  async configureWebhooks(@Body() body: { enable: boolean }) {
-    return this.cjMainService.configureWebhooks(body.enable);
+  @ApiOperation({ 
+    summary: 'Configurer les webhooks CJ Dropshipping',
+    description: 'Active ou désactive les webhooks avec l\'URL de callback. Conforme à la doc CJ : POST /webhook/set'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        enable: { 
+          type: 'boolean', 
+          description: 'Activer (true) ou désactiver (false) les webhooks',
+          example: true
+        },
+        callbackUrl: { 
+          type: 'string', 
+          description: 'URL de callback HTTPS pour recevoir les webhooks',
+          example: 'https://votre-domaine.com/api/cj-dropshipping/webhooks'
+        },
+        types: { 
+          type: 'array', 
+          items: { type: 'string', enum: ['product', 'stock', 'order', 'logistics'] },
+          description: 'Types de webhooks à configurer (optionnel, tous par défaut)',
+          example: ['product', 'stock', 'order', 'logistics']
+        }
+      },
+      required: ['enable', 'callbackUrl']
+    }
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Webhooks configurés avec succès',
+    schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'number', example: 200 },
+        result: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Webhooks configured successfully' },
+        data: { type: 'object' },
+        requestId: { type: 'string' }
+      }
+    }
+  })
+  async configureWebhooks(
+    @Body() config: { 
+      enable: boolean; 
+      callbackUrl?: string;
+      types?: ('product' | 'stock' | 'order' | 'logistics')[];
+    }
+  ) {
+    // Validation de l'URL : HTTPS obligatoire (même en local, CJ Dropshipping exige HTTPS)
+    // Pour tester en local, utilisez un tunnel HTTPS (ngrok, Cloudflare Tunnel, etc.)
+    if (config.enable) {
+      if (!config.callbackUrl) {
+        return {
+          code: 200,
+          result: false,
+          message: 'Callback URL is required when enabling webhooks',
+          data: {
+            error: 'Callback URL is required',
+            suggestion: 'Please provide a callbackUrl in the request body'
+          },
+          requestId: 'config-validation-' + Date.now()
+        };
+      }
+      if (!config.callbackUrl.startsWith('https://')) {
+        return {
+          code: 200,
+          result: false,
+          message: 'Callback URL must use HTTPS protocol. CJ Dropshipping requires HTTPS even for local testing. Use ngrok or similar tunnel.',
+          data: {
+            error: 'HTTPS required by CJ Dropshipping API',
+            suggestion: 'For local testing, use ngrok: ngrok http 3001'
+          },
+          requestId: 'config-validation-' + Date.now()
+        };
+      }
+    }
+
+    return this.cjWebhookService.configureWebhooks(
+      config.enable,
+      config.callbackUrl || '',
+      config.types
+    );
+  }
+
+  @Get('webhooks/status')
+  @ApiOperation({ 
+    summary: 'Obtenir le statut de configuration des webhooks',
+    description: 'Récupère le statut actuel des webhooks (activé/désactivé, URL, types)'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Statut des webhooks',
+    schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'number', example: 200 },
+        result: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Webhook status retrieved' },
+        data: { 
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean' },
+            configured: { type: 'boolean' },
+            callbackUrl: { type: 'string' },
+            types: { type: 'array', items: { type: 'string' } },
+            lastUpdated: { type: 'string', format: 'date-time' }
+          }
+        },
+        requestId: { type: 'string' }
+      }
+    }
+  })
+  async getWebhookStatus() {
+    return this.cjWebhookService.getWebhookStatus();
   }
 
   @Get('webhooks/logs')
-  @ApiOperation({ summary: 'Obtenir les logs des webhooks' })
-  @ApiResponse({ status: 200, description: 'Logs des webhooks' })
-  async getWebhookLogs(@Query() query: any) {
-    return this.cjMainService.getWebhookLogs(query);
+  @ApiOperation({ 
+    summary: 'Obtenir les logs des webhooks reçus',
+    description: 'Liste tous les webhooks reçus avec leur statut de traitement'
+  })
+  @ApiQuery({ name: 'type', required: false, description: 'Filtrer par type (PRODUCT, VARIANT, STOCK, ORDER, etc.)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filtrer par statut (RECEIVED, PROCESSED, ERROR)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre de résultats (défaut: 100)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Offset pour pagination (défaut: 0)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Logs des webhooks',
+    schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'number', example: 200 },
+        result: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Webhook logs retrieved' },
+        data: { 
+          type: 'object',
+          properties: {
+            logs: { type: 'array', items: { type: 'object' } },
+            total: { type: 'number' },
+            limit: { type: 'number' },
+            offset: { type: 'number' }
+          }
+        },
+        requestId: { type: 'string' }
+      }
+    }
+  })
+  async getWebhookLogs(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number
+  ) {
+    return this.cjWebhookService.getWebhookLogs({
+      type,
+      status,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined
+    });
   }
 
   // ===== STATISTIQUES =====

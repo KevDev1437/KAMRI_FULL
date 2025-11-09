@@ -130,12 +130,23 @@ export class CJMainService {
     return this.cjWebhookService.handleWebhook(type, payload);
   }
 
-  async configureWebhooks(enable: boolean) {
-    return this.cjWebhookService.configureWebhooks(enable);
+  async configureWebhooks(enable: boolean, callbackUrl?: string, types?: ('product' | 'stock' | 'order' | 'logistics')[]) {
+    // Si callbackUrl n'est pas fourni, utiliser une URL par défaut ou désactiver
+    if (!callbackUrl && enable) {
+      // Pour la compatibilité, si enable est true mais pas de callbackUrl, on désactive
+      return this.cjWebhookService.configureWebhooks(false, '', types || []);
+    }
+    return this.cjWebhookService.configureWebhooks(enable, callbackUrl || '', types || ['product', 'stock', 'order', 'logistics']);
   }
 
-  async getWebhookLogs(query: any) {
-    return this.cjWebhookService.getWebhookLogs(query);
+  async getWebhookLogs(query?: any) {
+    // Adapter le format de query pour le nouveau format
+    return this.cjWebhookService.getWebhookLogs({
+      type: query?.type,
+      status: query?.status,
+      limit: query?.limit,
+      offset: query?.offset
+    });
   }
 
   // ===== MÉTHODES MANQUANTES (pour compatibilité) =====

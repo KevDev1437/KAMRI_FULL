@@ -135,6 +135,18 @@ export class CJWebhookService {
         modifiedFields: params.fields
       }, duplicateCheck);
 
+      // ✅ Créer une notification de mise à jour
+      if (upsertResult.productId) {
+        await this.createProductUpdateNotification({
+          productId: upsertResult.productId,
+          cjProductId: params.pid,
+          webhookType: 'PRODUCT',
+          webhookMessageId: messageId,
+          changes: params.fields,
+          productName: params.productName || params.productNameEn || `Produit CJ ${params.pid}`
+        });
+      }
+
       return {
         success: true,
         messageId,
@@ -221,6 +233,20 @@ export class CJWebhookService {
       });
 
       this.logger.log(`✅ Variante ${params.vid} mise à jour: ${variant.id}`);
+
+      // ✅ Créer une notification de mise à jour
+      const pid = (params as any).pid || existingProduct.cjProductId;
+      if (pid && existingProduct) {
+        await this.createProductUpdateNotification({
+          productId: existingProduct.id,
+          cjProductId: pid,
+          cjVariantId: params.vid,
+          webhookType: 'VARIANT',
+          webhookMessageId: messageId,
+          changes: params.fields,
+          productName: existingProduct.name
+        });
+      }
 
       return {
         success: true,
@@ -521,62 +547,286 @@ export class CJWebhookService {
   }
 
   /**
-   * Configurer les webhooks (pour compatibilité avec CJMainService)
+   * Configurer les webhooks CJ Dropshipping
+   * Doc : POST https://developers.cjdropshipping.com/api2.0/v1/webhook/set
+   * Format conforme à la documentation officielle CJ
    */
-  async configureWebhooks(enable: boolean): Promise<any> {
-    this.logger.log(`📡 Configuration webhooks CJ: ${enable ? 'activé' : 'désactivé'}`);
-    
-    // Mettre à jour la configuration CJ - pour l'instant juste un flag enabled général
-    const config = await this.prisma.cJConfig.findFirst();
-    if (config) {
-      await this.prisma.cJConfig.update({
-        where: { id: config.id },
-        data: { 
-          enabled: enable, // Utiliser le champ enabled existant
-          updatedAt: new Date()
-        }
-      });
+  async configureWebhooks(
+    enable: boolean,
+    callbackUrl: string,
+    types: ('product' | 'stock' | 'order' | 'logistics')[] = ['product', 'stock', 'order', 'logistics']
+  ): Promise<{
+    code: number;
+    result: boolean;
+    message: string;
+    data: any;
+    requestId: string;
+  }> {
+    this.logger.log('🔧 === CONFIGURATION WEBHOOKS CJ ===');
+    this.logger.log(`   Action: ${enable ? 'ENABLE' : 'CANCEL'}`);
+    this.logger.log(`   URL: ${callbackUrl}`);
+    this.logger.log(`   Types: ${types.join(', ')}`);
+
+    // Validation de l'URL : HTTPS obligatoire (même en local, CJ Dropshipping exige HTTPS)
+    // Pour tester en local, utilisez un tunnel HTTPS (ngrok, Cloudflare Tunnel, etc.)
+    if (enable) {
+      if (!callbackUrl.startsWith('https://')) {
+        // ✅ Retourner le format CJ au lieu de lancer une exception
+        return {
+          code: 200,
+          result: false,
+          message: 'Callback URL must use HTTPS protocol. CJ Dropshipping requires HTTPS even for local testing. Use ngrok or similar tunnel: https://ngrok.com/',
+          data: {
+            error: 'HTTPS required by CJ Dropshipping API',
+            suggestion: 'For local testing, use ngrok: ngrok http 3001'
+          },
+          requestId: 'config-validation-' + Date.now()
+        };
+      }
     }
 
-    return {
-      success: true,
-      webhooksEnabled: enable,
-      message: `Webhooks ${enable ? 'activés' : 'désactivés'} avec succès`
-    };
+    // Construire la configuration selon la doc CJ
+    const config: any = {};
+    
+    types.forEach(type => {
+      config[type] = {
+        type: enable ? 'ENABLE' : 'CANCEL',
+        callbackUrls: [callbackUrl]
+      };
+    });
+
+    this.logger.log('📝 Configuration à envoyer:', JSON.stringify(config, null, 2));
+
+    try {
+      // Récupérer la configuration CJ
+      const cjConfig = await this.prisma.cJConfig.findFirst();
+      if (!cjConfig || !cjConfig.enabled) {
+        throw new Error('Configuration CJ Dropshipping non trouvée ou désactivée');
+      }
+
+      // Initialiser le client CJ avec la config
+      this.cjApiClient.setConfig({
+        email: cjConfig.email,
+        apiKey: cjConfig.apiKey,
+        tier: cjConfig.tier as any,
+        platformToken: cjConfig.platformToken || undefined
+      });
+
+      // S'assurer que le client est authentifié
+      await this.cjApiClient.login();
+      
+      // Appel API CJ pour configurer les webhooks
+      this.logger.log('📡 Envoi de la configuration à CJ Dropshipping...');
+      const response = await this.cjApiClient.makeRequest('POST', '/webhook/set', config);
+
+      this.logger.log('📥 Réponse CJ:', JSON.stringify(response, null, 2));
+
+      if (response.code === 200 && response.result) {
+        this.logger.log('✅ Webhooks configurés avec succès sur CJ');
+        
+        // Enregistrer la configuration dans la base de données
+        await this.saveWebhookConfig(enable, callbackUrl, types);
+        
+        return {
+          code: 200,
+          result: true,
+          message: 'Webhooks configured successfully',
+          data: {
+            enabled: enable,
+            callbackUrl,
+            types,
+            configuredAt: new Date(),
+            cjResponse: response.data
+          },
+          requestId: response.requestId || `config-${Date.now()}`
+        };
+      } else {
+        throw new Error(response.message || 'Failed to configure webhooks on CJ platform');
+      }
+    } catch (error: any) {
+      this.logger.error('❌ Erreur configuration webhooks:', error);
+      // ✅ Retourner le format CJ au lieu de lancer une exception
+      return {
+        code: 200,
+        result: false,
+        message: error.message || 'Webhook configuration failed',
+        data: {
+          error: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        },
+        requestId: 'config-error-' + Date.now()
+      };
+    }
   }
 
   /**
-   * Obtenir les logs de webhooks (pour compatibilité avec CJMainService)
+   * Sauvegarder la configuration des webhooks dans la base de données
    */
-  async getWebhookLogs(query?: any): Promise<any> {
-    const { 
-      limit = 50, 
-      offset = 0, 
-      type, 
-      status,
-      since 
-    } = query || {};
+  private async saveWebhookConfig(
+    enabled: boolean,
+    callbackUrl: string,
+    types: string[]
+  ): Promise<void> {
+    this.logger.log('💾 Sauvegarde de la configuration dans la base de données...');
+    
+    try {
+      // Récupérer la config CJ existante
+      const config = await this.prisma.cJConfig.findFirst();
+      
+      if (config) {
+        await this.prisma.cJConfig.update({
+          where: { id: config.id },
+          data: {
+            webhookEnabled: enabled,
+            webhookUrl: callbackUrl,
+            webhookTypes: types.join(','),
+            updatedAt: new Date()
+          }
+        });
+        this.logger.log('✅ Configuration sauvegardée dans CJConfig');
+      } else {
+        this.logger.warn('⚠️ Aucune configuration CJ trouvée pour sauvegarder les webhooks');
+      }
+    } catch (error: any) {
+      this.logger.error('❌ Erreur sauvegarde config webhooks:', error);
+      // Ne pas bloquer si la sauvegarde échoue
+    }
+  }
 
-    const where: any = {};
-    if (type) where.type = type;
-    if (status) where.status = status;
-    if (since) where.receivedAt = { gte: new Date(since) };
+  /**
+   * Obtenir le statut de configuration des webhooks
+   */
+  async getWebhookStatus(): Promise<{
+    code: number;
+    result: boolean;
+    message: string;
+    data: any;
+    requestId: string;
+  }> {
+    this.logger.log('🔍 Récupération du statut des webhooks...');
+    
+    try {
+      const config = await this.prisma.cJConfig.findFirst();
+      
+      if (!config) {
+        return {
+          code: 200,
+          result: true,
+          message: 'No webhook configuration found',
+          data: {
+            enabled: false,
+            configured: false,
+            message: 'No CJ configuration found. Please configure CJ Dropshipping first.'
+          },
+          requestId: 'status-' + Date.now()
+        };
+      }
 
-    // Utiliser le modèle WebhookLog correct avec la bonne casse
-    const logs = await this.prisma.webhookLog.findMany({
-      where,
-      orderBy: { receivedAt: 'desc' },
-      take: limit,
-      skip: offset
-    });
+      const status = {
+        enabled: config.webhookEnabled || false,
+        configured: !!config.webhookUrl,
+        callbackUrl: config.webhookUrl || null,
+        types: config.webhookTypes ? config.webhookTypes.split(',') : [],
+        lastUpdated: config.updatedAt
+      };
 
-    const total = await this.prisma.webhookLog.count({ where });
+      this.logger.log('✅ Statut webhooks:', JSON.stringify(status, null, 2));
 
-    return {
-      logs,
-      total,
-      page: Math.floor(offset / limit) + 1,
-      limit
-    };
+      return {
+        code: 200,
+        result: true,
+        message: 'Webhook status retrieved',
+        data: status,
+        requestId: 'status-' + Date.now()
+      };
+    } catch (error: any) {
+      this.logger.error('❌ Erreur récupération statut webhooks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les logs des webhooks
+   * Format conforme à la documentation CJ
+   */
+  async getWebhookLogs(filters?: {
+    type?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    code: number;
+    result: boolean;
+    message: string;
+    data: any;
+    requestId: string;
+  }> {
+    this.logger.log('📋 Récupération des logs webhooks...');
+    
+    try {
+      const where: any = {};
+      
+      if (filters?.type) where.type = filters.type;
+      if (filters?.status) where.status = filters.status;
+
+      const logs = await this.prisma.webhookLog.findMany({
+        where,
+        orderBy: { receivedAt: 'desc' },
+        take: filters?.limit || 100,
+        skip: filters?.offset || 0
+      });
+
+      const total = await this.prisma.webhookLog.count({ where });
+
+      this.logger.log(`✅ ${logs.length} logs récupérés (total: ${total})`);
+
+      return {
+        code: 200,
+        result: true,
+        message: 'Webhook logs retrieved',
+        data: {
+          logs,
+          total,
+          limit: filters?.limit || 100,
+          offset: filters?.offset || 0
+        },
+        requestId: 'logs-' + Date.now()
+      };
+    } catch (error: any) {
+      this.logger.error('❌ Erreur récupération logs webhooks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Créer une notification de mise à jour de produit
+   */
+  private async createProductUpdateNotification(data: {
+    productId?: string;
+    cjProductId: string;
+    cjVariantId?: string;
+    webhookType: string;
+    webhookMessageId: string;
+    changes: string[];
+    productName?: string;
+  }): Promise<void> {
+    try {
+      await this.prisma.productUpdateNotification.create({
+        data: {
+          productId: data.productId || null,
+          cjProductId: data.cjProductId,
+          cjVariantId: data.cjVariantId || null,
+          webhookType: data.webhookType,
+          webhookMessageId: data.webhookMessageId,
+          changes: JSON.stringify(data.changes),
+          productName: data.productName || `Produit CJ ${data.cjProductId}`,
+          isRead: false
+        }
+      });
+      this.logger.log(`🔔 Notification créée pour produit ${data.cjProductId} (${data.webhookType})`);
+    } catch (error) {
+      // Ne pas bloquer le traitement du webhook si la notification échoue
+      this.logger.warn(`⚠️ Erreur lors de la création de la notification:`, error);
+    }
   }
 }

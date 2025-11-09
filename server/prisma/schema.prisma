@@ -362,6 +362,11 @@ model CJConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // ✅ Configuration des webhooks
+  webhookEnabled  Boolean?  @default(false) // Webhooks activés ou non
+  webhookUrl      String?                   // URL de callback HTTPS
+  webhookTypes    String?                   // Types configurés (product,stock,order,logistics)
+
   @@map("cj_configs")
 }
 
@@ -469,6 +474,26 @@ model CJWebhookLog {
 
   @@index([type, processed])
   @@map("cj_webhook_logs")
+}
+
+// Notifications de mise à jour de produits via webhooks
+model ProductUpdateNotification {
+  id               String    @id @default(cuid())
+  productId        String?   // ID du produit KAMRI (peut être null si produit non importé)
+  cjProductId      String    // ID produit CJ (pid)
+  cjVariantId      String?   // ID variante CJ (vid) si c'est une variante
+  webhookType      String    // PRODUCT, VARIANT, STOCK, etc.
+  webhookMessageId String    // ID du message webhook
+  changes          String?   // JSON string des champs modifiés
+  productName      String?   // Nom du produit (pour affichage)
+  isRead           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  readAt           DateTime?
+
+  @@index([isRead, createdAt])
+  @@index([productId])
+  @@index([cjProductId])
+  @@map("product_update_notifications")
 }
 
 

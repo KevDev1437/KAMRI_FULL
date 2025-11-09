@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetUser } from '../auth/get-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -221,6 +221,39 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Produits mis à jour avec succès' })
   async updateDraftProductsWithMapping() {
     return this.productsService.updateDraftProductsWithMapping();
+  }
+
+  // ===== NOTIFICATIONS DE MISE À JOUR DE PRODUITS =====
+
+  @Get('update-notifications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir les notifications de mise à jour de produits via webhooks' })
+  @ApiResponse({ status: 200, description: 'Notifications récupérées avec succès' })
+  @ApiQuery({ name: 'unread', required: false, type: Boolean, description: 'Filtrer uniquement les notifications non lues' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre de notifications à retourner' })
+  getUpdateNotifications(@Query('unread') unread?: string, @Query('limit') limit?: number) {
+    const unreadOnly = unread === 'true';
+    const limitNum = limit ? Number(limit) : 50;
+    return this.productsService.getUpdateNotifications(unreadOnly, limitNum);
+  }
+
+  @Patch('update-notifications/:id/read')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Marquer une notification comme lue' })
+  @ApiResponse({ status: 200, description: 'Notification marquée comme lue' })
+  markNotificationAsRead(@Param('id') id: string) {
+    return this.productsService.markNotificationAsRead(id);
+  }
+
+  @Patch('update-notifications/read-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Marquer toutes les notifications comme lues' })
+  @ApiResponse({ status: 200, description: 'Toutes les notifications marquées comme lues' })
+  markAllNotificationsAsRead() {
+    return this.productsService.markAllNotificationsAsRead();
   }
 }
 

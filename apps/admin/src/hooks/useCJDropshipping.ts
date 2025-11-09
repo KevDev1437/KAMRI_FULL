@@ -369,14 +369,36 @@ export const useCJDropshipping = () => {
 
   // ===== WEBHOOKS =====
 
-  const configureWebhooks = async (enable: boolean): Promise<any> => {
+  const configureWebhooks = async (
+    enable: boolean,
+    callbackUrl?: string,
+    types?: ('product' | 'stock' | 'order' | 'logistics')[]
+  ): Promise<any> => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.post('/webhooks/configure', { enable });
+      const { data } = await api.post('/webhooks/configure', {
+        enable,
+        callbackUrl,
+        types: types || ['product', 'stock', 'order', 'logistics']
+      });
       return data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erreur lors de la configuration des webhooks');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getWebhookStatus = async (): Promise<any> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/webhooks/status');
+      return data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Erreur lors de la récupération du statut des webhooks');
       throw err;
     } finally {
       setLoading(false);
@@ -602,6 +624,7 @@ export const useCJDropshipping = () => {
     calculateShipping,
     getTracking,
     configureWebhooks,
+    getWebhookStatus,
     getWebhookLogs,
     getStats,
     getCategories,

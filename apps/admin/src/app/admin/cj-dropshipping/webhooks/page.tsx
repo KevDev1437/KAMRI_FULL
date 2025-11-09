@@ -2,33 +2,79 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJWebhookLog } from '@/types/cj.types';
 import { useEffect, useState } from 'react';
+import { Copy, Check, ExternalLink } from 'lucide-react';
 
 export default function CJWebhooksPage() {
   const {
     loading,
     error,
     configureWebhooks,
+    getWebhookStatus,
     getWebhookLogs,
   } = useCJDropshipping();
 
   const [webhookLogs, setWebhookLogs] = useState<CJWebhookLog[]>([]);
   const [configuring, setConfiguring] = useState(false);
   const [webhooksEnabled, setWebhooksEnabled] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<any>(null);
+  const [callbackUrl, setCallbackUrl] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<('product' | 'stock' | 'order' | 'logistics')[]>(['product', 'stock', 'order', 'logistics']);
+  const [copied, setCopied] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     loadWebhookLogs();
+    loadWebhookStatus();
+    // Détecter automatiquement l'URL ngrok ou utiliser l'URL par défaut
+    detectCallbackUrl();
   }, []);
+
+  const detectCallbackUrl = () => {
+    // Détecter automatiquement l'URL ngrok depuis window.location si disponible
+    // Sinon, utiliser l'URL par défaut
+    const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const isNgrok = currentHost.includes('ngrok') || currentHost.includes('ngrok-free.dev');
+    
+    if (isNgrok && typeof window !== 'undefined') {
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      setCallbackUrl(`${protocol}//${host}/api/cj-dropshipping/webhooks`);
+    } else {
+      // URL par défaut (sera remplacée par ngrok en production)
+      setCallbackUrl('https://pinacoidal-pat-unlasting.ngrok-free.dev/api/cj-dropshipping/webhooks');
+    }
+  };
+
+  const loadWebhookStatus = async () => {
+    try {
+      const response = await getWebhookStatus();
+      if (response?.data) {
+        setWebhookStatus(response.data);
+        setWebhooksEnabled(response.data.enabled || false);
+        if (response.data.callbackUrl) {
+          setCallbackUrl(response.data.callbackUrl);
+        }
+        if (response.data.types && Array.isArray(response.data.types)) {
+          setSelectedTypes(response.data.types as any);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement du statut:', err);
+    }
+  };
 
   const loadWebhookLogs = async () => {
     try {
       const response = await getWebhookLogs();
       // L'API retourne { logs: [], total, page, limit }
-      const logs = response?.logs || response || [];
+      const logs = response?.data?.logs || response?.logs || response || [];
       setWebhookLogs(Array.isArray(logs) ? logs : []);
     } catch (err) {
       console.error('Erreur lors du chargement des logs:', err);
@@ -37,16 +83,48 @@ export default function CJWebhooksPage() {
   };
 
   const handleConfigureWebhooks = async (enable: boolean) => {
+    if (enable && !callbackUrl) {
+      toast.showToast({ type: 'error', title: 'Webhooks', description: '❌ URL de callback requise pour activer les webhooks' });
+      return;
+    }
+
+    if (enable && !callbackUrl.startsWith('https://')) {
+      toast.showToast({ type: 'error', title: 'Webhooks', description: '❌ L\'URL de callback doit utiliser HTTPS (utilisez ngrok pour le développement local)' });
+      return;
+    }
+
     setConfiguring(true);
     try {
-      await configureWebhooks(enable);
+      const result = await configureWebhooks(enable, enable ? callbackUrl : undefined, enable ? selectedTypes : undefined);
       setWebhooksEnabled(enable);
-      toast.showToast({ type: 'success', title: 'Webhooks', description: enable ? '✅ Webhooks activés avec succès' : '✅ Webhooks désactivés avec succès' });
-    } catch (err) {
-      toast.showToast({ type: 'error', title: 'Webhooks', description: '❌ Erreur lors de la configuration des webhooks' });
+      if (result?.result) {
+        toast.showToast({ type: 'success', title: 'Webhooks', description: enable ? '✅ Webhooks activés avec succès' : '✅ Webhooks désactivés avec succès' });
+        await loadWebhookStatus();
+      } else {
+        toast.showToast({ type: 'error', title: 'Webhooks', description: result?.message || '❌ Erreur lors de la configuration des webhooks' });
+      }
+    } catch (err: any) {
+      toast.showToast({ type: 'error', title: 'Webhooks', description: err?.response?.data?.message || '❌ Erreur lors de la configuration des webhooks' });
     } finally {
       setConfiguring(false);
     }
+  };
+
+  const handleCopyUrl = () => {
+    if (typeof window !== 'undefined' && callbackUrl) {
+      navigator.clipboard.writeText(callbackUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.showToast({ type: 'success', title: 'Copié', description: 'URL copiée dans le presse-papiers' });
+    }
+  };
+
+  const toggleWebhookType = (type: 'product' | 'stock' | 'order' | 'logistics') => {
+    setSelectedTypes(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
   };
 
   const getWebhookTypeColor = (type: string) => {
@@ -89,6 +167,67 @@ export default function CJWebhooksPage() {
     });
   };
 
+  // Formater le payload JSON pour un affichage lisible
+  const formatPayload = (payload: string | any): any => {
+    if (typeof payload === 'string') {
+      try {
+        return JSON.parse(payload);
+      } catch (e) {
+        return payload;
+      }
+    }
+    return payload;
+  };
+
+  // Extraire les informations importantes du payload selon le type
+  const extractPayloadInfo = (log: CJWebhookLog) => {
+    const payload = formatPayload(log.payload);
+    const params = payload?.params || payload || {};
+
+    if (log.type === 'VARIANT') {
+      return {
+        pid: params.pid || 'N/A',
+        vid: params.vid || 'N/A',
+        variantName: params.variantName || 'N/A',
+        variantSku: params.variantSku || 'N/A',
+        variantSellPrice: params.variantSellPrice || 'N/A',
+        variantImage: params.variantImage || null,
+        variantKey: params.variantKey || 'N/A',
+        variantValue1: params.variantValue1 || 'N/A',
+        variantValue2: params.variantValue2 || 'N/A',
+        variantWeight: params.variantWeight || 'N/A',
+        variantLength: params.variantLength || 'N/A',
+        variantWidth: params.variantWidth || 'N/A',
+        variantHeight: params.variantHeight || 'N/A',
+        fields: params.fields || []
+      };
+    } else if (log.type === 'PRODUCT') {
+      return {
+        pid: params.pid || 'N/A',
+        productName: params.productName || params.productNameEn || 'N/A',
+        productSku: params.productSku || 'N/A',
+        productSellPrice: params.productSellPrice || 'N/A',
+        productImage: params.productImage || null,
+        categoryName: params.categoryName || 'N/A',
+        fields: params.fields || []
+      };
+    } else if (log.type === 'STOCK') {
+      return {
+        variants: Object.keys(params).length || 0,
+        stockData: params
+      };
+    } else if (log.type === 'ORDER') {
+      return {
+        orderNumber: params.orderNumber || 'N/A',
+        cjOrderId: params.cjOrderId || 'N/A',
+        orderStatus: params.orderStatus || 'N/A',
+        fields: params.fields || []
+      };
+    }
+
+    return params;
+  };
+
   return (
     <div className="p-6">
       <div className="mb-8">
@@ -120,16 +259,76 @@ export default function CJWebhooksPage() {
                 }`}>
                   {webhooksEnabled ? 'Activés' : 'Désactivés'}
                 </p>
+                {webhookStatus?.callbackUrl && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    URL: {webhookStatus.callbackUrl}
+                  </p>
+                )}
               </div>
               <div className={`w-3 h-3 rounded-full ${
                 webhooksEnabled ? 'bg-green-500' : 'bg-red-500'
               }`}></div>
             </div>
 
+            {/* Champ URL de callback */}
+            <div className="space-y-2">
+              <Label htmlFor="callbackUrl">URL de callback (HTTPS requis)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="callbackUrl"
+                  type="text"
+                  value={callbackUrl}
+                  onChange={(e) => setCallbackUrl(e.target.value)}
+                  placeholder="https://votre-domaine.com/api/cj-dropshipping/webhooks"
+                  className="flex-1"
+                  disabled={configuring}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyUrl}
+                  title="Copier l'URL"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                💡 Pour le développement local, utilisez ngrok : <code className="bg-gray-100 px-1 rounded">ngrok http 3001</code>
+              </p>
+            </div>
+
+            {/* Sélection des types de webhooks */}
+            <div className="space-y-2">
+              <Label>Types de webhooks à activer</Label>
+              <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
+                {[
+                  { value: 'product' as const, label: 'Product - Changements de produits' },
+                  { value: 'stock' as const, label: 'Stock - Mises à jour de stock' },
+                  { value: 'order' as const, label: 'Order - Changements de commandes' },
+                  { value: 'logistics' as const, label: 'Logistics - Informations de tracking' }
+                ].map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`webhook-type-${value}`}
+                      checked={selectedTypes.includes(value)}
+                      onCheckedChange={() => toggleWebhookType(value)}
+                      disabled={configuring}
+                    />
+                    <Label
+                      htmlFor={`webhook-type-${value}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-3">
               <Button
                 onClick={() => handleConfigureWebhooks(true)}
-                disabled={configuring || webhooksEnabled}
+                disabled={configuring || webhooksEnabled || !callbackUrl || selectedTypes.length === 0}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 {configuring ? 'Configuration...' : 'Activer les webhooks'}
@@ -148,24 +347,61 @@ export default function CJWebhooksPage() {
         </Card>
 
         <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Informations</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Informations</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadWebhookStatus}
+              disabled={loading}
+            >
+              Actualiser
+            </Button>
+          </div>
           
           <div className="space-y-4">
             <div>
-              <h3 className="font-medium mb-2">URL du webhook</h3>
+              <h3 className="font-medium mb-2">URL du webhook configurée</h3>
               <div className="bg-gray-100 p-3 rounded-lg">
-                <code className="text-sm">
-                  {(() => {
-                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-                    const cleanUrl = baseUrl.replace(/\/api$/, ''); // Remove trailing /api if present
-                    return `${cleanUrl}/api/cj-dropshipping/webhooks`;
-                  })()}
+                <code className="text-sm break-all">
+                  {webhookStatus?.callbackUrl || callbackUrl || 'Aucune URL configurée'}
                 </code>
+              </div>
+              {webhookStatus?.lastUpdated && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Dernière mise à jour : {new Date(webhookStatus.lastUpdated).toLocaleString('fr-FR')}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Types d'événements configurés</h3>
+              <div className="space-y-1">
+                {webhookStatus?.types && webhookStatus.types.length > 0 ? (
+                  webhookStatus.types.map((type: string) => (
+                    <div key={type} className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        type === 'product' ? 'bg-blue-500' :
+                        type === 'stock' ? 'bg-green-500' :
+                        type === 'order' ? 'bg-purple-500' :
+                        'bg-orange-500'
+                      }`}></span>
+                      <span className="text-sm">
+                        {type === 'product' ? 'PRODUCT - Changements de produits' :
+                         type === 'stock' ? 'STOCK - Mises à jour de stock' :
+                         type === 'order' ? 'ORDER - Changements de commandes' :
+                         'LOGISTICS - Informations de tracking'}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">Aucun type configuré</p>
+                )}
               </div>
             </div>
 
             <div>
-              <h3 className="font-medium mb-2">Types d'événements</h3>
+              <h3 className="font-medium mb-2">Types d'événements disponibles</h3>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -241,54 +477,219 @@ export default function CJWebhooksPage() {
 
         {webhookLogs.length > 0 ? (
           <div className="space-y-4">
-            {webhookLogs.slice(0, 50).map((log) => (
-              <div key={log.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getWebhookTypeColor(log.type)}`}>
-                      {getWebhookTypeText(log.type)}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      {log.messageId}
-                    </span>
+            {webhookLogs.slice(0, 50).map((log) => {
+              const payloadInfo = extractPayloadInfo(log);
+              const payload = formatPayload(log.payload);
+              
+              return (
+                <div key={log.id} className={`border rounded-lg p-4 ${
+                  log.status === 'ERROR' ? 'border-red-300 bg-red-50/30' :
+                  log.status === 'PROCESSED' ? 'border-green-300 bg-green-50/30' :
+                  'border-gray-200 bg-white'
+                }`}>
+                  {/* En-tête */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getWebhookTypeColor(log.type)}`}>
+                        {getWebhookTypeText(log.type)}
+                      </span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        {log.messageId.substring(0, 8)}...
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {formatDate(log.receivedAt)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        log.status === 'PROCESSED' ? 'bg-green-500' : 
+                        log.status === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'
+                      }`}></span>
+                      <span className="text-xs font-medium text-gray-600">
+                        {log.status === 'PROCESSED' ? 'Traité' : 
+                         log.status === 'ERROR' ? 'Erreur' : 'En attente'}
+                      </span>
+                      {log.processingTimeMs && (
+                        <span className="text-xs text-gray-400">
+                          ({log.processingTimeMs}ms)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${
-                      log.status === 'PROCESSED' ? 'bg-green-500' : 
-                      log.status === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'
-                    }`}></span>
-                    <span className="text-sm text-gray-600">
-                      {log.status === 'PROCESSED' ? 'Traité' : 
-                       log.status === 'ERROR' ? 'Erreur' : 'En attente'}
-                    </span>
-                  </div>
+
+                  {/* Informations principales selon le type */}
+                  {log.type === 'VARIANT' && (
+                    <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Produit ID:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.pid}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Variante ID:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.vid}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">SKU:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.variantSku}</span>
+                        </div>
+                        <div className="col-span-2 md:col-span-3">
+                          <span className="text-gray-500">Nom:</span>
+                          <span className="ml-2">{payloadInfo.variantName}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Prix:</span>
+                          <span className="ml-2 font-semibold">{payloadInfo.variantSellPrice} €</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Poids:</span>
+                          <span className="ml-2">{payloadInfo.variantWeight} g</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Dimensions:</span>
+                          <span className="ml-2">{payloadInfo.variantLength}×{payloadInfo.variantWidth}×{payloadInfo.variantHeight}</span>
+                        </div>
+                        {payloadInfo.variantImage && (
+                          <div className="col-span-2 md:col-span-3">
+                            <img 
+                              src={payloadInfo.variantImage} 
+                              alt={payloadInfo.variantName}
+                              className="w-20 h-20 object-cover rounded border border-gray-200"
+                            />
+                          </div>
+                        )}
+                        {payloadInfo.fields && payloadInfo.fields.length > 0 && (
+                          <div className="col-span-2 md:col-span-3">
+                            <span className="text-gray-500">Champs modifiés:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {payloadInfo.fields.map((field: string, idx: number) => (
+                                <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                  {field}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {log.type === 'PRODUCT' && (
+                    <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Produit ID:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.pid}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">SKU:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.productSku}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Prix:</span>
+                          <span className="ml-2 font-semibold">{payloadInfo.productSellPrice} €</span>
+                        </div>
+                        <div className="col-span-2 md:col-span-3">
+                          <span className="text-gray-500">Nom:</span>
+                          <span className="ml-2">{payloadInfo.productName}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Catégorie:</span>
+                          <span className="ml-2">{payloadInfo.categoryName}</span>
+                        </div>
+                        {payloadInfo.productImage && (
+                          <div className="col-span-2 md:col-span-3">
+                            <img 
+                              src={Array.isArray(payloadInfo.productImage) ? payloadInfo.productImage[0] : payloadInfo.productImage} 
+                              alt={payloadInfo.productName}
+                              className="w-20 h-20 object-cover rounded border border-gray-200"
+                            />
+                          </div>
+                        )}
+                        {payloadInfo.fields && payloadInfo.fields.length > 0 && (
+                          <div className="col-span-2 md:col-span-3">
+                            <span className="text-gray-500">Champs modifiés:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {payloadInfo.fields.map((field: string, idx: number) => (
+                                <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                  {field}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {log.type === 'STOCK' && (
+                    <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
+                      <div className="text-sm">
+                        <span className="text-gray-500">Variantes mises à jour:</span>
+                        <span className="ml-2 font-semibold">{payloadInfo.variants}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {log.type === 'ORDER' && (
+                    <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Commande:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.orderNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">ID CJ:</span>
+                          <span className="ml-2 font-mono text-xs">{payloadInfo.cjOrderId}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Statut:</span>
+                          <span className="ml-2 font-semibold">{payloadInfo.orderStatus}</span>
+                        </div>
+                        {payloadInfo.fields && payloadInfo.fields.length > 0 && (
+                          <div className="col-span-2 md:col-span-3">
+                            <span className="text-gray-500">Champs modifiés:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {payloadInfo.fields.map((field: string, idx: number) => (
+                                <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                  {field}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Message d'erreur */}
+                  {log.error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                      <div className="flex items-start gap-2">
+                        <span className="text-red-600 font-bold">⚠️</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800 mb-1">Erreur</p>
+                          <p className="text-sm text-red-700">{log.error}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Détails complets du payload (collapsible) */}
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium py-2">
+                      ▼ Voir les détails complets du payload
+                    </summary>
+                    <div className="mt-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <pre className="text-xs whitespace-pre-wrap overflow-x-auto font-mono">
+                        {JSON.stringify(payload, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
                 </div>
-
-                <div className="text-sm text-gray-500 mb-2">
-                  {formatDate(log.receivedAt)}
-                </div>
-
-                {log.error && (
-                  <div className="bg-red-50 border border-red-200 rounded p-3 mb-3">
-                    <p className="text-sm text-red-800">
-                      <strong>Erreur:</strong> {log.error}
-                    </p>
-                  </div>
-                )}
-
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
-                    Voir les détails du payload
-                  </summary>
-                  <div className="mt-2 bg-gray-50 p-3 rounded">
-                    <pre className="text-xs whitespace-pre-wrap overflow-x-auto">
-                      {JSON.stringify(log.payload, null, 2)}
-                    </pre>
-                  </div>
-                </details>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">
