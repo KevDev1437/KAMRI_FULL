@@ -385,10 +385,13 @@ export default function DraftProductsPage() {
       let colorMatch = description.match(/### 🎨 Couleurs disponibles\n([\s\S]*?)(?=\n\n|###|$)/i)
       
       // Pattern 2 : Format "Color:" ou "Couleur:" (format simple)
+      // Chercher aussi après "Color:" même s'il y a d'autres mots avant (ex: "Lining material: PU Color: ...")
       if (!colorMatch) {
-        colorMatch = description.match(/Color:\s*([^\n]+)/i) || 
-                     description.match(/Couleur:\s*([^\n]+)/i) ||
-                     description.match(/Colour:\s*([^\n]+)/i)
+        // Chercher "Color:" suivi de tout jusqu'à la fin de la ligne ou jusqu'au prochain label (ex: "Heel height:")
+        colorMatch = description.match(/Color:\s*([^\n]+?)(?=\s+[A-Z][a-z]+:|$)/i) || 
+                     description.match(/Couleur:\s*([^\n]+?)(?=\s+[A-Z][a-z]+:|$)/i) ||
+                     description.match(/Colour:\s*([^\n]+?)(?=\s+[A-Z][a-z]+:|$)/i) ||
+                     description.match(/[^a-z]Color:\s*([^\n]+?)(?=\s+[A-Z][a-z]+:|$)/i) // Chercher "Color:" même après d'autres mots
       }
       
       if (colorMatch && colorMatch[1]) {
@@ -447,10 +450,37 @@ export default function DraftProductsPage() {
         } else {
           // Format simple : séparé par virgules (ex: "white gold Q911, yellow gold Q912")
           // OU format avec détails : "Gold White Diamond (width 6mm), Platinum White Diamond (width 6mm)"
+          // OU format simple : "Black, Brown, Khaki"
+          // OU format avec détails : "Brown single lining, Black single lining, Black fur lining, Brown fur lining"
           colorNames = colorsText
             .split(',')
             .map(color => {
               let cleanColor = color.trim()
+              
+              // Si la couleur contient "lining", "material", "fur", etc., extraire seulement la partie couleur
+              // Ex: "Brown single lining" → "Brown"
+              // Ex: "Black fur lining" → "Black"
+              // Ex: "Brown single" → "Brown"
+              // Ex: "Black fur" → "Black"
+              const lowerColor = cleanColor.toLowerCase()
+              if (lowerColor.includes('lining') || 
+                  lowerColor.includes('material') ||
+                  lowerColor.includes('fur') ||
+                  lowerColor.includes('single') ||
+                  lowerColor.includes('double') ||
+                  lowerColor.includes('triple')) {
+                // Extraire le premier mot (la couleur) avant "single", "double", "triple", "fur", "lining", "material", etc.
+                // Pattern: "Brown single lining" → "Brown"
+                // Pattern: "Black fur" → "Black"
+                // Pattern: "Brown single" → "Brown"
+                const colorMatch = cleanColor.match(/^([a-zA-Z]+)\s+(?:single|double|triple|fur|lining|material)/i)
+                if (colorMatch && colorMatch[1]) {
+                  cleanColor = colorMatch[1].trim()
+                } else {
+                  // Si pas de match, prendre le premier mot seulement
+                  cleanColor = cleanColor.split(/\s+/)[0]
+                }
+              }
               
               // Enlever les détails entre parenthèses (ex: "(width 6mm)", "(length cm)", etc.)
               cleanColor = cleanColor.replace(/\s*\([^)]*\)/g, '') // Enlever tout ce qui est entre parenthèses
@@ -469,9 +499,10 @@ export default function DraftProductsPage() {
               // Vérifier que c'est bien une couleur (contient des lettres)
               if (!/^[a-zA-Z\s]+$/.test(cleanColor) || cleanColor.length === 0) return null
               
+              const cleanColorLower = cleanColor.toLowerCase().trim()
+              
               // ❌ EXCLURE les tailles qui sont extraites comme couleurs
               const sizePatterns = ['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'xi', 'xii', 'xiii']
-              const cleanColorLower = cleanColor.toLowerCase().trim()
               
               // Si c'est une taille pure (ex: "M", "L", "XL", "XI")
               if (sizePatterns.includes(cleanColorLower)) {
@@ -481,6 +512,32 @@ export default function DraftProductsPage() {
               // Si c'est une taille avec un préfixe/suffixe (ex: "Size M", "M Size")
               if (cleanColorLower.match(/^(size|taille)\s*[xslm]+$/i) || 
                   cleanColorLower.match(/^[xslm]+\s*(size|taille)$/i)) {
+                return null
+              }
+              
+              // ❌ EXCLURE les mots qui ne sont pas des couleurs
+              const nonColorWords = [
+                'warm', 'cold', 'hot', 'cool', 'single', 'double', 'triple',
+                'lining', 'material', 'inner', 'outer', 'upper', 'lower',
+                'height', 'width', 'length', 'depth', 'size', 'sizes',
+                'style', 'type', 'method', 'process', 'applicable', 'popular',
+                'element', 'shape', 'form', 'heel', 'shaft', 'sole', 'toe',
+                'sports', 'craft', 'mouth', 'shoe', 'packing', 'list'
+              ]
+              
+              // Si c'est un mot non-couleur pur (ex: "Warm", "Single")
+              if (nonColorWords.includes(cleanColorLower)) {
+                return null
+              }
+              
+              // Si c'est un mot non-couleur avec d'autres mots (ex: "Warm Lining")
+              const words = cleanColorLower.split(/\s+/)
+              if (words.length === 1 && nonColorWords.some(word => cleanColorLower.includes(word))) {
+                return null
+              }
+              
+              // Si tous les mots sont des mots non-couleur, exclure
+              if (words.every(word => nonColorWords.includes(word))) {
                 return null
               }
               
@@ -530,6 +587,58 @@ export default function DraftProductsPage() {
         
         console.log('🔍 [DEBUG] Product images available:', productImages.length)
         
+        // ✅ Fonction pour extraire la couleur depuis le nom de fichier d'image
+        const extractColorFromImageUrl = (imageUrl: string): string[] => {
+          const colors: string[] = []
+          const urlLower = imageUrl.toLowerCase()
+          
+          // Liste des couleurs communes à chercher dans l'URL
+          const colorKeywords: { [key: string]: string[] } = {
+            'black': ['black', 'noir', 'noire', 'bk'],
+            'white': ['white', 'blanc', 'blanche', 'wt', 'wht'],
+            'brown': ['brown', 'marron', 'brun', 'brune', 'br'],
+            'gray': ['gray', 'grey', 'gris', 'grise', 'gy'],
+            'blue': ['blue', 'bleu', 'bleue', 'bl'],
+            'red': ['red', 'rouge', 'rd'],
+            'green': ['green', 'vert', 'verte', 'gr'],
+            'yellow': ['yellow', 'jaune', 'yl'],
+            'pink': ['pink', 'rose', 'pk'],
+            'purple': ['purple', 'violet', 'violette', 'pp'],
+            'orange': ['orange', 'or'],
+            'khaki': ['khaki', 'kaki', 'kh'],
+            'beige': ['beige', 'bg'],
+            'navy': ['navy', 'nv'],
+            'tan': ['tan', 'tn'],
+            'burgundy': ['burgundy', 'burg', 'bg'],
+            'wine': ['wine', 'wn'],
+            'ivory': ['ivory', 'iv'],
+            'cream': ['cream', 'cr'],
+            'gold': ['gold', 'or', 'doré', 'dorée', 'gd'],
+            'silver': ['silver', 'argent', 'argenté', 'argentée', 'sl'],
+            'platinum': ['platinum', 'platine', 'pt'],
+          }
+          
+          // Chercher chaque couleur dans l'URL
+          for (const [colorName, keywords] of Object.entries(colorKeywords)) {
+            for (const keyword of keywords) {
+              // Chercher le mot-clé dans l'URL (avec séparateurs pour éviter les faux positifs)
+              // Pattern 1 : Avec séparateurs (ex: "product_black_001.jpg", "product-black-001.jpg")
+              const regex1 = new RegExp(`[_-]${keyword}[_-]|[_-]${keyword}$|^${keyword}[_-]`, 'i')
+              // Pattern 2 : Dans le nom de fichier (ex: "blackboots.jpg", "brownshoes.jpg")
+              const regex2 = new RegExp(`\\b${keyword}\\b`, 'i')
+              // Pattern 3 : Dans le chemin (ex: "/black/", "/brown/")
+              const regex3 = new RegExp(`/${keyword}/|/${keyword}$`, 'i')
+              
+              if (regex1.test(urlLower) || regex2.test(urlLower) || regex3.test(urlLower)) {
+                colors.push(colorName)
+                break // Une seule fois par couleur
+              }
+            }
+          }
+          
+          return colors
+        }
+        
         if (product?.productVariants && product.productVariants.length > 0) {
           console.log('🔍 [DEBUG] Processing variants:', product.productVariants.length)
           
@@ -539,6 +648,7 @@ export default function DraftProductsPage() {
           
           product.productVariants.forEach((variant, idx) => {
             console.log(`🔍 [DEBUG] Variant ${idx}:`, { 
+              name: variant.name,
               hasImage: !!variant.image, 
               image: variant.image?.substring(0, 50),
               properties: variant.properties 
@@ -552,8 +662,56 @@ export default function DraftProductsPage() {
             try {
               let variantColor = ''
               
-              // Essayer d'extraire la couleur depuis properties
-              if (variant.properties) {
+              // ✅ PRIORITÉ 1 : Extraire la couleur depuis le nom du variant
+              // Ex: "Brown Single Liner-35" → "Brown"
+              // Ex: "Black Single Liner-35" → "Black"
+              // Ex: "Side Zipper ... Black 35" → "Black"
+              // Ex: "Black-35" → "Black"
+              // Ex: "Brown-35" → "Brown"
+              // Ex: "Khaki-35" → "Khaki"
+              if (variant.name) {
+                const variantName = variant.name.trim()
+                
+                // Pattern 1 : Format "Couleur-Taille" ou "Couleur Taille" (ex: "Black-35", "Black 35")
+                let colorMatch = variantName.match(/^([a-zA-Z]+)[-\s]+(\d+)$/i)
+                if (colorMatch && colorMatch[1]) {
+                  variantColor = colorMatch[1].trim()
+                  console.log(`✅ [DEBUG] Couleur extraite (format Couleur-Taille): "${variant.name}" → "${variantColor}"`)
+                } else {
+                  // Pattern 2 : Format "Couleur Single/Double/Triple/Fur/Liner/Lining/Material"
+                  colorMatch = variantName.match(/^([a-zA-Z]+)\s+(?:single|double|triple|fur|liner|lining|material)/i)
+                  if (colorMatch && colorMatch[1]) {
+                    variantColor = colorMatch[1].trim()
+                    console.log(`✅ [DEBUG] Couleur extraite (format Couleur-Type): "${variant.name}" → "${variantColor}"`)
+                  } else {
+                    // Pattern 3 : Format "Nom complet ... Couleur Taille" (ex: "Side Zipper ... Black 35")
+                    // Chercher la couleur avant la taille (nombre) à la fin
+                    colorMatch = variantName.match(/([a-zA-Z]+)\s+(\d+)$/i)
+                    if (colorMatch && colorMatch[1]) {
+                      const possibleColor = colorMatch[1].trim()
+                      // Vérifier que c'est bien une couleur connue (pas un mot générique)
+                      const knownColors = ['black', 'white', 'brown', 'gray', 'grey', 'blue', 'red', 'green', 'yellow', 'pink', 'purple', 'orange', 'khaki', 'beige', 'navy', 'tan', 'burgundy', 'wine', 'ivory', 'cream', 'gold', 'silver', 'platinum']
+                      if (knownColors.includes(possibleColor.toLowerCase())) {
+                        variantColor = possibleColor
+                        console.log(`✅ [DEBUG] Couleur extraite (format Nom-Couleur-Taille): "${variant.name}" → "${variantColor}"`)
+                      }
+                    }
+                    
+                    // Pattern 4 : Si pas de match, prendre le premier mot (probablement la couleur)
+                    if (!variantColor) {
+                      const firstWord = variantName.split(/\s+/)[0]
+                      // Vérifier que c'est bien une couleur (pas un nombre)
+                      if (firstWord && !/^[0-9]+$/.test(firstWord)) {
+                        variantColor = firstWord
+                        console.log(`✅ [DEBUG] Couleur extraite (premier mot): "${variant.name}" → "${variantColor}"`)
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // ✅ PRIORITÉ 2 : Essayer d'extraire la couleur depuis properties
+              if (!variantColor && variant.properties) {
                 const properties = typeof variant.properties === 'string' 
                   ? JSON.parse(variant.properties) 
                   : variant.properties
@@ -565,18 +723,29 @@ export default function DraftProductsPage() {
                     !/^[0-9]+(-[0-9]+)?(\.[0-9])?$/.test(variantColor) && // Pas un nombre ou plage
                     !/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(variantColor)) { // Pas une taille texte
                   
-                  if (!colorMap.has(variantColor.toLowerCase())) {
-                    colorMap.set(variantColor.toLowerCase(), variant.image)
-                    variantsWithImages.push({ color: variantColor, image: variant.image })
-                  }
+                  console.log(`✅ [DEBUG] Couleur extraite depuis properties: "${variantColor}"`)
+                } else {
+                  variantColor = '' // Réinitialiser si ce n'est pas une couleur valide
                 }
               }
               
-              // Si pas de couleur dans properties, garder quand même l'image pour distribution
-              if (!variantColor && variant.image) {
-                variantsWithImages.push({ color: '', image: variant.image })
+              // Ajouter à la map si on a trouvé une couleur
+              if (variantColor) {
+                const colorLower = variantColor.toLowerCase()
+                if (!colorMap.has(colorLower)) {
+                  colorMap.set(colorLower, variant.image)
+                  variantsWithImages.push({ color: variantColor, image: variant.image })
+                  console.log(`✅ [DEBUG] Variant ajouté à la map: "${variantColor}" → image`)
+                }
+              } else {
+                // Si pas de couleur trouvée, garder quand même l'image pour distribution
+                if (variant.image) {
+                  variantsWithImages.push({ color: '', image: variant.image })
+                  console.log(`⚠️ [DEBUG] Variant sans couleur: "${variant.name}"`)
+                }
               }
             } catch (e) {
+              console.error(`❌ [DEBUG] Erreur traitement variant ${idx}:`, e)
               // Si erreur de parsing, garder quand même l'image
               if (variant.image) {
                 variantsWithImages.push({ color: '', image: variant.image })
@@ -588,48 +757,132 @@ export default function DraftProductsPage() {
           const colorMapEntries = Array.from(colorMap.entries())
           const allVariantImages = variantsWithImages.map(v => v.image).filter(Boolean)
           
+          // ✅ Créer une liste ordonnée des variants avec leurs couleurs et images
+          const orderedVariants: Array<{ color: string; image: string; index: number }> = []
+          product.productVariants.forEach((variant, variantIdx) => {
+            if (!variant.image) return
+            
+            let variantColor = ''
+            
+            // ✅ PRIORITÉ 1 : Extraire la couleur depuis le nom du variant
+            // Ex: "Black-35" → "black"
+            // Ex: "Brown 35" → "brown"
+            // Ex: "Side Zipper ... Black 35" → "black"
+            // Ex: "Khaki-35" → "khaki"
+            if (variant.name) {
+              const variantName = variant.name.trim()
+              
+              // Pattern 1 : Format "Couleur-Taille" ou "Couleur Taille" (ex: "Black-35", "Black 35")
+              let colorMatch = variantName.match(/^([a-zA-Z]+)[-\s]+(\d+)$/i)
+              if (colorMatch && colorMatch[1]) {
+                variantColor = colorMatch[1].trim().toLowerCase()
+              } else {
+                // Pattern 2 : Format "Couleur Single/Double/Triple/Fur/Liner/Lining/Material"
+                colorMatch = variantName.match(/^([a-zA-Z]+)\s+(?:single|double|triple|fur|liner|lining|material)/i)
+                if (colorMatch && colorMatch[1]) {
+                  variantColor = colorMatch[1].trim().toLowerCase()
+                } else {
+                  // Pattern 3 : Format "Nom complet ... Couleur Taille" (ex: "Side Zipper ... Black 35")
+                  colorMatch = variantName.match(/([a-zA-Z]+)\s+(\d+)$/i)
+                  if (colorMatch && colorMatch[1]) {
+                    const possibleColor = colorMatch[1].trim().toLowerCase()
+                    // Vérifier que c'est bien une couleur connue
+                    const knownColors = ['black', 'white', 'brown', 'gray', 'grey', 'blue', 'red', 'green', 'yellow', 'pink', 'purple', 'orange', 'khaki', 'beige', 'navy', 'tan', 'burgundy', 'wine', 'ivory', 'cream', 'gold', 'silver', 'platinum']
+                    if (knownColors.includes(possibleColor)) {
+                      variantColor = possibleColor
+                    }
+                  }
+                  
+                  // Pattern 4 : Si pas de match, prendre le premier mot
+                  if (!variantColor) {
+                    const firstWord = variantName.split(/\s+/)[0]
+                    if (firstWord && !/^[0-9]+$/.test(firstWord)) {
+                      variantColor = firstWord.toLowerCase()
+                    }
+                  }
+                }
+              }
+            }
+            
+            // ✅ PRIORITÉ 2 : Essayer d'extraire depuis properties
+            if (!variantColor && variant.properties) {
+              try {
+                const properties = typeof variant.properties === 'string' 
+                  ? JSON.parse(variant.properties) 
+                  : variant.properties
+                const colorFromProps = (properties.value1 || '').trim().toLowerCase()
+                // Vérifier que c'est bien une couleur (pas un nombre ou une taille)
+                if (colorFromProps && 
+                    !/^[0-9]+(-[0-9]+)?(\.[0-9])?$/.test(colorFromProps) &&
+                    !/^(xs|s|m|l|xl|xxl|xxxl)$/i.test(colorFromProps)) {
+                  variantColor = colorFromProps
+                }
+              } catch (e) {
+                // Ignorer les erreurs
+              }
+            }
+            
+            orderedVariants.push({
+              color: variantColor,
+              image: variant.image,
+              index: variantIdx
+            })
+          })
+          
           console.log('🔍 [DEBUG] Color map entries:', colorMapEntries)
+          console.log('🔍 [DEBUG] Ordered variants:', orderedVariants.map(v => ({ color: v.color, hasImage: !!v.image })))
           console.log('🔍 [DEBUG] All variant images:', allVariantImages.length, allVariantImages.map(img => img?.substring(0, 50)))
           console.log('🔍 [DEBUG] Color names from description:', colorNames)
+          
+          // ✅ Créer un Set pour suivre les variants déjà utilisés (partagé entre toutes les couleurs)
+          const usedVariantIndices = new Set<number>()
+          const usedVariantImages = new Set<string>()
+          
+          // ✅ Mots-clés de couleur (défini une seule fois)
+          const colorKeywords: { [key: string]: string[] } = {
+            'white': ['white', 'blanc', 'blanche', 'diamond'],
+            'black': ['black', 'noir', 'noire'],
+            'gray': ['gray', 'grey', 'gris', 'grise', 'gray blue'],
+            'red': ['red', 'rouge'],
+            'blue': ['blue', 'bleu', 'bleue'],
+            'green': ['green', 'vert', 'verte', 'army green'],
+            'yellow': ['yellow', 'jaune', 'gold'],
+            'pink': ['pink', 'rose'],
+            'purple': ['purple', 'violet', 'violette'],
+            'orange': ['orange'],
+            'brown': ['brown', 'marron', 'brun', 'brune'],
+            'gold': ['gold', 'or', 'doré', 'dorée'],
+            'platinum': ['platinum', 'platine'],
+            'silver': ['silver', 'argent', 'argenté', 'argentée'],
+          }
           
           info.colors = colorNames.map((colorName, idx) => {
             const colorNameLower = colorName.toLowerCase()
             
-            // 1. Chercher une correspondance exacte ou partielle
+            // 1. Chercher une correspondance exacte ou partielle dans la map
             for (const [variantColor, variantImage] of colorMapEntries) {
               const variantColorLower = variantColor.toLowerCase()
               
               // Correspondance exacte
               if (variantColorLower === colorNameLower) {
-                console.log(`✅ [DEBUG] Correspondance exacte: "${colorName}" → variant "${variantColor}"`)
-                return { name: colorName, image: variantImage }
+                if (!usedVariantImages.has(variantImage)) {
+                  usedVariantImages.add(variantImage)
+                  console.log(`✅ [DEBUG] Correspondance exacte: "${colorName}" → variant "${variantColor}"`)
+                  return { name: colorName, image: variantImage }
+                }
               }
               
               // Correspondance partielle (ex: "leather red" contient "red")
               if (variantColorLower.includes(colorNameLower) || 
                   colorNameLower.includes(variantColorLower)) {
-                console.log(`✅ [DEBUG] Correspondance partielle: "${colorName}" → variant "${variantColor}"`)
-                return { name: colorName, image: variantImage }
+                if (!usedVariantImages.has(variantImage)) {
+                  usedVariantImages.add(variantImage)
+                  console.log(`✅ [DEBUG] Correspondance partielle: "${colorName}" → variant "${variantColor}"`)
+                  return { name: colorName, image: variantImage }
+                }
               }
               
               // Correspondance par mots-clés communs (couleurs de base)
-              const colorKeywords: { [key: string]: string[] } = {
-                'white': ['white', 'blanc', 'blanche', 'diamond'],
-                'black': ['black', 'noir', 'noire'],
-                'gray': ['gray', 'grey', 'gris', 'grise'],
-                'red': ['red', 'rouge'],
-                'blue': ['blue', 'bleu', 'bleue'],
-                'green': ['green', 'vert', 'verte'],
-                'yellow': ['yellow', 'jaune', 'gold'],
-                'pink': ['pink', 'rose'],
-                'purple': ['purple', 'violet', 'violette'],
-                'orange': ['orange'],
-                'brown': ['brown', 'marron', 'brun', 'brune'],
-                'gold': ['gold', 'or', 'doré', 'dorée'],
-                'platinum': ['platinum', 'platine'],
-                'silver': ['silver', 'argent', 'argenté', 'argentée'],
-              }
-              
               // Extraire les mots-clés de la couleur (ex: "Gold White Diamond" → ["gold", "white", "diamond"])
               const colorNameWords = colorNameLower.split(/\s+/).filter(w => w.length > 2)
               const variantColorWords = variantColorLower.split(/\s+/).filter(w => w.length > 2)
@@ -649,7 +902,9 @@ export default function DraftProductsPage() {
                 return variantColorWords.some(vWord => word === vWord || word.includes(vWord) || vWord.includes(word))
               })
               
-              if (hasCommonKeyword) {
+              if (hasCommonKeyword && !usedVariantImages.has(variantImage)) {
+                usedVariantImages.add(variantImage)
+                console.log(`✅ [DEBUG] Correspondance par mots-clés: "${colorName}" → variant "${variantColor}"`)
                 return { name: colorName, image: variantImage }
               }
               
@@ -657,24 +912,130 @@ export default function DraftProductsPage() {
               const colorNameKeywords = colorKeywords[colorNameLower] || []
               const variantColorKeywords = colorKeywords[variantColorLower] || []
               
-              if (colorNameKeywords.some(k => variantColorLower.includes(k)) ||
-                  variantColorKeywords.some(k => colorNameLower.includes(k))) {
+              if ((colorNameKeywords.some(k => variantColorLower.includes(k)) ||
+                  variantColorKeywords.some(k => colorNameLower.includes(k))) &&
+                  !usedVariantImages.has(variantImage)) {
+                usedVariantImages.add(variantImage)
+                console.log(`✅ [DEBUG] Correspondance par mots-clés simples: "${colorName}" → variant "${variantColor}"`)
                 return { name: colorName, image: variantImage }
               }
             }
             
-            // 2. Si pas de correspondance, distribuer les images de manière cyclique
+            // 2. Chercher dans les variants ordonnés par correspondance de couleur
+            for (const variant of orderedVariants) {
+              const variantColorLower = variant.color.toLowerCase()
+              
+              // Correspondance exacte ou partielle avec la couleur du variant
+              if (variantColorLower && (
+                  variantColorLower === colorNameLower ||
+                  variantColorLower.includes(colorNameLower) ||
+                  colorNameLower.includes(variantColorLower)
+                )) {
+                // Vérifier si ce variant n'a pas déjà été utilisé pour une autre couleur
+                if (!usedVariantIndices.has(variant.index) && !usedVariantImages.has(variant.image)) {
+                  usedVariantIndices.add(variant.index)
+                  usedVariantImages.add(variant.image)
+                  console.log(`✅ [DEBUG] Correspondance avec variant ordonné: "${colorName}" → variant[${variant.index}] "${variant.color}"`)
+                  return { name: colorName, image: variant.image }
+                }
+              }
+            }
+            
+            // 3. Si pas de correspondance, utiliser l'ordre des variants (par index)
+            // Utiliser l'index de la couleur pour sélectionner le variant correspondant
+            // Cela garantit que la première couleur de la description correspond au premier variant, etc.
+            if (orderedVariants.length > 0) {
+              // Trouver le premier variant non utilisé
+              let selectedVariant = orderedVariants.find(v => !usedVariantIndices.has(v.index) && !usedVariantImages.has(v.image))
+              
+              // Si tous les variants sont utilisés, utiliser l'ordre cyclique
+              if (!selectedVariant) {
+                const variantIndex = idx % orderedVariants.length
+                selectedVariant = orderedVariants[variantIndex]
+              } else {
+                usedVariantIndices.add(selectedVariant.index)
+                usedVariantImages.add(selectedVariant.image)
+              }
+              
+              console.log(`✅ [DEBUG] Distribution par ordre pour "${colorName}": variant[${selectedVariant.index}] (couleur: "${selectedVariant.color}")`)
+              return { name: colorName, image: selectedVariant.image }
+            }
+            
+            // 3. Chercher dans les images de la galerie par correspondance de couleur dans l'URL
+            if (productImages.length > 0) {
+              const colorNameLower = colorName.toLowerCase()
+              
+              // ✅ PRIORITÉ : Chercher d'abord une correspondance exacte dans l'URL
+              for (const imageUrl of productImages) {
+                if (usedVariantImages.has(imageUrl)) continue
+                
+                const imageColors = extractColorFromImageUrl(imageUrl)
+                
+                // Correspondance exacte (ex: "black" = "black")
+                if (imageColors.some(imgColor => {
+                  const imgColorLower = imgColor.toLowerCase()
+                  return imgColorLower === colorNameLower
+                })) {
+                  usedVariantImages.add(imageUrl)
+                  console.log(`✅ [DEBUG] Correspondance EXACTE par URL pour "${colorName}": image contient la couleur (${imageColors.join(', ')})`)
+                  return { name: colorName, image: imageUrl }
+                }
+              }
+              
+              // ✅ FALLBACK : Correspondance partielle (ex: "black" contient "bl" ou "noir")
+              for (const imageUrl of productImages) {
+                if (usedVariantImages.has(imageUrl)) continue
+                
+                const imageColors = extractColorFromImageUrl(imageUrl)
+                
+                // Correspondance partielle
+                if (imageColors.some(imgColor => {
+                  const imgColorLower = imgColor.toLowerCase()
+                  return imgColorLower.includes(colorNameLower) ||
+                         colorNameLower.includes(imgColorLower)
+                })) {
+                  usedVariantImages.add(imageUrl)
+                  console.log(`✅ [DEBUG] Correspondance PARTIELLE par URL pour "${colorName}": image contient la couleur (${imageColors.join(', ')})`)
+                  return { name: colorName, image: imageUrl }
+                }
+              }
+            }
+            
+            // 4. Fallback : distribuer les images de manière cyclique
             if (allVariantImages.length > 0) {
               const imageIndex = idx % allVariantImages.length
               console.log(`✅ [DEBUG] Distribution cyclique pour "${colorName}": image ${imageIndex}/${allVariantImages.length}`)
               return { name: colorName, image: allVariantImages[imageIndex] }
             }
             
-            // 3. Fallback : utiliser les images de la galerie du produit
+            // 5. Fallback : utiliser les images de la galerie du produit (par ordre)
+            // ⚠️ ATTENTION : Cette méthode n'est pas fiable car on ne sait pas si l'ordre correspond
             if (productImages.length > 0) {
-              const imageIndex = idx % productImages.length
-              console.log(`✅ [DEBUG] Utilisation image galerie pour "${colorName}": image ${imageIndex}/${productImages.length}`)
-              return { name: colorName, image: productImages[imageIndex] }
+              // Trouver la première image non utilisée
+              let selectedImage = productImages.find(img => !usedVariantImages.has(img))
+              
+              // Si toutes les images sont utilisées, utiliser l'ordre cyclique
+              if (!selectedImage) {
+                const imageIndex = idx % productImages.length
+                selectedImage = productImages[imageIndex]
+              } else {
+                usedVariantImages.add(selectedImage)
+              }
+              
+              // 🔍 Analyser l'URL de l'image sélectionnée pour vérifier si elle correspond
+              const selectedImageColors = extractColorFromImageUrl(selectedImage)
+              const colorNameLower = colorName.toLowerCase()
+              const hasColorMatch = selectedImageColors.some(imgColor => 
+                imgColor.toLowerCase() === colorNameLower
+              )
+              
+              if (!hasColorMatch && selectedImageColors.length > 0) {
+                console.warn(`⚠️ [DEBUG] ATTENTION: Image sélectionnée pour "${colorName}" contient "${selectedImageColors.join(', ')}" au lieu de "${colorName}"`)
+                console.warn(`⚠️ [DEBUG] URL de l'image: ${selectedImage.substring(0, 100)}`)
+              }
+              
+              console.log(`✅ [DEBUG] Utilisation image galerie pour "${colorName}": image ${productImages.indexOf(selectedImage)}/${productImages.length} (couleurs détectées: ${selectedImageColors.join(', ') || 'aucune'})`)
+              return { name: colorName, image: selectedImage }
             }
             
             // 4. Fallback final : aucune image
