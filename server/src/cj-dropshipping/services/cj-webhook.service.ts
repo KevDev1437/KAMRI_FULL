@@ -114,15 +114,40 @@ export class CJWebhookService {
     this.logger.log(`🔄 Champs modifiés: ${params.fields.join(', ')}`);
 
     try {
+      // Nettoyer le nom du produit (peut être un tableau JSON stringifié)
+      let productName = params.productName || params.productNameEn || `Produit CJ ${params.pid}`;
+      try {
+        // Si c'est un tableau JSON stringifié, extraire le premier élément
+        if (productName.startsWith('[') && productName.endsWith(']')) {
+          const parsed = JSON.parse(productName);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            productName = parsed[0];
+          }
+        }
+      } catch (e) {
+        // Si ce n'est pas du JSON, garder le nom tel quel
+      }
+      
+      // Nettoyer le nom (enlever les caractères spéciaux, HTML, etc.)
+      productName = this.cleanProductName(productName);
+      
+      // Convertir le prix en Float
+      const price = typeof params.productSellPrice === 'string' 
+        ? parseFloat(params.productSellPrice) || 0
+        : (params.productSellPrice || 0);
+      
+      // Nettoyer la description
+      const description = this.cleanProductDescription(params.productDescription || '');
+      
       // Utiliser le service anti-doublons pour l'upsert intelligent
       const duplicateCheck = await this.duplicatePreventionService.checkCJProductDuplicate(params.pid);
       
       const upsertResult = await this.duplicatePreventionService.upsertCJProduct({
         cjProductId: params.pid,
-        name: params.productName || params.productNameEn || `Produit CJ ${params.pid}`,
-        description: params.productDescription,
-        price: params.productSellPrice,
-        sku: params.productSku,
+        name: productName,
+        description: description,
+        price: price,
+        productSku: params.productSku, // ✅ Utiliser productSku au lieu de sku
         status: params.productStatus,
         categoryId: params.categoryId,
         categoryName: params.categoryName,
@@ -170,8 +195,10 @@ export class CJWebhookService {
     this.logger.log(`🔄 Champs modifiés: ${params.fields.join(', ')}`);
 
     try {
-      // Trouver le produit parent par la variante
-      const existingProduct = await this.prisma.product.findFirst({
+      const pid = (params as any).pid;
+      
+      // 1️⃣ Chercher le produit parent par la variante existante
+      let existingProduct = await this.prisma.product.findFirst({
         where: {
           productVariants: {
             some: {
@@ -184,14 +211,138 @@ export class CJWebhookService {
         }
       });
 
+      // 2️⃣ Si pas trouvé, chercher par cjProductId (pid)
+      if (!existingProduct && pid) {
+        existingProduct = await this.prisma.product.findFirst({
+          where: {
+            cjProductId: pid
+          },
+          include: {
+            productVariants: true
+          }
+        });
+      }
+
+      // 3️⃣ Si pas trouvé, chercher dans CJProductStore
+      if (!existingProduct && pid) {
+        const cjStoreProduct = await this.prisma.cJProductStore.findFirst({
+          where: {
+            cjProductId: pid
+          }
+        });
+
+        if (cjStoreProduct) {
+          this.logger.log(`📦 Produit trouvé dans CJProductStore, création dans Product...`);
+          
+          // Parser les variants depuis le JSON
+          let variants = [];
+          try {
+            variants = typeof cjStoreProduct.variants === 'string' 
+              ? JSON.parse(cjStoreProduct.variants) 
+              : cjStoreProduct.variants || [];
+          } catch (e) {
+            this.logger.warn(`⚠️ Erreur parsing variants:`, e);
+          }
+
+          // Trouver la catégorie mappée
+          let categoryId = null;
+          if (cjStoreProduct.category) {
+            const categoryMapping = await this.prisma.categoryMapping.findFirst({
+              where: {
+                externalCategory: cjStoreProduct.category
+              }
+            });
+            if (categoryMapping) {
+              categoryId = categoryMapping.internalCategory;
+            }
+          }
+
+          // Trouver le fournisseur
+          let supplierId = null;
+          const supplier = await this.prisma.supplier.findFirst({
+            where: {
+              name: cjStoreProduct.supplierName || 'CJ Dropshipping'
+            }
+          });
+          if (supplier) {
+            supplierId = supplier.id;
+          }
+
+          // Créer le produit dans Product (draft)
+          existingProduct = await this.prisma.product.create({
+            data: {
+              name: cjStoreProduct.name,
+              description: cjStoreProduct.description || '',
+              price: cjStoreProduct.price || 0,
+              originalPrice: cjStoreProduct.price || 0,
+              image: cjStoreProduct.image || '',
+              categoryId: categoryId,
+              supplierId: supplierId,
+              externalCategory: cjStoreProduct.category,
+              source: 'cj-dropshipping',
+              status: 'draft',
+              stock: 0,
+              cjProductId: pid,
+              productSku: cjStoreProduct.productSku,
+              variants: cjStoreProduct.variants,
+              cjMapping: {
+                create: {
+                  cjProductId: pid,
+                  cjSku: cjStoreProduct.productSku || pid
+                }
+              },
+              // Créer les variants comme ProductVariant
+              productVariants: {
+                create: variants.map((v: any) => ({
+                  name: v.variantName || v.variantNameEn || '',
+                  sku: v.variantSku || '',
+                  price: parseFloat(v.sellPrice || v.variantSellPrice || '0'),
+                  weight: v.variantWeight || 0,
+                  dimensions: v.variantLength || v.variantWidth || v.variantHeight ? 
+                    JSON.stringify({
+                      length: v.variantLength,
+                      width: v.variantWidth,
+                      height: v.variantHeight
+                    }) : null,
+                  image: v.variantImage || null,
+                  status: v.variantStatus || 1,
+                  properties: JSON.stringify({
+                    key: v.variantKey || '',
+                    value1: v.variantValue1 || '',
+                    value2: v.variantValue2 || '',
+                    value3: v.variantValue3 || '',
+                  }),
+                  cjVariantId: v.vid || v.variantId || ''
+                })).filter((v: any) => v.cjVariantId) // Filtrer les variants sans cjVariantId
+              }
+            },
+            include: {
+              productVariants: true
+            }
+          });
+
+          this.logger.log(`✅ Produit créé depuis CJProductStore: ${existingProduct.id} avec ${existingProduct.productVariants.length} variants`);
+        }
+      }
+
+      // 4️⃣ Si toujours pas trouvé, NE PAS récupérer depuis l'API CJ (trop coûteux en rate limit)
+      // L'utilisateur devra importer le produit manuellement depuis la page de recherche
+      // Réduire la verbosité des logs (seulement logger une fois par PID)
+      if (!existingProduct && pid) {
+        // Logger seulement en mode debug pour éviter trop de logs
+        this.logger.debug(`⚠️  Produit ${pid} introuvable localement. Importez-le manuellement avec le PID: ${pid}`);
+      }
+
+      // 5️⃣ Si toujours pas trouvé, retourner une erreur
       if (!existingProduct) {
-        this.logger.warn(`⚠️  Produit parent introuvable pour variante ${params.vid}`);
+        // Réduire la verbosité des logs (seulement logger en debug)
+        this.logger.debug(`⚠️  Produit parent introuvable pour variante ${params.vid} (pid: ${pid})`);
         return {
           success: false,
           messageId,
           type: 'VARIANT',
           processedAt: new Date(),
-          error: `Produit parent introuvable pour variante ${params.vid}`
+          error: `Produit parent introuvable pour variante ${params.vid}. Le produit n'a pas été importé. Importez-le depuis la page de recherche CJ Dropshipping avec le PID: ${pid}`
         };
       }
 
@@ -235,11 +386,11 @@ export class CJWebhookService {
       this.logger.log(`✅ Variante ${params.vid} mise à jour: ${variant.id}`);
 
       // ✅ Créer une notification de mise à jour
-      const pid = (params as any).pid || existingProduct.cjProductId;
-      if (pid && existingProduct) {
+      const productPid = (params as any).pid || existingProduct.cjProductId;
+      if (productPid && existingProduct) {
         await this.createProductUpdateNotification({
           productId: existingProduct.id,
-          cjProductId: pid,
+          cjProductId: productPid,
           cjVariantId: params.vid,
           webhookType: 'VARIANT',
           webhookMessageId: messageId,
@@ -828,5 +979,50 @@ export class CJWebhookService {
       // Ne pas bloquer le traitement du webhook si la notification échoue
       this.logger.warn(`⚠️ Erreur lors de la création de la notification:`, error);
     }
+  }
+
+  /**
+   * Nettoyer le nom d'un produit
+   */
+  private cleanProductName(name: string): string {
+    if (!name) return '';
+    
+    // Si c'est un tableau JSON stringifié, extraire le premier élément
+    try {
+      if (name.startsWith('[') && name.endsWith(']')) {
+        const parsed = JSON.parse(name);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          name = parsed[0];
+        }
+      }
+    } catch (e) {
+      // Si ce n'est pas du JSON, garder le nom tel quel
+    }
+    
+    return name
+      .trim()
+      .replace(/\s+/g, ' ') // Espaces multiples
+      .replace(/[^\w\s-]/gi, '') // Caractères spéciaux (sauf tirets et lettres)
+      .substring(0, 200); // Limite de longueur
+  }
+
+  /**
+   * Nettoyer la description d'un produit
+   */
+  private cleanProductDescription(description: string): string {
+    if (!description) return '';
+    
+    // Supprimer les balises HTML
+    let cleaned = description
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim();
+    
+    return cleaned;
   }
 }

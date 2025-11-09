@@ -71,32 +71,30 @@ export class CJProductService {
   private async initializeClient(): Promise<CJAPIClient> {
     this.logger.log('🚀 Initialisation du client CJ...');
     
-    // Vérifier si on a un token valide
-    const hasToken = this.cjApiClient['accessToken'];
-    const tokenExpiry = this.cjApiClient['tokenExpiry'];
-    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    const config = await this.prisma.cJConfig.findFirst();
+    if (!config?.enabled) {
+      throw new Error('L\'intégration CJ Dropshipping est désactivée');
+    }
+
+    // Initialiser la configuration du client injecté
+    this.cjApiClient.setConfig({
+      email: config.email,
+      apiKey: config.apiKey,
+      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
+      platformToken: config.platformToken,
+      debug: process.env.CJ_DEBUG === 'true',
+    });
+
+    // ✅ Essayer de charger le token depuis la base de données
+    const tokenLoaded = await this.cjApiClient.loadTokenFromDatabase();
     
-    if (!isTokenValid) {
-      this.logger.log('🔑 Pas de token valide - Login CJ requis');
-      
-      const config = await this.prisma.cJConfig.findFirst();
-      if (!config?.enabled) {
-        throw new Error('L\'intégration CJ Dropshipping est désactivée');
-      }
-
-      // Initialiser la configuration du client injecté
-      this.cjApiClient.setConfig({
-        email: config.email,
-        apiKey: config.apiKey,
-        tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
-        platformToken: config.platformToken,
-        debug: process.env.CJ_DEBUG === 'true',
-      });
-
+    if (!tokenLoaded) {
+      // Si le token n'est pas en base ou est expiré, faire un login (dernier recours)
+      this.logger.log('🔑 Token non trouvé en base ou expiré - Login CJ requis');
       await this.cjApiClient.login();
       this.logger.log('✅ Login CJ réussi');
     } else {
-      this.logger.log('✅ Token CJ déjà valide - Utilisation de la connexion existante');
+      this.logger.log('✅ Token CJ chargé depuis la base de données - Utilisation de la connexion existante');
     }
     
     return this.cjApiClient;
@@ -528,7 +526,35 @@ export class CJProductService {
       
       const client = await this.initializeClient();
       // ✅ CORRECTION: Utiliser l'endpoint /product/detail/{pid} selon la doc CJ
-      const cjProduct = await client.getProductDetails(productId);
+      const cjProduct: any = await client.getProductDetails(productId);
+      
+      // Vérifier si le produit est null ou vide
+      if (!cjProduct) {
+        this.logger.error(`❌ Produit ${productId} non trouvé dans l'API CJ (retour null)`);
+        throw new Error(`Produit ${productId} non trouvé dans l'API CJ Dropshipping`);
+      }
+      
+      // Vérifier si c'est une liste au lieu d'un objet unique
+      if (Array.isArray(cjProduct) && cjProduct.length > 0) {
+        this.logger.log(`⚠️ L'API a retourné une liste, utilisation du premier élément`);
+        const details = this.mapApiProductToDetails(cjProduct[0]);
+        this.setCachedDetails(productId, details);
+        return details;
+      }
+      
+      // Vérifier si c'est un objet avec une propriété data
+      if (cjProduct.data && typeof cjProduct.data === 'object') {
+        this.logger.log(`⚠️ L'API a retourné un objet avec propriété data`);
+        const details = this.mapApiProductToDetails(cjProduct.data);
+        this.setCachedDetails(productId, details);
+        return details;
+      }
+      
+      // Vérifier si le produit a un pid (structure attendue)
+      if (!cjProduct.pid && !cjProduct.productId) {
+        this.logger.error(`❌ Structure de produit invalide:`, JSON.stringify(cjProduct).substring(0, 200));
+        throw new Error(`Structure de produit invalide retournée par l'API CJ pour ${productId}`);
+      }
       
       const details = this.mapApiProductToDetails(cjProduct);
       
@@ -650,8 +676,21 @@ export class CJProductService {
    * Mapper un produit de l'API CJ vers la structure de détails  
    */
   private mapApiProductToDetails(cjProduct: any): any {
+    // Vérifier que le produit n'est pas null
+    if (!cjProduct) {
+      this.logger.error('❌ mapApiProductToDetails: cjProduct est null');
+      throw new Error('Produit null reçu de l\'API CJ');
+    }
+    
+    // Utiliser productId si pid n'existe pas
+    const pid = cjProduct.pid || cjProduct.productId || null;
+    if (!pid) {
+      this.logger.error('❌ mapApiProductToDetails: pid et productId sont absents', cjProduct);
+      throw new Error('Produit sans ID (pid ou productId) reçu de l\'API CJ');
+    }
+    
     return {
-      pid: cjProduct.pid,
+      pid: pid,
       productName: cjProduct.productNameEn || cjProduct.productName,
       productNameEn: cjProduct.productNameEn || cjProduct.productName,
       productSku: cjProduct.productSku,

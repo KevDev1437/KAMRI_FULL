@@ -19,32 +19,30 @@ export class CJFavoriteService {
   private async initializeClient(): Promise<CJAPIClient> {
     this.logger.log('🚀 Initialisation du client CJ...');
     
-    // Vérifier si on a un token valide
-    const hasToken = this.cjApiClient['accessToken'];
-    const tokenExpiry = this.cjApiClient['tokenExpiry'];
-    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    const config = await this.prisma.cJConfig.findFirst();
+    if (!config?.enabled) {
+      throw new Error('L\'intégration CJ Dropshipping est désactivée');
+    }
+
+    // Initialiser la configuration du client injecté
+    this.cjApiClient.setConfig({
+      email: config.email,
+      apiKey: config.apiKey,
+      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
+      platformToken: config.platformToken,
+      debug: process.env.CJ_DEBUG === 'true',
+    });
+
+    // ✅ Essayer de charger le token depuis la base de données
+    const tokenLoaded = await this.cjApiClient.loadTokenFromDatabase();
     
-    if (!isTokenValid) {
-      this.logger.log('🔑 Pas de token valide - Login CJ requis');
-      
-      const config = await this.prisma.cJConfig.findFirst();
-      if (!config?.enabled) {
-        throw new Error('L\'intégration CJ Dropshipping est désactivée');
-      }
-
-      // Initialiser la configuration du client injecté
-      this.cjApiClient.setConfig({
-        email: config.email,
-        apiKey: config.apiKey,
-        tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
-        platformToken: config.platformToken,
-        debug: process.env.CJ_DEBUG === 'true',
-      });
-
+    if (!tokenLoaded) {
+      // Si le token n'est pas en base ou est expiré, faire un login (dernier recours)
+      this.logger.log('🔑 Token non trouvé en base ou expiré - Login CJ requis');
       await this.cjApiClient.login();
       this.logger.log('✅ Login CJ réussi');
     } else {
-      this.logger.log('✅ Token CJ déjà valide - Utilisation de la connexion existante');
+      this.logger.log('✅ Token CJ chargé depuis la base de données - Utilisation de la connexion existante');
     }
     
     return this.cjApiClient;
@@ -329,6 +327,18 @@ export class CJFavoriteService {
       
       if (result.code !== 200) {
         this.logger.error(`❌ Erreur détails produit ${pid}:`, result.message);
+        
+        // ✅ Gérer spécifiquement le cas où le produit a été retiré des étagères
+        if (result.message && result.message.includes('removed from shelves')) {
+          return {
+            success: false,
+            message: `Ce produit a été retiré des étagères de CJ Dropshipping (PID: ${pid}). Il n'est plus disponible à l'import.`,
+            product: null,
+            errorCode: 'PRODUCT_REMOVED'
+          };
+        }
+        
+        // ✅ Gérer les autres erreurs
         throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
       }
       
@@ -435,7 +445,24 @@ export class CJFavoriteService {
       this.logger.error(`💥 Erreur import produit ${pid}: ${error instanceof Error ? error.message : String(error)}`);
       this.logger.error(`📊 Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
       this.logger.error('🔍 === FIN ERREUR IMPORT PRODUIT ===');
-      throw error;
+      
+      // ✅ Gérer spécifiquement le cas où le produit a été retiré des étagères
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('removed from shelves')) {
+        return {
+          success: false,
+          message: `Ce produit a été retiré des étagères de CJ Dropshipping (PID: ${pid}). Il n'est plus disponible à l'import.`,
+          product: null,
+          errorCode: 'PRODUCT_REMOVED'
+        };
+      }
+      
+      // ✅ Retourner une erreur gracieuse au lieu de lancer une exception
+      return {
+        success: false,
+        message: errorMessage || 'Erreur lors de l\'import du produit',
+        product: null
+      };
     }
   }
 

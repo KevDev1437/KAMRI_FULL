@@ -281,9 +281,42 @@ export class DuplicatePreventionService {
         // 🆕 CRÉATION d'un nouveau produit
         this.logger.log(`🆕 Création d'un nouveau produit CJ`);
         
+        // ✅ Mapper sku vers productSku si présent (compatibilité)
+        const createData: any = { ...productData };
+        if (createData.sku && !createData.productSku) {
+          createData.productSku = createData.sku;
+          delete createData.sku;
+        }
+        
+        // ✅ Mapper categoryName vers externalCategory si présent
+        if (createData.categoryName && !createData.externalCategory) {
+          createData.externalCategory = createData.categoryName;
+          delete createData.categoryName;
+        }
+        
+        // ✅ Supprimer les champs non valides pour Prisma
+        delete createData.modifiedFields; // Ce champ n'existe pas dans Prisma
+        delete createData.properties; // Ce champ n'existe pas dans Prisma
+        
+        // ✅ S'assurer que status est une string valide (pending, active, inactive, rejected)
+        if (createData.status && typeof createData.status === 'string') {
+          // Si status est un nombre stringifié, le convertir
+          if (createData.status === '2' || createData.status === '1' || createData.status === '0') {
+            // Mapper les statuts CJ vers les statuts KAMRI
+            createData.status = 'pending'; // Par défaut, les produits importés sont en pending
+          }
+        } else {
+          createData.status = 'pending'; // Par défaut
+        }
+        
+        // ✅ S'assurer que source est défini
+        if (!createData.source) {
+          createData.source = 'cj-dropshipping';
+        }
+        
         const newProduct = await this.prisma.product.create({
           data: {
-            ...productData,
+            ...createData,
             importStatus: 'new',
             lastImportAt: new Date(),
           },

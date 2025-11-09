@@ -58,6 +58,10 @@ export default function CJProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<CJProduct | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [pidSearch, setPidSearch] = useState('');
+  const [loadingPidSearch, setLoadingPidSearch] = useState(false);
+  const [pidProduct, setPidProduct] = useState<CJProduct | null>(null);
+  const [importingPid, setImportingPid] = useState(false);
   const toast = useToast();
 
   // Charger les catégories et produits lors de la connexion
@@ -334,6 +338,63 @@ export default function CJProductsPage() {
     }
   };
 
+  // Rechercher un produit par PID
+  const handlePidSearch = async () => {
+    if (!pidSearch.trim()) {
+      toast.showToast({ type: 'warning', title: 'Recherche PID', description: '❌ Veuillez entrer un PID' });
+      return;
+    }
+
+    setLoadingPidSearch(true);
+    setPidProduct(null);
+    try {
+      const product = await getProductDetails(pidSearch.trim());
+      setPidProduct(product);
+      toast.showToast({ type: 'success', title: 'Recherche PID', description: '✅ Produit trouvé !' });
+    } catch (error: any) {
+      console.error('Erreur lors de la recherche par PID:', error);
+      toast.showToast({ 
+        type: 'error', 
+        title: 'Recherche PID', 
+        description: error?.response?.data?.message || '❌ Produit introuvable avec ce PID' 
+      });
+      setPidProduct(null);
+    } finally {
+      setLoadingPidSearch(false);
+    }
+  };
+
+  // Importer directement par PID
+  const handleImportByPid = async () => {
+    if (!pidSearch.trim()) {
+      toast.showToast({ type: 'warning', title: 'Import PID', description: '❌ Veuillez entrer un PID' });
+      return;
+    }
+
+    setImportingPid(true);
+    try {
+      const result = await importProduct(pidSearch.trim());
+      if (result.success) {
+        toast.showToast({ type: 'success', title: 'Import PID', description: '✅ Produit importé avec succès !' });
+        setPidSearch('');
+        setPidProduct(null);
+        // Rafraîchir les notifications
+        window.dispatchEvent(new Event('refreshStoreNotifications'));
+      } else {
+        toast.showToast({ type: 'error', title: 'Import PID', description: `❌ ${result.message}` });
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de l\'import par PID:', error);
+      toast.showToast({ 
+        type: 'error', 
+        title: 'Import PID', 
+        description: error?.response?.data?.message || '❌ Erreur lors de l\'import du produit' 
+      });
+    } finally {
+      setImportingPid(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="mb-8">
@@ -350,6 +411,104 @@ export default function CJProductsPage() {
           <p className="text-red-800">{error}</p>
         </div>
       )}
+
+      {/* Recherche par PID */}
+      <Card className="mb-6 p-4 bg-blue-50 border-blue-200">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rechercher ou importer directement par PID
+            </label>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Entrez le PID du produit (ex: 1551876795908239360)"
+                value={pidSearch}
+                onChange={(e) => setPidSearch(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePidSearch();
+                  }
+                }}
+                className="flex-1"
+                disabled={loadingPidSearch || importingPid}
+              />
+              <Button
+                onClick={handlePidSearch}
+                disabled={loadingPidSearch || importingPid || !pidSearch.trim()}
+                variant="outline"
+              >
+                {loadingPidSearch ? 'Recherche...' : 'Rechercher'}
+              </Button>
+              <Button
+                onClick={handleImportByPid}
+                disabled={importingPid || loadingPidSearch || !pidSearch.trim()}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {importingPid ? 'Import...' : 'Importer directement'}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Si le produit n'apparaît pas dans la recherche, vous pouvez l'importer directement avec son PID (visible dans les webhooks)
+            </p>
+          </div>
+        </div>
+
+        {/* Afficher le produit trouvé par PID */}
+        {pidProduct && (
+          <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-2">{pidProduct.productNameEn || pidProduct.productName}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">PID:</span>
+                    <span className="ml-2 font-mono text-xs">{pidProduct.pid}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">SKU:</span>
+                    <span className="ml-2 font-mono text-xs">{pidProduct.productSku}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Prix:</span>
+                    <span className="ml-2 font-semibold">{pidProduct.sellPrice} €</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Catégorie:</span>
+                    <span className="ml-2">{pidProduct.categoryName}</span>
+                  </div>
+                </div>
+                {pidProduct.productImage && (
+                  <div className="mt-3">
+                    <img 
+                      src={Array.isArray(pidProduct.productImage) ? pidProduct.productImage[0] : pidProduct.productImage} 
+                      alt={pidProduct.productNameEn || pidProduct.productName}
+                      className="w-32 h-32 object-cover rounded border border-gray-200"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 ml-4">
+                <Button
+                  onClick={() => handleShowDetails(pidProduct)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Voir détails
+                </Button>
+                <Button
+                  onClick={handleImportByPid}
+                  disabled={importingPid}
+                  className="bg-green-600 hover:bg-green-700"
+                  size="sm"
+                >
+                  {importingPid ? 'Import...' : 'Importer'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Filtres de recherche */}
       <Card className="p-6 mb-6">

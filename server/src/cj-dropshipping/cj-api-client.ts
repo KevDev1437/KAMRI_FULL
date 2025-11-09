@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 import axios, { AxiosInstance } from 'axios';
 
 export class CJAPIError extends Error {
@@ -102,7 +103,8 @@ export class CJAPIClient {
   public tier: 'free' | 'plus' | 'prime' | 'advanced' = 'free';
 
   constructor(
-    private configService: ConfigService
+    private configService: ConfigService,
+    private prisma?: PrismaService
   ) {
     this.axiosInstance = axios.create({
       baseURL: this.baseURL,
@@ -145,12 +147,77 @@ export class CJAPIClient {
   }
 
   /**
+   * Charger le token depuis la base de données
+   */
+  async loadTokenFromDatabase(): Promise<boolean> {
+    if (!this.prisma) {
+      return false;
+    }
+    try {
+      const config = await this.prisma.cJConfig.findFirst();
+      if (!config) {
+        return false;
+      }
+
+      if (config.accessToken && config.refreshToken && config.tokenExpiry) {
+        const expiryDate = new Date(config.tokenExpiry);
+        // Vérifier si le token est encore valide (avec une marge de 1 heure)
+        if (new Date() < new Date(expiryDate.getTime() - 60 * 60 * 1000)) {
+          this.accessToken = config.accessToken;
+          this.refreshToken = config.refreshToken;
+          this.tokenExpiry = expiryDate;
+          this.logger.log('✅ Token chargé depuis la base de données (valide jusqu\'à ' + expiryDate.toISOString() + ')');
+          return true;
+        } else {
+          this.logger.log('⚠️ Token en base de données expiré, nouveau login requis');
+          return false;
+        }
+      }
+      return false;
+    } catch (error) {
+      this.logger.error('Erreur lors du chargement du token depuis la base de données:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Sauvegarder le token dans la base de données
+   */
+  private async saveTokenToDatabase(): Promise<void> {
+    if (!this.prisma) {
+      this.logger.warn('⚠️ PrismaService non disponible, impossible de sauvegarder le token');
+      return;
+    }
+    try {
+      const config = await this.prisma.cJConfig.findFirst();
+      if (!config) {
+        this.logger.warn('⚠️ Aucune configuration CJ trouvée pour sauvegarder le token');
+        return;
+      }
+
+      await this.prisma.cJConfig.update({
+        where: { id: config.id },
+        data: {
+          accessToken: this.accessToken,
+          refreshToken: this.refreshToken,
+          tokenExpiry: this.tokenExpiry,
+          updatedAt: new Date()
+        }
+      });
+      this.logger.log('✅ Token sauvegardé dans la base de données');
+    } catch (error) {
+      this.logger.error('Erreur lors de la sauvegarde du token dans la base de données:', error);
+      // Ne pas bloquer si la sauvegarde échoue
+    }
+  }
+
+  /**
    * Authentification avec l'API CJ
    */
   async login(): Promise<void> {
     try {
       this.checkConfig();
-      this.logger.log('Authentification avec CJ Dropshipping...');
+      this.logger.log('🔐 Authentification avec CJ Dropshipping...');
       this.logger.log('Config:', JSON.stringify(this.config, null, 2));
       
       const response = await this.axiosInstance.post('/authentication/getAccessToken', {
@@ -168,9 +235,12 @@ export class CJAPIClient {
       this.refreshToken = data.refreshToken;
       this.tokenExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 jours
 
-      this.logger.log('Authentification réussie');
+      // ✅ Sauvegarder le token dans la base de données
+      await this.saveTokenToDatabase();
+
+      this.logger.log('✅ Authentification réussie et token sauvegardé');
     } catch (error) {
-      this.logger.error('Erreur d\'authentification:', error);
+      this.logger.error('❌ Erreur d\'authentification:', error);
       throw error;
     }
   }
@@ -220,11 +290,21 @@ export class CJAPIClient {
 
   async refreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
-      throw new Error('Aucun refresh token disponible');
+      // ✅ Essayer de charger le refresh token depuis la base de données
+      if (!this.prisma) {
+        throw new Error('Aucun refresh token disponible et PrismaService non disponible');
+      }
+      const config = await this.prisma.cJConfig.findFirst();
+      if (config?.refreshToken) {
+        this.refreshToken = config.refreshToken;
+        this.logger.log('✅ Refresh token chargé depuis la base de données');
+      } else {
+        throw new Error('Aucun refresh token disponible');
+      }
     }
 
     try {
-      this.logger.log('Rafraîchissement du token...');
+      this.logger.log('🔄 Rafraîchissement du token...');
       
       const response = await this.axiosInstance.post('/authentication/refreshAccessToken', {
         refreshToken: this.refreshToken,
@@ -235,10 +315,14 @@ export class CJAPIClient {
       this.refreshToken = data.refreshToken;
       this.tokenExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
 
-      this.logger.log('Token rafraîchi avec succès');
+      // ✅ Sauvegarder le token rafraîchi dans la base de données
+      await this.saveTokenToDatabase();
+
+      this.logger.log('✅ Token rafraîchi avec succès et sauvegardé');
     } catch (error) {
-      this.logger.error('Erreur de rafraîchissement du token:', error);
-      // Si le refresh échoue, on relogin
+      this.logger.error('❌ Erreur de rafraîchissement du token:', error);
+      // Si le refresh échoue, on relogin (dernier recours)
+      this.logger.log('🔄 Tentative de login...');
       await this.login();
     }
   }
@@ -312,10 +396,18 @@ export class CJAPIClient {
     await this.handleRateLimit();
     this.logger.log('✅ Rate limiting géré');
 
-    // Vérifier et rafraîchir le token si nécessaire
+    // ✅ Vérifier et charger le token depuis la base de données si nécessaire
     if (!this.accessToken || (this.tokenExpiry && new Date() >= this.tokenExpiry)) {
-      this.logger.log('🔄 Token expiré ou manquant, rafraîchissement...');
-      await this.refreshAccessToken();
+      this.logger.log('🔄 Token expiré ou manquant, tentative de chargement depuis la base de données...');
+      
+      // Essayer de charger depuis la base de données
+      const loaded = await this.loadTokenFromDatabase();
+      
+      if (!loaded) {
+        // Si le token n'est pas en base ou est expiré, essayer de le rafraîchir
+        this.logger.log('🔄 Token non trouvé en base ou expiré, rafraîchissement...');
+        await this.refreshAccessToken();
+      }
     }
     this.logger.log('✅ Token valide');
 
@@ -562,13 +654,39 @@ export class CJAPIClient {
       const response = await this.makeRequest('GET', endpoint);
       
       this.logger.log('✅ Réponse API CJ reçue');
-      this.logger.log('📊 Structure de la réponse:', {
+      this.logger.log('📊 Structure complète de la réponse:', JSON.stringify({
+        code: response.code,
+        result: response.result,
         hasData: !!response.data,
         dataType: typeof response.data,
-        hasProduct: !!(response.data as any)?.productNameEn
-      });
+        dataIsNull: response.data === null,
+        dataIsUndefined: response.data === undefined,
+        hasProduct: !!(response.data as any)?.productNameEn,
+        hasPid: !!(response.data as any)?.pid,
+        message: response.message
+      }, null, 2));
+      
+      // Vérifier si l'API retourne une erreur
+      if (response.code !== 200 || !response.result) {
+        this.logger.error(`❌ API CJ a retourné une erreur: code=${response.code}, result=${response.result}, message=${response.message}`);
+        throw new Error(response.message || `Produit ${pid} non trouvé dans l'API CJ (code: ${response.code})`);
+      }
+      
+      // Vérifier si data est null ou undefined
+      if (response.data === null || response.data === undefined) {
+        this.logger.error(`❌ API CJ a retourné data null/undefined pour PID ${pid}`);
+        this.logger.error(`📊 Code: ${response.code}, Result: ${response.result}, Message: ${response.message}`);
+        throw new Error(`Produit ${pid} non trouvé dans l'API CJ Dropshipping (data null/undefined)`);
+      }
       
       const result = response.data as any;
+      
+      // Vérifier si le résultat a un pid
+      if (!result.pid && !result.productId) {
+        this.logger.error(`❌ Produit retourné sans pid/productId:`, JSON.stringify(result).substring(0, 300));
+        throw new Error(`Structure de produit invalide retournée par l'API CJ pour ${pid}`);
+      }
+      
       this.logger.log('🎉 getProductDetails terminé avec succès');
       this.logger.log('🔍 === FIN getProductDetails ===');
       
