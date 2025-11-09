@@ -28,6 +28,21 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+interface ProductVariant {
+  id: string
+  name?: string
+  sku?: string
+  price?: number
+  weight?: number
+  dimensions?: string
+  image?: string
+  status?: string
+  properties?: string
+  stock?: number
+  isActive: boolean
+  cjVariantId?: string
+}
+
 interface DraftProduct {
   id: string
   name: string
@@ -36,7 +51,8 @@ interface DraftProduct {
   originalPrice?: number
   margin?: number
   image?: string
-  images?: Array<{ id: string; url: string }>
+  images?: Array<{ id: string; url: string }> | string[] // ✅ Supporte les deux formats
+  productVariants?: ProductVariant[] // ✅ Variants du produit
   categoryId?: string
   category?: { id: string; name: string }
   supplierId?: string
@@ -71,6 +87,8 @@ export default function DraftProductsPage() {
   const [formData, setFormData] = useState<Partial<DraftProduct>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState<{ [key: string]: number }>({}) // ✅ Index de l'image actuelle par produit
+  const [editingVariants, setEditingVariants] = useState<{ [key: string]: ProductVariant[] }>({}) // ✅ Variants en cours d'édition
   const { isAuthenticated } = useAuth()
   const toast = useToast()
   const router = useRouter()
@@ -154,12 +172,44 @@ export default function DraftProductsPage() {
     // ✅ Nettoyer l'image si c'est un tableau JSON stringifié
     const cleanImage = getCleanImageUrl(product.image) || ''
     
+    // ✅ Récupérer toutes les images (depuis la relation images ou depuis le champ image)
+    const allImages: string[] = []
+    if (product.images && product.images.length > 0) {
+      // Vérifier si c'est un tableau d'objets ou de strings
+      if (typeof product.images[0] === 'string') {
+        allImages.push(...(product.images as string[]))
+      } else {
+        allImages.push(...(product.images as Array<{ id: string; url: string }>).map(img => img.url))
+      }
+    } else if (product.image) {
+      try {
+        const parsed = JSON.parse(product.image)
+        if (Array.isArray(parsed)) {
+          allImages.push(...parsed)
+        } else {
+          allImages.push(product.image)
+        }
+      } catch {
+        allImages.push(product.image)
+      }
+    }
+    
+    // ✅ Initialiser l'index de l'image actuelle
+    setCurrentImageIndex(prev => ({ ...prev, [product.id]: 0 }))
+    
+    // ✅ Initialiser les variants en cours d'édition
+    setEditingVariants(prev => ({
+      ...prev,
+      [product.id]: product.productVariants || []
+    }))
+    
     setFormData({
       name: product.name,
       description: product.description || '',
       margin: product.margin || 30,
       categoryId: product.categoryId || '',
-      image: cleanImage,
+      image: cleanImage || allImages[0] || '',
+      images: allImages, // ✅ Stocker toutes les images
       badge: product.badge || 'none',
       stock: product.stock || 0,
     })
@@ -168,11 +218,25 @@ export default function DraftProductsPage() {
   const handleCancel = () => {
     setEditingId(null)
     setFormData({})
+    setCurrentImageIndex({})
+    setEditingVariants({})
   }
 
   const handleSave = async (id: string) => {
     try {
       setIsSaving(true)
+
+      // ✅ Préparer les images (utiliser toutes les images si disponibles)
+      const imagesToSave: string[] = []
+      if (formData.images && formData.images.length > 0) {
+        if (typeof formData.images[0] === 'string') {
+          imagesToSave.push(...(formData.images as string[]))
+        } else {
+          imagesToSave.push(...(formData.images as Array<{ id: string; url: string }>).map(img => img.url))
+        }
+      } else if (formData.image) {
+        imagesToSave.push(formData.image)
+      }
 
       const response = await apiClient.editDraftProduct(id, {
         name: formData.name,
@@ -180,6 +244,7 @@ export default function DraftProductsPage() {
         margin: formData.margin,
         categoryId: formData.categoryId,
         image: formData.image,
+        images: imagesToSave.length > 0 ? imagesToSave : undefined, // ✅ Envoyer toutes les images
         badge: formData.badge === 'none' ? undefined : formData.badge,
         stock: formData.stock,
       })
@@ -568,36 +633,228 @@ export default function DraftProductsPage() {
                           </Select>
                         </div>
 
-                        {/* Aperçu de l'image */}
+                        {/* ✅ Galerie d'images avec navigation */}
                         {(() => {
-                          // ✅ Nettoyer l'URL de l'image (gérer les tableaux JSON)
-                          const imageUrl = getCleanImageUrl(formData.image)
+                          // ✅ Récupérer toutes les images disponibles
+                          const allImages: string[] = []
+                          if (formData.images && formData.images.length > 0) {
+                            if (typeof formData.images[0] === 'string') {
+                              allImages.push(...(formData.images as string[]))
+                            } else {
+                              allImages.push(...(formData.images as Array<{ id: string; url: string }>).map(img => img.url))
+                            }
+                          } else if (formData.image) {
+                            allImages.push(formData.image)
+                          }
                           
-                          if (imageUrl) {
-                            return (
-                              <div>
-                                <Label>Aperçu de l'image</Label>
-                                <div className="mt-2 border rounded-lg p-2 bg-gray-50 flex items-center justify-center min-h-[300px]">
+                          if (allImages.length === 0) return null
+                          
+                          const currentIndex = currentImageIndex[product.id] || 0
+                          const currentImage = allImages[currentIndex]
+                          
+                          return (
+                            <div>
+                              <Label>Galerie d'images ({allImages.length} image{allImages.length > 1 ? 's' : ''})</Label>
+                              
+                              {/* Image principale avec navigation */}
+                              <div className="mt-2 border rounded-lg p-2 bg-gray-50 relative">
+                                <div className="flex items-center justify-center min-h-[300px] relative">
                                   <img
-                                    src={imageUrl}
-                                    alt="Aperçu du produit"
+                                    src={currentImage}
+                                    alt={`Aperçu ${currentIndex + 1}/${allImages.length}`}
                                     className="max-w-full max-h-[400px] object-contain rounded"
                                     onError={(e) => {
-                                      // Afficher un placeholder si l'image ne charge pas
                                       e.currentTarget.src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+non+disponible'
                                     }}
                                   />
+                                  
+                                  {/* Navigation si plusieurs images */}
+                                  {allImages.length > 1 && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newIndex = currentIndex > 0 ? currentIndex - 1 : allImages.length - 1
+                                          setCurrentImageIndex(prev => ({ ...prev, [product.id]: newIndex }))
+                                        }}
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all z-10"
+                                      >
+                                        ‹
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newIndex = currentIndex < allImages.length - 1 ? currentIndex + 1 : 0
+                                          setCurrentImageIndex(prev => ({ ...prev, [product.id]: newIndex }))
+                                        }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all z-10"
+                                      >
+                                        ›
+                                      </button>
+                                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                                        {currentIndex + 1} / {allImages.length}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
-                                {formData.image && formData.image !== imageUrl && (
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    ℹ️ Première image extraite d'un tableau JSON
-                                  </p>
+                                
+                                {/* Miniatures des images */}
+                                {allImages.length > 1 && (
+                                  <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                                    {allImages.map((img, idx) => (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setCurrentImageIndex(prev => ({ ...prev, [product.id]: idx }))}
+                                        className={`flex-shrink-0 w-16 h-16 border-2 rounded overflow-hidden ${
+                                          idx === currentIndex ? 'border-blue-500' : 'border-gray-300'
+                                        }`}
+                                      >
+                                        <img
+                                          src={img}
+                                          alt={`Miniature ${idx + 1}`}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.src = 'https://via.placeholder.com/64/f3f4f6/9ca3af?text=+'
+                                          }}
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
-                            )
-                          }
-                          return null
+                            </div>
+                          )
                         })()}
+                        
+                        {/* ✅ Gestion des variants */}
+                        {editingVariants[product.id] && editingVariants[product.id].length > 0 && (
+                          <div className="mt-4">
+                            <Label>Variants du produit ({editingVariants[product.id].length} variant{editingVariants[product.id].length > 1 ? 's' : ''})</Label>
+                            <div className="mt-2 space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                              {editingVariants[product.id].map((variant, idx) => {
+                                // Parser les propriétés JSON
+                                let properties: any = {}
+                                try {
+                                  if (variant.properties) {
+                                    properties = typeof variant.properties === 'string' 
+                                      ? JSON.parse(variant.properties) 
+                                      : variant.properties
+                                  }
+                                } catch (e) {
+                                  properties = {}
+                                }
+                                
+                                // Parser les dimensions JSON
+                                let dimensions: any = {}
+                                try {
+                                  if (variant.dimensions) {
+                                    dimensions = typeof variant.dimensions === 'string'
+                                      ? JSON.parse(variant.dimensions)
+                                      : variant.dimensions
+                                  }
+                                } catch (e) {
+                                  dimensions = {}
+                                }
+                                
+                                return (
+                                  <div key={variant.id || idx} className="bg-white border rounded-lg p-3">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <p className="font-medium text-sm">
+                                          {variant.name || `Variant ${idx + 1}`}
+                                        </p>
+                                        {variant.sku && (
+                                          <p className="text-xs text-gray-500 font-mono">SKU: {variant.sku}</p>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {variant.image && (
+                                          <img
+                                            src={variant.image}
+                                            alt={variant.name || `Variant ${idx + 1}`}
+                                            className="w-12 h-12 object-cover rounded border"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none'
+                                            }}
+                                          />
+                                        )}
+                                        <span className={`text-xs px-2 py-1 rounded ${
+                                          variant.isActive 
+                                            ? 'bg-green-100 text-green-800' 
+                                            : 'bg-gray-100 text-gray-800'
+                                        }`}>
+                                          {variant.isActive ? 'Actif' : 'Inactif'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                      {variant.price !== undefined && variant.price !== null && (
+                                        <div>
+                                          <span className="text-gray-500">Prix:</span>
+                                          <span className="ml-1 font-semibold">{variant.price}€</span>
+                                        </div>
+                                      )}
+                                      {variant.stock !== undefined && variant.stock !== null && (
+                                        <div>
+                                          <span className="text-gray-500">Stock:</span>
+                                          <span className="ml-1">{variant.stock}</span>
+                                        </div>
+                                      )}
+                                      {variant.weight !== undefined && variant.weight !== null && (
+                                        <div>
+                                          <span className="text-gray-500">Poids:</span>
+                                          <span className="ml-1">{variant.weight}g</span>
+                                        </div>
+                                      )}
+                                      {dimensions && Object.keys(dimensions).length > 0 && (
+                                        <div>
+                                          <span className="text-gray-500">Dimensions:</span>
+                                          <span className="ml-1">
+                                            {dimensions.length || '-'}×{dimensions.width || '-'}×{dimensions.height || '-'}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Propriétés du variant */}
+                                    {properties && Object.keys(properties).length > 0 && (
+                                      <div className="mt-2 pt-2 border-t text-xs">
+                                        <span className="text-gray-500">Propriétés:</span>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {properties.key && (
+                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                                              {properties.key}
+                                            </span>
+                                          )}
+                                          {properties.value1 && (
+                                            <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                                              {properties.value1}
+                                            </span>
+                                          )}
+                                          {properties.value2 && (
+                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                              {properties.value2}
+                                            </span>
+                                          )}
+                                          {properties.value3 && (
+                                            <span className="px-2 py-0.5 bg-orange-100 text-orange-800 rounded">
+                                              {properties.value3}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                              ℹ️ Les variants sont en lecture seule. Pour modifier un variant, utilisez la page de gestion des variants.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 

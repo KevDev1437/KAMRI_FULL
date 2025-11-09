@@ -886,6 +886,7 @@ export class ProductsService {
         category: true,
         supplier: true,
         images: true,
+        productVariants: true, // ✅ Inclure les variants
         cjMapping: true
       },
       orderBy: {
@@ -911,6 +912,7 @@ export class ProductsService {
         category: true,
         supplier: true,
         images: true,
+        productVariants: true, // ✅ Inclure les variants
         cjMapping: true
       }
     });
