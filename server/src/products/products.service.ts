@@ -518,10 +518,36 @@ export class ProductsService {
     formatted = formatted.replace(/&#39;/g, "'");
     formatted = formatted.replace(/&apos;/g, "'");
     
-    // 3. Structurer les informations de produit (Product information:)
+    // 3. ✅ CORRECTION : Ajouter des espaces manquants entre les mots
+    // Ex: "Asiansizesare1to2sizessmaller" → "Asian sizes are 1 to 2 sizes smaller"
+    formatted = formatted.replace(/([a-z])([A-Z])/g, '$1 $2'); // Ajouter espace entre minuscule et majuscule
+    formatted = formatted.replace(/([a-z])(\d)/g, '$1 $2'); // Ajouter espace entre lettre et chiffre
+    formatted = formatted.replace(/(\d)([A-Za-z])/g, '$1 $2'); // Ajouter espace entre chiffre et lettre
+    formatted = formatted.replace(/([.!?])([A-Za-z])/g, '$1 $2'); // Ajouter espace après ponctuation
+    
+    // 4. Structurer les informations de produit (Product information:)
     formatted = formatted.replace(/Product information:/gi, '\n\n## 📋 INFORMATIONS DU PRODUIT\n');
     
-    // 4. Détecter et formater les champs avec le pattern "Label: Value" (sans saut de ligne entre eux)
+    // 5. ✅ Extraire et formater les notes importantes
+    // Pattern: "1.Asiansizesare..." ou "1. Asian sizes are..." ou "Note: ..."
+    formatted = formatted.replace(/(\d+\.)\s*([A-Z][^.!?]*[.!?])/g, (match, num, note) => {
+      const cleanNote = note.trim();
+      return `\n\n**Note ${num.trim()}:** ${cleanNote}`;
+    });
+    
+    // Pattern: "Please check..." ou "Please allow..." (notes sans numéro)
+    formatted = formatted.replace(/(Please\s+[^.!?]*[.!?])/gi, (match, note) => {
+      const cleanNote = note.trim();
+      return `\n\n**Note:** ${cleanNote}`;
+    });
+    
+    // Pattern: "if you don't know..." (notes conditionnelles)
+    formatted = formatted.replace(/(if\s+you\s+[^.!?]*[.!?])/gi, (match, note) => {
+      const cleanNote = note.trim();
+      return `\n\n**Note:** ${cleanNote}`;
+    });
+    
+    // 6. Détecter et formater les champs avec le pattern "Label: Value" (sans saut de ligne entre eux)
     // D'abord, détecter les patterns comme "Fabric name:", "Color:", "Size:" qui sont collés ensemble
     formatted = formatted.replace(/([A-Z][a-z\s]+):\s*([^A-Z\n]+?)(?=[A-Z][a-z\s]+:|$)/g, (match, label, value) => {
       // Nettoyer le label et la valeur
@@ -644,7 +670,24 @@ export class ProductsService {
       }
     });
     
-    // 9. Formater les notes (Note: ...)
+    // 9. ✅ Extraire et formater les notes importantes sur les tailles asiatiques
+    // Pattern: "Asian sizes are 1 to 2 sizes smaller..."
+    formatted = formatted.replace(/Asian\s+sizes\s+are\s+(\d+)\s+to\s+(\d+)\s+sizes\s+smaller\s+than\s+European\s+and\s+American\s+people/gi, 
+      '**⚠️ Note importante:** Les tailles asiatiques sont $1 à $2 tailles plus petites que les tailles européennes et américaines');
+    
+    formatted = formatted.replace(/Choose\s+the\s+larger\s+size\s+if\s+your\s+size\s+between\s+two\s+sizes/gi,
+      'Choisissez la taille supérieure si votre taille se situe entre deux tailles');
+    
+    formatted = formatted.replace(/Please\s+allow\s+(\d+)-(\d+)\s*cm\s+differences\s+due\s+to\s+manual\s+measurement/gi,
+      'Veuillez prévoir $1-$2 cm de différence en raison de la mesure manuelle');
+    
+    formatted = formatted.replace(/Please\s+check\s+the\s+size\s+chart\s+carefully\s+before\s+you\s+buy\s+the\s+item/gi,
+      '**📏 Important:** Veuillez vérifier attentivement le tableau des tailles avant d\'acheter l\'article');
+    
+    formatted = formatted.replace(/if\s+you\s+don'?t\s+know\s+how\s+to\s+choose\s+size/gi,
+      '**💡 Conseil:** Si vous ne savez pas comment choisir la taille, contactez notre service client');
+    
+    // 10. Formater les notes (Note: ...)
     formatted = formatted.replace(/Note:\s*([^\n]+(?:\n[^\n]+)*)/gi, (match, note) => {
       const notes = note
         .split(/(?=\d+\.)/)
@@ -655,18 +698,18 @@ export class ProductsService {
       return `\n\n## ⚠️ NOTES IMPORTANTES\n${notes}`;
     });
     
-    // 10. Structurer les sections avec des sauts de ligne
+    // 11. Structurer les sections avec des sauts de ligne
     formatted = formatted.replace(/\n\n\*\*/g, '\n**');
     formatted = formatted.replace(/\*\*([^*]+)\*\*:\s*/g, '\n**$1:**\n');
     
-    // 11. Nettoyer les espaces multiples (mais préserver les sauts de ligne)
+    // 12. Nettoyer les espaces multiples (mais préserver les sauts de ligne)
     formatted = formatted.replace(/[ \t]+/g, ' '); // Remplacer les espaces multiples par un seul
     formatted = formatted.replace(/[ \t]+$/gm, ''); // Supprimer les espaces en fin de ligne
     
-    // 12. Nettoyer les sauts de ligne multiples (garder max 2 sauts de ligne)
+    // 13. Nettoyer les sauts de ligne multiples (garder max 2 sauts de ligne)
     formatted = formatted.replace(/\n{3,}/g, '\n\n');
     
-    // 13. Supprimer les espaces en début de ligne (sauf pour les listes)
+    // 14. Supprimer les espaces en début de ligne (sauf pour les listes)
     formatted = formatted.split('\n').map(line => {
       // Préserver l'indentation des listes (commençant par - ou •)
       if (line.match(/^[\s]*[-•]/)) {
@@ -675,14 +718,14 @@ export class ProductsService {
       return line.trim();
     }).join('\n');
     
-    // 14. Supprimer les lignes vides en début et fin
+    // 15. Supprimer les lignes vides en début et fin
     formatted = formatted.trim();
     
-    // 15. Remplacer les crochets chinois par des sauts de ligne
+    // 16. Remplacer les crochets chinois par des sauts de ligne
     formatted = formatted.replace(/【/g, '\n\n🌸 ');
     formatted = formatted.replace(/】/g, '');
     
-    // 16. Finaliser le formatage
+    // 17. Finaliser le formatage
     formatted = formatted.replace(/\n{3,}/g, '\n\n');
     
     return formatted;

@@ -732,10 +732,16 @@ export default function DraftProductsPage() {
               // Ajouter à la map si on a trouvé une couleur
               if (variantColor) {
                 const colorLower = variantColor.toLowerCase()
+                // ✅ IMPORTANT : Si la couleur existe déjà, garder la première image trouvée
+                // Mais si on a plusieurs variants de la même couleur, on peut les stocker tous
                 if (!colorMap.has(colorLower)) {
                   colorMap.set(colorLower, variant.image)
                   variantsWithImages.push({ color: variantColor, image: variant.image })
-                  console.log(`✅ [DEBUG] Variant ajouté à la map: "${variantColor}" → image`)
+                  console.log(`✅ [DEBUG] Variant ajouté à la map: "${variantColor}" → image (variant: "${variant.name}")`)
+                } else {
+                  // Si la couleur existe déjà, on peut quand même garder l'image pour référence
+                  // Mais on garde la première trouvée comme image principale
+                  console.log(`ℹ️ [DEBUG] Variant "${variantColor}" déjà dans la map, image principale: ${colorMap.get(colorLower)?.substring(0, 50)}`)
                 }
               } else {
                 // Si pas de couleur trouvée, garder quand même l'image pour distribution
@@ -859,7 +865,44 @@ export default function DraftProductsPage() {
           info.colors = colorNames.map((colorName, idx) => {
             const colorNameLower = colorName.toLowerCase()
             
-            // 1. Chercher une correspondance exacte ou partielle dans la map
+            // 1. ✅ PRIORITÉ ABSOLUE : Chercher un variant avec cette couleur exacte et utiliser son image
+            // Ex: "Black" → chercher un variant avec name="Black-170" ou "Black 175" et utiliser son image
+            if (product?.productVariants && product.productVariants.length > 0) {
+              for (const variant of product.productVariants) {
+                if (!variant.image || !variant.name) continue
+                
+                // Extraire la couleur depuis le nom du variant
+                const variantName = variant.name.trim()
+                let variantColorFromName = ''
+                
+                // Pattern 1 : "Black-170" ou "Black 175"
+                const colorMatch = variantName.match(/^([a-zA-Z]+)[-\s]+(\d+)$/i)
+                if (colorMatch && colorMatch[1]) {
+                  variantColorFromName = colorMatch[1].trim().toLowerCase()
+                } else {
+                  // Pattern 2 : "Black Single Liner-35"
+                  const colorMatch2 = variantName.match(/^([a-zA-Z]+)\s+(?:single|double|triple|fur|liner|lining|material)/i)
+                  if (colorMatch2 && colorMatch2[1]) {
+                    variantColorFromName = colorMatch2[1].trim().toLowerCase()
+                  } else {
+                    // Pattern 3 : Premier mot
+                    const firstWord = variantName.split(/\s+/)[0]
+                    if (firstWord && !/^[0-9]+$/.test(firstWord)) {
+                      variantColorFromName = firstWord.toLowerCase()
+                    }
+                  }
+                }
+                
+                // Si la couleur du variant correspond exactement à la couleur recherchée
+                if (variantColorFromName === colorNameLower && !usedVariantImages.has(variant.image)) {
+                  usedVariantImages.add(variant.image)
+                  console.log(`✅ [DEBUG] Correspondance EXACTE variant: "${colorName}" → variant "${variant.name}" avec image directe`)
+                  return { name: colorName, image: variant.image }
+                }
+              }
+            }
+            
+            // 2. Chercher une correspondance exacte ou partielle dans la map
             for (const [variantColor, variantImage] of colorMapEntries) {
               const variantColorLower = variantColor.toLowerCase()
               
