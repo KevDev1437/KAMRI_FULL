@@ -42,30 +42,7 @@ export class ProductsService {
     // ✅ Formater la description avec une structure claire
     let formattedDescription = product.description;
     if (formattedDescription) {
-      // Supprimer toutes les balises HTML
-      formattedDescription = formattedDescription.replace(/<[^>]*>/g, '');
-      // Remplacer les entités HTML communes
-      formattedDescription = formattedDescription.replace(/&nbsp;/g, ' ');
-      formattedDescription = formattedDescription.replace(/&amp;/g, '&');
-      formattedDescription = formattedDescription.replace(/&lt;/g, '<');
-      formattedDescription = formattedDescription.replace(/&gt;/g, '>');
-      formattedDescription = formattedDescription.replace(/&quot;/g, '"');
-      
-      // ✅ Structurer la description avec des sauts de ligne
-      // Remplacer les parenthèses ouvrantes par des sauts de ligne
-      formattedDescription = formattedDescription.replace(/\(/g, '\n\n• ');
-      // Remplacer les crochets chinois par des sauts de ligne
-      formattedDescription = formattedDescription.replace(/【/g, '\n\n🌸 ');
-      formattedDescription = formattedDescription.replace(/】/g, '');
-      
-      // Nettoyer les espaces multiples
-      formattedDescription = formattedDescription.replace(/\s+/g, ' ');
-      // Nettoyer les sauts de ligne multiples
-      formattedDescription = formattedDescription.replace(/\n\s*\n/g, '\n\n');
-      // Supprimer les espaces en début et fin de ligne
-      formattedDescription = formattedDescription.split('\n').map(line => line.trim()).join('\n');
-      // Supprimer les lignes vides en début et fin
-      formattedDescription = formattedDescription.trim();
+      formattedDescription = this.formatProductDescription(formattedDescription);
     }
 
     return {
@@ -522,6 +499,195 @@ export class ProductsService {
   /**
    * Nettoyer la description d'un produit
    */
+  /**
+   * Formater la description du produit avec une structure claire
+   * Extrait et structure les informations importantes (tailles, couleurs, matériaux, etc.)
+   */
+  private formatProductDescription(description: string): string {
+    if (!description) return '';
+
+    // 1. Supprimer toutes les balises HTML
+    let formatted = description.replace(/<[^>]*>/g, '');
+    
+    // 2. Remplacer les entités HTML communes
+    formatted = formatted.replace(/&nbsp;/g, ' ');
+    formatted = formatted.replace(/&amp;/g, '&');
+    formatted = formatted.replace(/&lt;/g, '<');
+    formatted = formatted.replace(/&gt;/g, '>');
+    formatted = formatted.replace(/&quot;/g, '"');
+    formatted = formatted.replace(/&#39;/g, "'");
+    formatted = formatted.replace(/&apos;/g, "'");
+    
+    // 3. Structurer les informations de produit (Product information:)
+    formatted = formatted.replace(/Product information:/gi, '\n\n## 📋 INFORMATIONS DU PRODUIT\n');
+    
+    // 4. Détecter et formater les champs avec le pattern "Label: Value" (sans saut de ligne entre eux)
+    // D'abord, détecter les patterns comme "Fabric name:", "Color:", "Size:" qui sont collés ensemble
+    formatted = formatted.replace(/([A-Z][a-z\s]+):\s*([^A-Z\n]+?)(?=[A-Z][a-z\s]+:|$)/g, (match, label, value) => {
+      // Nettoyer le label et la valeur
+      const cleanLabel = label.trim();
+      const cleanValue = value.trim();
+      
+      // Traduire les labels communs
+      const labelMap: { [key: string]: string } = {
+        'Fabric name': 'Nom du tissu',
+        'Color': 'Couleur',
+        'Size': 'Tailles disponibles',
+        'Main fabric composition': 'Composition principale',
+        'Applicable Gender': 'Genre applicable',
+        'Style': 'Style',
+        'Packing list': 'Contenu de l\'emballage',
+        'Product Image': 'Image du produit',
+        'Upper material': 'Matériau supérieur',
+        'Sole material': 'Matériau semelle',
+        'Lining composition': 'Composition doublure',
+        'Inner material': 'Matériau intérieur',
+        'Insole material': 'Matériau semelle intérieure',
+        'Mold Cup type': 'Type de bonnet',
+        'Cup type': 'Type de bonnet',
+        'Applicable age group': 'Groupe d\'âge',
+        'Applicable sports': 'Sports applicables',
+        'Function': 'Fonctionnalités',
+        'How to wear': 'Comment porter',
+        'Popular element': 'Éléments populaires',
+        'Heel shape': 'Forme du talon',
+        'Heel height': 'Hauteur du talon',
+        'Toe shape': 'Forme de la pointe',
+      };
+      
+      const translatedLabel = labelMap[cleanLabel] || cleanLabel;
+      
+      // Formater les tailles (S,M,L ou 35,36,37,38,39,40,41,42)
+      if (cleanLabel.toLowerCase().includes('size')) {
+        const cleanSizes = cleanValue
+          .replace(/\s+/g, '') // Supprimer les espaces
+          .split(/[,;]/) // Séparer par virgule ou point-virgule
+          .filter(s => s.trim()) // Filtrer les vides
+          .map(s => s.trim())
+          .join(', '); // Rejoindre avec virgule et espace
+        return `\n\n### 🎯 Tailles disponibles\n${cleanSizes.split(', ').map(s => `- ${s}`).join('\n')}`;
+      }
+      
+      // Formater les couleurs
+      if (cleanLabel.toLowerCase().includes('color')) {
+        const cleanColors = cleanValue
+          .split(/[,;]/)
+          .map(c => c.trim())
+          .filter(c => c)
+          .join(', ');
+        return `\n\n### 🎨 Couleurs disponibles\n${cleanColors.split(', ').map(c => `- ${c}`).join('\n')}`;
+      }
+      
+      // Formater les autres champs
+      return `\n**${translatedLabel}:** ${cleanValue}`;
+    });
+    
+    // 5. Détecter et formater les tailles (Size: S,M,L ou Size: 35,36,37,38,39,40,41,42) - Pattern alternatif
+    formatted = formatted.replace(/Size:\s*([^\n]+)/gi, (match, sizes) => {
+      const cleanSizes = sizes
+        .replace(/\s+/g, '')
+        .split(/[,;]/)
+        .filter(s => s.trim())
+        .map(s => s.trim())
+        .join(', ');
+      return `\n\n### 🎯 Tailles disponibles\n${cleanSizes.split(', ').map(s => `- ${s}`).join('\n')}`;
+    });
+    
+    // 6. Détecter et formater les couleurs (Color: Black, white, black, gray, red) - Pattern alternatif
+    formatted = formatted.replace(/Color:\s*([^\n]+)/gi, (match, colors) => {
+      const cleanColors = colors
+        .split(/[,;]/)
+        .map(c => c.trim())
+        .filter(c => c)
+        .join(', ');
+      return `\n\n### 🎨 Couleurs disponibles\n${cleanColors.split(', ').map(c => `- ${c}`).join('\n')}`;
+    });
+    
+    // 7. Détecter et formater les matériaux
+    const materialPatterns = [
+      { pattern: /Main fabric composition:\s*([^\n]+)/gi, label: 'Composition principale' },
+      { pattern: /Upper material:\s*([^\n]+)/gi, label: 'Matériau supérieur' },
+      { pattern: /Sole material:\s*([^\n]+)/gi, label: 'Matériau semelle' },
+      { pattern: /Lining composition:\s*([^\n]+)/gi, label: 'Composition doublure' },
+      { pattern: /Inner material:\s*([^\n]+)/gi, label: 'Matériau intérieur' },
+      { pattern: /Insole material:\s*([^\n]+)/gi, label: 'Matériau semelle intérieure' },
+    ];
+    
+    materialPatterns.forEach(({ pattern, label }) => {
+      formatted = formatted.replace(pattern, `\n**${label}:** $1`);
+    });
+    
+    // 8. Détecter et formater les autres informations importantes
+    const infoPatterns = [
+      { pattern: /Fabric name:\s*([^\n]+)/gi, label: 'Nom du tissu' },
+      { pattern: /Mold Cup type:\s*([^\n]+)/gi, label: 'Type de bonnet' },
+      { pattern: /Cup type:\s*([^\n]+)/gi, label: 'Type de bonnet' },
+      { pattern: /Applicable Gender:\s*([^\n]+)/gi, label: 'Genre applicable' },
+      { pattern: /Applicable age group:\s*([^\n]+)/gi, label: 'Groupe d\'âge' },
+      { pattern: /Applicable sports:\s*([^\n]+)/gi, label: 'Sports applicables' },
+      { pattern: /Function:\s*([^\n]+)/gi, label: 'Fonctionnalités' },
+      { pattern: /Style:\s*([^\n]+)/gi, label: 'Style' },
+      { pattern: /How to wear:\s*([^\n]+)/gi, label: 'Comment porter' },
+      { pattern: /Popular element[;:]\s*([^\n]+)/gi, label: 'Éléments populaires' },
+      { pattern: /Heel shape:\s*([^\n]+)/gi, label: 'Forme du talon' },
+      { pattern: /Heel height:\s*([^\n]+)/gi, label: 'Hauteur du talon' },
+      { pattern: /Toe shape:\s*([^\n]+)/gi, label: 'Forme de la pointe' },
+      { pattern: /Packing list:\s*([^\n]+)/gi, label: 'Contenu de l\'emballage' },
+      { pattern: /Product Image:\s*([^\n]*)/gi, label: '' }, // Supprimer "Product Image:" s'il est vide
+    ];
+    
+    infoPatterns.forEach(({ pattern, label }) => {
+      if (label) {
+        formatted = formatted.replace(pattern, `\n**${label}:** $1`);
+      } else {
+        formatted = formatted.replace(pattern, ''); // Supprimer si label vide
+      }
+    });
+    
+    // 9. Formater les notes (Note: ...)
+    formatted = formatted.replace(/Note:\s*([^\n]+(?:\n[^\n]+)*)/gi, (match, note) => {
+      const notes = note
+        .split(/(?=\d+\.)/)
+        .map(n => n.trim())
+        .filter(n => n)
+        .map(n => `  • ${n.trim()}`)
+        .join('\n');
+      return `\n\n## ⚠️ NOTES IMPORTANTES\n${notes}`;
+    });
+    
+    // 10. Structurer les sections avec des sauts de ligne
+    formatted = formatted.replace(/\n\n\*\*/g, '\n**');
+    formatted = formatted.replace(/\*\*([^*]+)\*\*:\s*/g, '\n**$1:**\n');
+    
+    // 11. Nettoyer les espaces multiples (mais préserver les sauts de ligne)
+    formatted = formatted.replace(/[ \t]+/g, ' '); // Remplacer les espaces multiples par un seul
+    formatted = formatted.replace(/[ \t]+$/gm, ''); // Supprimer les espaces en fin de ligne
+    
+    // 12. Nettoyer les sauts de ligne multiples (garder max 2 sauts de ligne)
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+    
+    // 13. Supprimer les espaces en début de ligne (sauf pour les listes)
+    formatted = formatted.split('\n').map(line => {
+      // Préserver l'indentation des listes (commençant par - ou •)
+      if (line.match(/^[\s]*[-•]/)) {
+        return line.trimStart().replace(/^[-•]/, '-');
+      }
+      return line.trim();
+    }).join('\n');
+    
+    // 14. Supprimer les lignes vides en début et fin
+    formatted = formatted.trim();
+    
+    // 15. Remplacer les crochets chinois par des sauts de ligne
+    formatted = formatted.replace(/【/g, '\n\n🌸 ');
+    formatted = formatted.replace(/】/g, '');
+    
+    // 16. Finaliser le formatage
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+    
+    return formatted;
+  }
+
   private cleanProductDescription(description: string): string {
     if (!description) return '';
     
@@ -635,7 +801,7 @@ export class ProductsService {
 
     // 4. Nettoyage automatique (Niveau 1)
     const cleanedName = this.cleanProductName(cjProduct.name);
-    const cleanedDescription = this.cleanProductDescription(cjProduct.description || '');
+      const cleanedDescription = this.formatProductDescription(cjProduct.description || '');
     const margin = prepareData.margin || 30;
     const originalPrice = cjProduct.originalPrice || cjProduct.price;
     const calculatedPrice = this.calculatePriceWithMargin(originalPrice, margin);
@@ -756,7 +922,7 @@ export class ProductsService {
 
     // Description
     if (editData.description !== undefined) {
-      updateData.description = this.cleanProductDescription(editData.description);
+      updateData.description = this.formatProductDescription(editData.description);
     }
 
     // Marge et prix
