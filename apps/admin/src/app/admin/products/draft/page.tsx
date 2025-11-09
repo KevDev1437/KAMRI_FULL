@@ -5,24 +5,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
 import {
+  CheckCircle,
   Edit,
-  Eye,
+  Image as ImageIcon,
   Package,
   Save,
   Send,
-  Trash2,
-  X,
-  CheckCircle,
-  AlertCircle,
-  DollarSign,
-  Image as ImageIcon,
-  Tag
+  Tag,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -372,6 +368,338 @@ export default function DraftProductsPage() {
     return null
   }
 
+  // ✅ Extraire les informations structurées de la description ET des variants
+  const extractProductInfo = (description: string, product?: DraftProduct) => {
+    const info = {
+      colors: [] as Array<{ name: string; image?: string }>,
+      sizes: [] as string[],
+      materials: [] as { label: string; value: string }[],
+      otherInfo: [] as { label: string; value: string }[]
+    }
+
+    // ==================== EXTRACTION DES COULEURS ====================
+    
+    // ✅ PRIORITÉ 1 : Extraire depuis la description markdown
+    if (description) {
+      const colorMatch = description.match(/### 🎨 Couleurs disponibles\n([\s\S]*?)(?=\n\n|###|$)/i)
+      
+      if (colorMatch && colorMatch[1]) {
+        const colorsText = colorMatch[1]
+        const colorNames = colorsText
+          .split('\n')
+          .map(line => {
+            let color = line.trim().replace(/^-\s*/, '') // Enlever le "- " au début
+            // Nettoyer les codes (ex: "8808 leather red" → "leather red")
+            color = color.replace(/^[0-9]+[-_\s]*/i, '')
+            color = color.replace(/[-_\s]*[0-9]+$/i, '')
+            color = color.replace(/[-_\s]+/g, ' ').trim()
+            // Capitaliser la première lettre
+            if (color) {
+              color = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase()
+            }
+            return color
+          })
+          .filter(c => c && c.length > 0)
+        
+        // Essayer d'associer avec les images des variants si disponibles
+        if (product?.productVariants && product.productVariants.length > 0) {
+          const colorMap = new Map<string, string>()
+          
+          product.productVariants.forEach(variant => {
+            if (!variant.properties || !variant.image) return
+            
+            try {
+              const properties = typeof variant.properties === 'string' 
+                ? JSON.parse(variant.properties) 
+                : variant.properties
+              
+              const colorValue = properties.value1 || ''
+              
+              // Vérifier que c'est bien une couleur (pas un nombre ou une taille)
+              if (colorValue && 
+                  !/^[0-9]+(-[0-9]+)?(\.[0-9]+)?$/.test(colorValue) && // Pas un nombre ou plage
+                  !/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(colorValue)) { // Pas une taille texte
+                
+                if (!colorMap.has(colorValue)) {
+                  colorMap.set(colorValue, variant.image)
+                }
+              }
+            } catch (e) {
+              console.warn('Erreur parsing properties:', e)
+            }
+          })
+          
+          // Associer les couleurs de la description avec les images des variants
+          const colorMapEntries = Array.from(colorMap.entries())
+          info.colors = colorNames.map(colorName => {
+            // Chercher une image correspondante
+            for (const [variantColor, variantImage] of colorMapEntries) {
+              if (variantColor.toLowerCase().includes(colorName.toLowerCase()) ||
+                  colorName.toLowerCase().includes(variantColor.toLowerCase())) {
+                return { name: colorName, image: variantImage }
+              }
+            }
+            // Si pas d'image trouvée, prendre la première disponible ou aucune
+            const firstImage = colorMapEntries.length > 0 ? colorMapEntries[0][1] : undefined
+            return { name: colorName, image: firstImage }
+          })
+        } else {
+          // Pas de variants, juste les noms
+          info.colors = colorNames.map(name => ({ name }))
+        }
+      }
+    }
+    
+    // ✅ FALLBACK : Si pas de couleurs dans la description, chercher dans les variants
+    if (info.colors.length === 0 && product?.productVariants && product.productVariants.length > 0) {
+      const colorMap = new Map<string, string>()
+      
+      product.productVariants.forEach(variant => {
+        if (!variant.properties) return
+        
+        try {
+          const properties = typeof variant.properties === 'string' 
+            ? JSON.parse(variant.properties) 
+            : variant.properties
+          
+          const colorValue = properties.value1 || ''
+          
+          if (colorValue && 
+              !/^[0-9]+(-[0-9]+)?(\.[0-9]+)?$/.test(colorValue) &&
+              !/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(colorValue) &&
+              variant.image) {
+            
+            if (!colorMap.has(colorValue)) {
+              colorMap.set(colorValue, variant.image)
+            }
+          }
+        } catch (e) {
+          console.warn('Erreur parsing properties:', e)
+        }
+      })
+      
+      info.colors = Array.from(colorMap.entries()).map(([name, image]) => ({
+        name,
+        image
+      }))
+    }
+
+    // ==================== EXTRACTION DES TAILLES ====================
+    
+    // ✅ PRIORITÉ 1 : Extraire depuis la description markdown
+    if (description) {
+      const sizeMatch = description.match(/### 🎯 Tailles disponibles\n([\s\S]*?)(?=\n\n|###|\*\*|$)/i)
+      
+      if (sizeMatch && sizeMatch[1]) {
+        const sizesText = sizeMatch[1]
+        info.sizes = sizesText
+          .split('\n')
+          .map(line => line.trim().replace(/^-\s*/, '')) // Enlever le "- " au début
+          .filter(s => {
+            if (!s || s.length === 0) return false
+            
+            // ✅ FILTRES STRICTS
+            const isValidSize = (
+              // Plages de pointures : 36-37, 38-39, etc.
+              /^[0-9]{2}-[0-9]{2}$/.test(s) ||
+              // Pointures simples : 36, 37, 42
+              /^[0-9]{1,3}(\.[0-9])?$/.test(s) ||
+              // Tailles texte : XS, S, M, L, XL, XXL
+              /^(XS|S|M|L|XL|XXL|XXXL)$/i.test(s) ||
+              // Codes internationaux : EU 42, US 10
+              /^(EU|US|UK)\s*[0-9]{1,3}$/i.test(s)
+            )
+            
+            // ✅ EXCLUSIONS
+            const isNotSize = (
+              s.length > 20 || // Trop long
+              s.includes('*') || // Contient des astérisques
+              s.includes(':') || // Contient des deux-points
+              /[a-z]{5,}/i.test(s) || // Contient des mots longs
+              s.toLowerCase().includes('craft') ||
+              s.toLowerCase().includes('sole') ||
+              s.toLowerCase().includes('shoe') ||
+              s.toLowerCase().includes('depth') ||
+              s.toLowerCase().includes('mouth')
+            )
+            
+            return isValidSize && !isNotSize
+          })
+        
+        // Trier les tailles
+        info.sizes.sort((a, b) => {
+          // Extraire les nombres
+          const aNum = parseFloat(a.split('-')[0]) // Pour "36-37", prendre 36
+          const bNum = parseFloat(b.split('-')[0])
+          
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            return aNum - bNum
+          }
+          
+          // Tailles texte
+          const sizeOrder: { [key: string]: number } = {
+            'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5, 'XXL': 6, 'XXXL': 7
+          }
+          
+          const aOrder = sizeOrder[a.toUpperCase()] || 999
+          const bOrder = sizeOrder[b.toUpperCase()] || 999
+          
+          if (aOrder !== 999 && bOrder !== 999) {
+            return aOrder - bOrder
+          }
+          
+          return a.localeCompare(b)
+        })
+      }
+    }
+    
+    // ✅ FALLBACK : Si pas de tailles dans la description, chercher dans les variants
+    if (info.sizes.length === 0 && product?.productVariants && product.productVariants.length > 0) {
+      const sizeSet = new Set<string>()
+      
+      product.productVariants.forEach(variant => {
+        if (!variant.properties) return
+        
+        try {
+          const properties = typeof variant.properties === 'string' 
+            ? JSON.parse(variant.properties) 
+            : variant.properties
+          
+          const possibleSizes = [properties.value2, properties.value3].filter(Boolean)
+          
+          possibleSizes.forEach(sizeValue => {
+            if (!sizeValue) return
+            
+            const trimmedSize = sizeValue.trim()
+            
+            const isValidSize = (
+              /^[0-9]{2}-[0-9]{2}$/.test(trimmedSize) ||
+              /^[0-9]{1,3}(\.[0-9])?$/.test(trimmedSize) ||
+              /^(XS|S|M|L|XL|XXL|XXXL)$/i.test(trimmedSize) ||
+              /^(EU|US|UK)\s*[0-9]{1,3}$/i.test(trimmedSize)
+            )
+            
+            const isNotSize = (
+              trimmedSize.length > 15 ||
+              /[a-z]{4,}/i.test(trimmedSize) ||
+              trimmedSize.includes(':') ||
+              trimmedSize.includes('*')
+            )
+            
+            if (isValidSize && !isNotSize) {
+              sizeSet.add(trimmedSize)
+            }
+          })
+        } catch (e) {
+          console.warn('Erreur parsing properties pour tailles:', e)
+        }
+      })
+      
+      info.sizes = Array.from(sizeSet).sort((a, b) => {
+        const aNum = parseFloat(a.split('-')[0])
+        const bNum = parseFloat(b.split('-')[0])
+        
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return aNum - bNum
+        }
+        
+        const sizeOrder: { [key: string]: number } = {
+          'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5, 'XXL': 6, 'XXXL': 7
+        }
+        
+        const aOrder = sizeOrder[a.toUpperCase()] || 999
+        const bOrder = sizeOrder[b.toUpperCase()] || 999
+        
+        if (aOrder !== 999 && bOrder !== 999) {
+          return aOrder - bOrder
+        }
+        
+        return a.localeCompare(b)
+      })
+    }
+
+    // ==================== EXTRACTION DES MATÉRIAUX ====================
+    
+    if (description) {
+      const materialPatterns = [
+        { pattern: /\*\*Matériau supérieur:\*\*\s*([^\n*]+)/i, label: 'Matériau supérieur' },
+        { pattern: /\*\*Matériau semelle:\*\*\s*([^\n*]+)/i, label: 'Matériau semelle' },
+        { pattern: /\*\*Lining material:\*\*\s*([^\n*]+)/i, label: 'Matériau intérieur' },
+        { pattern: /\*\*Matériau intérieur:\*\*\s*([^\n*]+)/i, label: 'Matériau intérieur' },
+        { pattern: /\*\*Composition principale:\*\*\s*([^\n*]+)/i, label: 'Composition principale' },
+        { pattern: /\*\*Composition doublure:\*\*\s*([^\n*]+)/i, label: 'Composition doublure' },
+      ]
+
+      materialPatterns.forEach(({ pattern, label }) => {
+        const match = description.match(pattern)
+        if (match && match[1]) {
+          const value = match[1].trim()
+          // Ne garder que si c'est court et pertinent
+          if (value.length > 0 && value.length < 50 && !value.includes('**')) {
+            info.materials.push({ label, value })
+          }
+        }
+      })
+    }
+
+    // ==================== EXTRACTION DES AUTRES INFORMATIONS ====================
+    
+    if (description) {
+      const otherPatterns = [
+        { pattern: /\*\*Sports applicables:\*\*\s*([^\n*]+)/i, label: 'Sports applicables' },
+        { pattern: /\*\*Forme du talon:\*\*\s*([^\n*]+)/i, label: 'Forme du talon' },
+        { pattern: /\*\*Hauteur du talon:\*\*\s*([^\n*]+)/i, label: 'Hauteur du talon' },
+        { pattern: /\*\*Style:\*\*\s*([^\n*]+)/i, label: 'Style' },
+        { pattern: /\*\*Upper height:\*\*\s*([^\n*]+)/i, label: 'Hauteur' },
+      ]
+
+      otherPatterns.forEach(({ pattern, label }) => {
+        const match = description.match(pattern)
+        if (match && match[1]) {
+          const value = match[1].trim()
+          // Ne garder que si c'est court et pertinent
+          if (value.length > 0 && value.length < 100 && !value.includes('**')) {
+            info.otherInfo.push({ label, value })
+          }
+        }
+      })
+    }
+
+    return info
+  }
+
+  // ✅ Fonction pour obtenir la couleur CSS à partir du nom
+  const getColorValue = (colorName: string): string => {
+    const colorMap: { [key: string]: string } = {
+      'black': '#000000',
+      'white': '#FFFFFF',
+      'gray': '#808080',
+      'grey': '#808080',
+      'red': '#FF0000',
+      'blue': '#0000FF',
+      'navy': '#000080',
+      'navy blue': '#000080',
+      'green': '#008000',
+      'mint green': '#98FF98',
+      'pink': '#FFC0CB',
+      'light pink': '#FFB6C1',
+      'purple': '#800080',
+      'light blue': '#ADD8E6',
+      'beige': '#F5F5DC',
+      'light grey': '#D3D3D3',
+      'light gray': '#D3D3D3',
+      'burgundy': '#800020',
+      'lavender': '#E6E6FA',
+      'olive green': '#556B2F',
+      'dark grey': '#A9A9A9',
+      'dark gray': '#A9A9A9',
+      'sky blue': '#87CEEB',
+    }
+    
+    const normalized = colorName.toLowerCase().trim()
+    return colorMap[normalized] || '#CCCCCC' // Couleur par défaut
+  }
+
   if (!isAuthenticated) {
     return (
       <>
@@ -524,15 +852,151 @@ export default function DraftProductsPage() {
                           />
                         </div>
 
+                        {/* ✅ Informations visuelles du produit */}
+                        {(() => {
+                          const productInfo = extractProductInfo(product.description || formData.description || '', product)
+                          
+                          if (productInfo.colors.length === 0 && productInfo.sizes.length === 0 && 
+                              productInfo.materials.length === 0 && productInfo.otherInfo.length === 0) {
+                            return null
+                          }
+
+                          return (
+                            <div className="space-y-4 pb-4 border-b">
+                              {/* Couleurs */}
+                              {productInfo.colors.length > 0 && (
+                                <div>
+                                  <Label className="mb-3 block text-sm font-semibold text-gray-700">🎨 Couleurs disponibles</Label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {productInfo.colors.map((color, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="relative w-20 h-20 border-2 border-gray-300 rounded-lg bg-white hover:border-orange-500 transition-all cursor-pointer overflow-hidden group"
+                                      >
+                                        {color.image ? (
+                                          <>
+                                            <img
+                                              src={color.image}
+                                              alt={`${color.name} variant`}
+                                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                              onError={(e) => {
+                                                // Si l'image ne charge pas, afficher un cercle de couleur en fallback
+                                                e.currentTarget.style.display = 'none'
+                                                const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                                                if (fallback) {
+                                                  fallback.style.display = 'flex'
+                                                }
+                                              }}
+                                            />
+                                            <div
+                                              className="color-fallback hidden w-full h-full items-center justify-center rounded absolute inset-0"
+                                              style={{ backgroundColor: getColorValue(color.name) }}
+                                            >
+                                              <span className="text-xs font-medium text-white capitalize drop-shadow">{color.name}</span>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div
+                                            className="w-full h-full items-center justify-center rounded flex"
+                                            style={{ backgroundColor: getColorValue(color.name) }}
+                                          >
+                                            <span className="text-xs font-medium text-white capitalize drop-shadow">{color.name}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Tailles */}
+                              {productInfo.sizes.length > 0 && (
+                                <div>
+                                  <Label className="mb-3 block text-sm font-semibold text-gray-700">
+                                    🎯 Tailles disponibles
+                                  </Label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {productInfo.sizes.map((size, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="min-w-[48px] h-12 px-3 border-2 border-gray-300 rounded-lg bg-white hover:border-orange-500 hover:bg-orange-50 transition-all font-semibold text-sm flex items-center justify-center cursor-pointer"
+                                      >
+                                        {size}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {productInfo.sizes.length === 0 && (
+                                    <p className="text-sm text-gray-500 italic">
+                                      Aucune taille détectée dans les variants
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Matériaux */}
+                              {productInfo.materials.length > 0 && (
+                                <div>
+                                  <Label className="mb-2 block text-sm font-semibold text-gray-700">
+                                    🧵 Matériaux
+                                  </Label>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {productInfo.materials.map((material, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                                      >
+                                        <div className="text-xs text-gray-500 mb-1 font-medium">
+                                          {material.label}
+                                        </div>
+                                        <div className="text-sm font-semibold text-gray-900">
+                                          {material.value}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Autres informations */}
+                              {productInfo.otherInfo.length > 0 && (
+                                <div>
+                                  <Label className="mb-2 block text-sm font-semibold text-gray-700">
+                                    ℹ️ Autres informations
+                                  </Label>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {productInfo.otherInfo.map((info, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                                      >
+                                        <div className="text-xs text-gray-500 mb-1 font-medium">
+                                          {info.label}
+                                        </div>
+                                        <div className="text-sm font-semibold text-gray-900">
+                                          {info.value}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
                         <div>
-                          <Label htmlFor="description">Description</Label>
+                          <Label htmlFor="description">Description complète</Label>
                           <Textarea
                             id="description"
                             value={formData.description || ''}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             placeholder="Description du produit"
                             rows={6}
+                            className="mt-2"
                           />
+                          <p className="text-xs text-gray-500 mt-1">
+                            ℹ️ Les informations ci-dessus sont extraites automatiquement de la description
+                          </p>
                         </div>
 
                         <div>

@@ -314,6 +314,44 @@ export class DuplicatePreventionService {
           createData.source = 'cj-dropshipping';
         }
         
+        // ✅ Vérifier que categoryId existe dans la base de données
+        if (createData.categoryId && typeof createData.categoryId === 'string' && createData.categoryId.trim() !== '') {
+          try {
+            const categoryExists = await this.prisma.category.findUnique({
+              where: { id: createData.categoryId }
+            });
+            if (!categoryExists) {
+              this.logger.warn(`⚠️ Catégorie ${createData.categoryId} introuvable, suppression de categoryId`);
+              delete createData.categoryId;
+            }
+          } catch (e) {
+            this.logger.warn(`⚠️ Erreur lors de la vérification de categoryId ${createData.categoryId}:`, e);
+            delete createData.categoryId;
+          }
+        } else {
+          // Si categoryId est null, undefined ou vide, le supprimer
+          delete createData.categoryId;
+        }
+        
+        // ✅ Vérifier que supplierId existe dans la base de données
+        if (createData.supplierId && typeof createData.supplierId === 'string' && createData.supplierId.trim() !== '') {
+          try {
+            const supplierExists = await this.prisma.supplier.findUnique({
+              where: { id: createData.supplierId }
+            });
+            if (!supplierExists) {
+              this.logger.warn(`⚠️ Fournisseur ${createData.supplierId} introuvable, suppression de supplierId`);
+              delete createData.supplierId;
+            }
+          } catch (e) {
+            this.logger.warn(`⚠️ Erreur lors de la vérification de supplierId ${createData.supplierId}:`, e);
+            delete createData.supplierId;
+          }
+        } else {
+          // Si supplierId est null, undefined ou vide, le supprimer
+          delete createData.supplierId;
+        }
+        
         const newProduct = await this.prisma.product.create({
           data: {
             ...createData,
