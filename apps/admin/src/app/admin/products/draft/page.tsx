@@ -150,12 +150,16 @@ export default function DraftProductsPage() {
 
   const handleEdit = (product: DraftProduct) => {
     setEditingId(product.id)
+    
+    // ✅ Nettoyer l'image si c'est un tableau JSON stringifié
+    const cleanImage = getCleanImageUrl(product.image) || ''
+    
     setFormData({
       name: product.name,
       description: product.description || '',
       margin: product.margin || 30,
       categoryId: product.categoryId || '',
-      image: product.image || '',
+      image: cleanImage,
       badge: product.badge || 'none',
       stock: product.stock || 0,
     })
@@ -490,9 +494,19 @@ export default function DraftProductsPage() {
                           <Input
                             id="image"
                             value={formData.image || ''}
-                            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                            onChange={(e) => {
+                              // ✅ Nettoyer l'URL si c'est un tableau JSON
+                              const inputValue = e.target.value
+                              const cleanUrl = getCleanImageUrl(inputValue) || inputValue
+                              setFormData({ ...formData, image: cleanUrl })
+                            }}
                             placeholder="URL de l'image"
                           />
+                          {formData.image && formData.image.startsWith('[') && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              ℹ️ Tableau JSON détecté, première URL extraite automatiquement
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -555,21 +569,35 @@ export default function DraftProductsPage() {
                         </div>
 
                         {/* Aperçu de l'image */}
-                        {formData.image && (
-                          <div>
-                            <Label>Aperçu de l'image</Label>
-                            <div className="mt-2 border rounded-lg p-2">
-                              <img
-                                src={formData.image}
-                                alt="Aperçu"
-                                className="w-full h-48 object-cover rounded"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none'
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
+                        {(() => {
+                          // ✅ Nettoyer l'URL de l'image (gérer les tableaux JSON)
+                          const imageUrl = getCleanImageUrl(formData.image)
+                          
+                          if (imageUrl) {
+                            return (
+                              <div>
+                                <Label>Aperçu de l'image</Label>
+                                <div className="mt-2 border rounded-lg p-2 bg-gray-50 flex items-center justify-center min-h-[300px]">
+                                  <img
+                                    src={imageUrl}
+                                    alt="Aperçu du produit"
+                                    className="max-w-full max-h-[400px] object-contain rounded"
+                                    onError={(e) => {
+                                      // Afficher un placeholder si l'image ne charge pas
+                                      e.currentTarget.src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Image+non+disponible'
+                                    }}
+                                  />
+                                </div>
+                                {formData.image && formData.image !== imageUrl && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    ℹ️ Première image extraite d'un tableau JSON
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
                       </div>
                     </div>
 

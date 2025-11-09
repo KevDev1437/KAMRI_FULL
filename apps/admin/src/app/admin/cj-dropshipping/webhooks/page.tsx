@@ -18,6 +18,7 @@ export default function CJWebhooksPage() {
     configureWebhooks,
     getWebhookStatus,
     getWebhookLogs,
+    importProduct,
   } = useCJDropshipping();
 
   const [webhookLogs, setWebhookLogs] = useState<CJWebhookLog[]>([]);
@@ -27,6 +28,7 @@ export default function CJWebhooksPage() {
   const [callbackUrl, setCallbackUrl] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<('product' | 'stock' | 'order' | 'logistics')[]>(['product', 'stock', 'order', 'logistics']);
   const [copied, setCopied] = useState(false);
+  const [importingPids, setImportingPids] = useState<Set<string>>(new Set());
   const toast = useToast();
 
   useEffect(() => {
@@ -671,6 +673,90 @@ export default function CJWebhooksPage() {
                         <div className="flex-1">
                           <p className="text-sm font-medium text-red-800 mb-1">Erreur</p>
                           <p className="text-sm text-red-700">{log.error}</p>
+                          
+                          {/* ✅ Bouton Importer pour les erreurs "Produit parent introuvable" */}
+                          {log.error.includes('Produit parent introuvable') && (() => {
+                            // Extraire le PID depuis l'erreur ou le payload
+                            let pid: string | null = null;
+                            
+                            // 1️⃣ Essayer depuis l'erreur (format: "pid: 123456" ou "PID: 123456")
+                            const pidMatch = log.error.match(/pid:\s*([^\s\)]+)/i) || 
+                                           log.error.match(/PID:\s*([^\s\)]+)/i);
+                            if (pidMatch && Array.isArray(pidMatch)) {
+                              pid = pidMatch[1];
+                            }
+                            
+                            // 2️⃣ Si pas trouvé, essayer depuis le payloadInfo (pour les webhooks VARIANT)
+                            if (!pid && (payloadInfo as any)?.pid && (payloadInfo as any).pid !== 'N/A') {
+                              pid = (payloadInfo as any).pid;
+                            }
+                            
+                            // 3️⃣ Si toujours pas trouvé, essayer depuis le payload brut
+                            if (!pid) {
+                              const payload = formatPayload(log.payload);
+                              const params = payload?.params || payload || {};
+                              if (params.pid && params.pid !== 'N/A') {
+                                pid = params.pid;
+                              }
+                            }
+                            
+                            if (pid && pid !== 'N/A') {
+                              const isImporting = importingPids.has(pid);
+                              
+                              return (
+                                <div className="mt-3 pt-3 border-t border-red-200">
+                                  <Button
+                                    onClick={async () => {
+                                      if (isImporting) return;
+                                      
+                                      setImportingPids(prev => new Set(prev).add(pid));
+                                      try {
+                                        const result = await importProduct(pid);
+                                        if (result.success) {
+                                          toast.showToast({
+                                            type: 'success',
+                                            title: 'Import réussi',
+                                            description: `✅ Produit ${pid} importé avec succès dans le magasin (statut: disponible)`
+                                          });
+                                          // Rafraîchir les logs après import
+                                          await loadWebhookLogs();
+                                          // Rafraîchir les notifications
+                                          window.dispatchEvent(new Event('refreshStoreNotifications'));
+                                        } else {
+                                          toast.showToast({
+                                            type: 'error',
+                                            title: 'Erreur import',
+                                            description: result.message || `❌ Erreur lors de l'import du produit ${pid}`
+                                          });
+                                        }
+                                      } catch (err: any) {
+                                        toast.showToast({
+                                          type: 'error',
+                                          title: 'Erreur import',
+                                          description: err?.response?.data?.message || `❌ Erreur lors de l'import du produit ${pid}`
+                                        });
+                                      } finally {
+                                        setImportingPids(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(pid);
+                                          return newSet;
+                                        });
+                                      }
+                                    }}
+                                    disabled={isImporting}
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    {isImporting ? 'Import en cours...' : '📦 Importer le produit dans le magasin'}
+                                  </Button>
+                                  <p className="text-xs text-gray-600 mt-2">
+                                    Le produit sera importé dans le magasin avec le statut "disponible" et pourra être suivi comme les autres produits.
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </div>
