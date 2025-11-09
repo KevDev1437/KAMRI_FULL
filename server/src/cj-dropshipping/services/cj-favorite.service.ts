@@ -306,7 +306,14 @@ export class CJFavoriteService {
     this.logger.log('📝 Paramètres:', { pid, categoryId, margin, isFavorite });
     
     // 🚨 VALIDATION : Rejeter les PID invalides
-    if (!pid || pid === 'imported' || pid === 'available' || pid === 'selected' || pid === 'pending') {
+    if (!pid || 
+        pid === 'undefined' || 
+        pid === 'null' || 
+        pid === 'imported' || 
+        pid === 'available' || 
+        pid === 'selected' || 
+        pid === 'pending' ||
+        pid.trim() === '') {
       this.logger.error(`❌ PID invalide reçu: "${pid}" - Ignoré pour éviter les appels API inutiles`);
       this.logger.error('🔍 Stack trace:', new Error().stack);
       return {

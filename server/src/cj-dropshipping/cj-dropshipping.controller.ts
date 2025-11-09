@@ -139,7 +139,8 @@ export class CJDropshippingController {
     try {
       const result = await this.cjMainService.searchProducts(query);
       this.logger.log('✅ Controller searchProducts terminé avec succès');
-      this.logger.log('📊 Nombre de produits retournés:', result.length);
+      this.logger.log('📊 Nombre de produits retournés:', result.products?.length || 0);
+      this.logger.log('📊 Total disponible:', result.total || 0);
       this.logger.log('🔍 === FIN CONTROLLER searchProducts ===');
       return result;
     } catch (error) {

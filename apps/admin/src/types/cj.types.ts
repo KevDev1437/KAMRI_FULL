@@ -176,7 +176,7 @@ export interface CJProductSearchFilters {
   minListedNum?: number;
   maxListedNum?: number;
   sort?: 'desc' | 'asc';
-  orderBy?: 'createAt' | 'listedNum';
+  orderBy?: 'createAt' | 'listedNum' | number; // ✅ V2 accepte aussi des nombres (0-4)
   
   // Personnalisation
   customizationVersion?: 1 | 2 | 3 | 4 | 5;

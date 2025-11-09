@@ -131,8 +131,9 @@ export class CJConfigService {
       ]);
       
       const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
-      const productsData = productsResult.status === 'fulfilled' ? productsResult.value : { list: [] };
-      const products = Array.isArray(productsData) ? productsData : productsData.list || [];
+      const productsData = productsResult.status === 'fulfilled' ? productsResult.value : { products: [] };
+      // ✅ V2 utilise "products" au lieu de "list"
+      const products = Array.isArray(productsData) ? productsData : (productsData as any).products || (productsData as any).list || [];
       
       this.logger.log(`✅ Connexion réussie - ${categories.length} catégories, ${products.length} produits chargés`);
       this.logger.log('✅ Connexion CJ établie (sans synchronisation automatique)');

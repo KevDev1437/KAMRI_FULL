@@ -1005,10 +1005,12 @@ export default function DraftProductsPage() {
             }
             
             // 3. Chercher dans les images de la galerie par correspondance de couleur dans l'URL
+            // ✅ Les images de la galerie sont souvent dans l'ordre des couleurs
+            // Ex: [image_brown, image_black, image_khaki] pour couleurs [Brown, Black, Khaki]
             if (productImages.length > 0) {
               const colorNameLower = colorName.toLowerCase()
               
-              // ✅ PRIORITÉ : Chercher d'abord une correspondance exacte dans l'URL
+              // ✅ PRIORITÉ 1 : Chercher d'abord une correspondance exacte dans l'URL
               for (const imageUrl of productImages) {
                 if (usedVariantImages.has(imageUrl)) continue
                 
@@ -1025,7 +1027,7 @@ export default function DraftProductsPage() {
                 }
               }
               
-              // ✅ FALLBACK : Correspondance partielle (ex: "black" contient "bl" ou "noir")
+              // ✅ PRIORITÉ 2 : Correspondance partielle (ex: "black" contient "bl" ou "noir")
               for (const imageUrl of productImages) {
                 if (usedVariantImages.has(imageUrl)) continue
                 
@@ -1041,6 +1043,32 @@ export default function DraftProductsPage() {
                   console.log(`✅ [DEBUG] Correspondance PARTIELLE par URL pour "${colorName}": image contient la couleur (${imageColors.join(', ')})`)
                   return { name: colorName, image: imageUrl }
                 }
+              }
+              
+              // ✅ PRIORITÉ 3 : Utiliser l'ordre des images de la galerie
+              // Si les couleurs sont dans l'ordre [Brown, Black, Khaki] et les images aussi
+              // Alors la première couleur = première image, etc.
+              // Mais seulement si on n'a pas trouvé de correspondance par URL
+              const unusedImages = productImages.filter(img => !usedVariantImages.has(img))
+              if (unusedImages.length > 0) {
+                // Utiliser l'index de la couleur pour sélectionner l'image correspondante
+                const imageIndex = idx % unusedImages.length
+                const selectedImage = unusedImages[imageIndex]
+                usedVariantImages.add(selectedImage)
+                
+                // Vérifier si l'image correspond à la couleur
+                const selectedImageColors = extractColorFromImageUrl(selectedImage)
+                const hasColorMatch = selectedImageColors.some(imgColor => 
+                  imgColor.toLowerCase() === colorNameLower
+                )
+                
+                if (!hasColorMatch && selectedImageColors.length > 0) {
+                  console.warn(`⚠️ [DEBUG] Image galerie sélectionnée pour "${colorName}" contient "${selectedImageColors.join(', ')}" au lieu de "${colorName}" (ordre: ${imageIndex}/${unusedImages.length})`)
+                } else {
+                  console.log(`✅ [DEBUG] Image galerie sélectionnée pour "${colorName}": image ${imageIndex}/${unusedImages.length} (couleurs détectées: ${selectedImageColors.join(', ') || 'aucune'})`)
+                }
+                
+                return { name: colorName, image: selectedImage }
               }
             }
             

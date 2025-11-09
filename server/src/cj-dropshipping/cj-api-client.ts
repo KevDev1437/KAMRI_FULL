@@ -2,6 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import axios, { AxiosInstance } from 'axios';
+import { 
+  CJProductSearchOptions, 
+  CJProductSearchResult,
+  CJProduct,
+  CJVariant,
+  CJReview
+} from './interfaces/cj-product.interface';
 
 export class CJAPIError extends Error {
   constructor(
@@ -30,42 +37,7 @@ export interface CJResponse<T = any> {
   requestId?: string;
 }
 
-export interface CJProduct {
-  pid: string;
-  productName: string;
-  productNameEn: string;
-  productSku: string;
-  productImage: string;
-  sellPrice: number;
-  variants: CJVariant[];
-  categoryName: string;
-  description: string;
-  weight: number;
-  dimensions: string;
-  brand: string;
-  tags: string[];
-  reviews: CJReview[];
-  rating: number;
-  totalReviews: number;
-}
-
-export interface CJVariant {
-  vid: string;
-  variantSku: string;
-  variantSellPrice: number;
-  variantKey: string;
-  variantValue: string;
-  stock: number;
-  images: string[];
-}
-
-export interface CJReview {
-  id: string;
-  rating: number;
-  comment: string;
-  userName: string;
-  createdAt: string;
-}
+// Interfaces CJProduct, CJVariant, CJReview sont maintenant importées depuis './interfaces/cj-product.interface'
 
 export interface CJOrder {
   orderId: string;
@@ -514,127 +486,254 @@ export class CJAPIClient {
   }
 
   /**
-   * Rechercher des produits
+   * Rechercher des produits (API V2 avec Elasticsearch)
+   * @param keyword Mot-clé de recherche
+   * @param options Options de recherche
    */
   async searchProducts(
     keyword?: string,
-    options: {
-      pageNum?: number;
-      pageSize?: number;
-      categoryId?: string;
-      minPrice?: number;
-      maxPrice?: number;
-      countryCode?: string;
-      sortBy?: string;
-      // Nouveaux paramètres selon la documentation CJ
-      productType?: string;
-      deliveryTime?: string;
-      verifiedWarehouse?: number;
-      startInventory?: number;
-      endInventory?: number;
-      isFreeShipping?: number;
-      searchType?: number;
-      sort?: string;
-      orderBy?: string;
-      isSelfPickup?: number;
-      supplierId?: string;
-      customizationVersion?: number;
-      brandOpenId?: number;
-      minListedNum?: number;
-      maxListedNum?: number;
-      createTimeFrom?: string;
-      createTimeTo?: string;
-    } = {}
-  ): Promise<{ list: CJProduct[]; total: number; pageNum: number; pageSize: number }> {
-    this.logger.log('🔍 === DÉBUT CLIENT API CJ searchProducts ===');
+    options: CJProductSearchOptions = {}
+  ): Promise<CJProductSearchResult> {
+    this.logger.log('🔍 === DÉBUT CLIENT API CJ searchProducts (V2) ===');
     this.logger.log('📝 Paramètres reçus:', { keyword, options });
     
-    const params = {
-      keyword,
-      pageNum: options.pageNum || 1,
-      pageSize: Math.max(options.pageSize || 20, 10), // Minimum 10 selon la doc CJ
-      categoryId: options.categoryId,
-      minPrice: options.minPrice,
-      maxPrice: options.maxPrice,
-      countryCode: options.countryCode, // ← CORRECTION: Pas de pays par défaut
-      sortBy: options.sortBy || 'relevance',
-    };
-
-    this.logger.log('📊 Paramètres finaux:', JSON.stringify(params, null, 2));
-
-    // ✅ CORRECTION: Utiliser les paramètres exacts de la documentation CJ
-    const requestParams: any = {
-      pageNum: options.pageNum || 1,
-      pageSize: Math.min(options.pageSize || 20, 200), // Max 200 selon doc CJ
-      searchType: options.searchType || 0, // 0=All products
-      sort: options.sort || 'desc',
-      orderBy: options.orderBy || 'createAt',
-    };
-
-    // Ajouter les paramètres seulement s'ils sont définis (éviter undefined)
-    if (keyword) {
-      // Rechercher dans les deux champs de nom selon la doc CJ
-      requestParams.productName = keyword;
-      requestParams.productNameEn = keyword;
-    }
-    
-    // Paramètres optionnels selon la documentation CJ
-    if (options.categoryId) requestParams.categoryId = options.categoryId;
-    if (options.minPrice !== undefined) requestParams.minPrice = options.minPrice;
-    if (options.maxPrice !== undefined) requestParams.maxPrice = options.maxPrice;
-    if (options.countryCode) requestParams.countryCode = options.countryCode;
-    if (options.productType) requestParams.productType = options.productType;
-    if (options.deliveryTime) requestParams.deliveryTime = options.deliveryTime;
-    if (options.verifiedWarehouse) requestParams.verifiedWarehouse = options.verifiedWarehouse;
-    if (options.startInventory) requestParams.startInventory = options.startInventory;
-    if (options.endInventory) requestParams.endInventory = options.endInventory;
-    if (options.isFreeShipping !== undefined) requestParams.isFreeShipping = options.isFreeShipping;
-    if (options.isSelfPickup !== undefined) requestParams.isSelfPickup = options.isSelfPickup;
-    if (options.supplierId) requestParams.supplierId = options.supplierId;
-    if (options.customizationVersion) requestParams.customizationVersion = options.customizationVersion;
-    if (options.brandOpenId) requestParams.brandOpenId = options.brandOpenId;
-    if (options.minListedNum) requestParams.minListedNum = options.minListedNum;
-    if (options.maxListedNum) requestParams.maxListedNum = options.maxListedNum;
-    if (options.createTimeFrom) requestParams.createTimeFrom = options.createTimeFrom;
-    if (options.createTimeTo) requestParams.createTimeTo = options.createTimeTo;
-    
-    this.logger.log('📡 Paramètres de requête API:', JSON.stringify(requestParams, null, 2));
-    this.logger.log('🌐 URL complète: GET /product/list');
-    
     try {
-      // Construire l'URL avec les paramètres de requête
+      await this.handleRateLimit();
+
+      // ✅ Construction des paramètres pour V2
+      const requestParams: any = {
+        page: options.page || options.pageNum || 1,                           // ✅ V2 utilise "page" au lieu de "pageNum"
+        size: Math.min(options.size || options.pageSize || 10, 100),           // ✅ V2 limite à 100 maximum (pas 200)
+      };
+
+      // ✅ V2 utilise "keyWord" au lieu de "productName" + "productNameEn"
+      // Priorité : options.keyWord > keyword (premier paramètre)
+      if (options.keyWord) {
+        requestParams.keyWord = options.keyWord;
+      } else if (keyword) {
+        requestParams.keyWord = keyword;
+      }
+
+      // Filtres de base
+      if (options.categoryId) requestParams.categoryId = options.categoryId;
+      if (options.lv2categoryList && options.lv2categoryList.length > 0) requestParams.lv2categoryList = options.lv2categoryList; // ✅ NOUVEAU
+      if (options.lv3categoryList && options.lv3categoryList.length > 0) requestParams.lv3categoryList = options.lv3categoryList; // ✅ NOUVEAU
+      if (options.countryCode) requestParams.countryCode = options.countryCode;
+      
+      // Plage de prix (noms V2)
+      if (options.minPrice !== undefined) requestParams.startSellPrice = options.minPrice; // ✅ V2 utilise "startSellPrice"
+      if (options.maxPrice !== undefined) requestParams.endSellPrice = options.maxPrice;   // ✅ V2 utilise "endSellPrice"
+      
+      // Plage d'inventaire (noms V2)
+      if (options.startInventory !== undefined) requestParams.startWarehouseInventory = options.startInventory; // ✅ V2
+      if (options.endInventory !== undefined) requestParams.endWarehouseInventory = options.endInventory;       // ✅ V2
+
+      // Type de produit
+      if (options.productType !== undefined) requestParams.productType = options.productType;
+      
+      // ✅ NOUVEAU : Product Flag (V2)
+      if (options.productFlag !== undefined) requestParams.productFlag = options.productFlag;
+      // 0=Trending, 1=New, 2=Video, 3=Slow-moving
+      
+      // Livraison
+      if (options.isFreeShipping !== undefined) requestParams.addMarkStatus = options.isFreeShipping; // ✅ V2 utilise "addMarkStatus"
+      if (options.isSelfPickup !== undefined) requestParams.isSelfPickup = options.isSelfPickup;
+      
+      // Entrepôt vérifié
+      if (options.verifiedWarehouse !== undefined) requestParams.verifiedWarehouse = options.verifiedWarehouse;
+      
+      // ✅ NOUVEAU : Zone Platform (V2)
+      if (options.zonePlatform) requestParams.zonePlatform = options.zonePlatform;
+      // Ex: "shopify", "ebay", "amazon", "tiktok", "etsy"
+      
+      // ✅ NOUVEAU : Is Warehouse (V2)
+      if (options.isWarehouse !== undefined) requestParams.isWarehouse = options.isWarehouse;
+      
+      // ✅ NOUVEAU : Currency (V2)
+      if (options.currency) requestParams.currency = options.currency;
+      // Ex: "USD", "AUD", "EUR"
+      
+      // ✅ NOUVEAU : Has Certification (V2)
+      if (options.hasCertification !== undefined) requestParams.hasCertification = options.hasCertification;
+      
+      // ✅ NOUVEAU : Customization (V2)
+      if (options.customization !== undefined) requestParams.customization = options.customization;
+      
+      // Filtres de temps
+      if (options.timeStart !== undefined) requestParams.timeStart = options.timeStart;
+      if (options.timeEnd !== undefined) requestParams.timeEnd = options.timeEnd;
+      
+      // Tri (noms V2)
+      if (options.sort) requestParams.sort = options.sort;           // desc/asc
+      if (options.orderBy !== undefined) requestParams.orderBy = options.orderBy; // ✅ V2 utilise des nombres
+      // 0=best match, 1=listing count, 2=sell price, 3=create time, 4=inventory
+      
+      // ✅ NOUVEAU : Features (V2) - Retour sélectif
+      if (options.features && options.features.length > 0) {
+        requestParams.features = options.features;
+      }
+      // Ex: ['enable_description', 'enable_category', 'enable_video']
+      
+      // Supplier
+      if (options.supplierId) requestParams.supplierId = options.supplierId;
+
+      // Construction de l'URL
       const queryString = new URLSearchParams();
       Object.entries(requestParams).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          queryString.append(key, String(value));
+          if (Array.isArray(value)) {
+            // Pour les tableaux (lv2categoryList, lv3categoryList, features)
+            value.forEach(item => queryString.append(key, String(item)));
+          } else {
+            queryString.append(key, String(value));
+          }
         }
       });
+
+      // ✅ V2 endpoint
+      const endpoint = `/product/listV2?${queryString.toString()}`;
       
-      const endpoint = `/product/list?${queryString.toString()}`;
-      this.logger.log('🌐 Endpoint final:', endpoint);
-      
+      this.logger.log(`📡 Endpoint V2: ${endpoint}`);
+
       const response = await this.makeRequest('GET', endpoint);
+
+      if (response && response.code === 200 && response.data) {
+        // ✅ Parser la réponse V2 (structure différente)
+        const data = response.data as any;
+        
+        if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+          return {
+            products: [],
+            total: 0,
+            pageNumber: requestParams.page,
+            pageSize: requestParams.size,
+            totalPages: 0,
+            relatedCategories: [],
+            warehouses: []
+          };
+        }
+
+        const contentData = data.content[0]; // Premier élément du content array
+        
+        // ✅ MAPPER les produits V2 vers le format attendu (V1 compatible)
+        const mappedProducts = (contentData.productList || []).map((product: any) => {
+          // Normaliser l'image : V2 utilise "bigImage", V1 utilise "productImage"
+          let productImage = product.productImage || product.bigImage || product.image || product.productImageEn || '';
+          
+          // Si c'est un array, prendre la première image
+          if (Array.isArray(productImage)) {
+            productImage = productImage.length > 0 ? productImage[0] : '';
+          }
+          // Si c'est une string JSON, parser
+          else if (typeof productImage === 'string' && productImage.startsWith('[')) {
+            try {
+              const parsed = JSON.parse(productImage);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                productImage = parsed[0];
+              } else {
+                productImage = '';
+              }
+            } catch (e) {
+              // Si le parsing échoue, garder la valeur originale si c'est une URL valide
+              if (!productImage.startsWith('http')) {
+                productImage = '';
+              }
+            }
+          }
+          
+          return {
+            ...product,
+            // ✅ Mapper les champs V2 → V1 pour compatibilité
+            pid: product.id || product.pid || '',                           // id → pid
+            productId: product.id || product.pid || '',                     // id → productId (compatibilité)
+            productName: product.name || product.productName || product.nameEn || product.productNameEn || '',
+            productNameEn: product.nameEn || product.productNameEn || product.name || product.productName || '',   // nameEn → productNameEn
+            productImage: productImage || '',                               // bigImage → productImage ✅
+            productSku: product.sku || product.productSku || '',           // sku → productSku
+            sellPrice: parseFloat(product.sellPrice) || parseFloat(product.nowPrice) || parseFloat(product.price) || 0,
+            // Garder aussi les nouveaux champs V2
+            bigImage: product.bigImage || productImage,
+            nameEn: product.nameEn,
+            sku: product.sku,
+            nowPrice: product.nowPrice,
+            discountPrice: product.discountPrice,
+            discountPriceRate: product.discountPriceRate,
+            // Catégories V2
+            categoryId: product.categoryId || product.threeCategoryId,
+            categoryName: product.categoryName || product.threeCategoryName || product.category || '',
+            oneCategoryId: product.oneCategoryId,
+            oneCategoryName: product.oneCategoryName,
+            twoCategoryId: product.twoCategoryId,
+            twoCategoryName: product.twoCategoryName,
+            threeCategoryId: product.threeCategoryId,
+            threeCategoryName: product.threeCategoryName,
+            // Autres champs V2
+            listedNum: product.listedNum,
+            addMarkStatus: product.addMarkStatus,
+            isVideo: product.isVideo,
+            videoList: product.videoList || [],
+            productType: product.productType,
+            supplierName: product.supplierName,
+            createAt: product.createAt,
+            warehouseInventoryNum: product.warehouseInventoryNum,
+            verifiedWarehouse: product.verifiedWarehouse,
+            customization: product.customization,
+            hasCECertification: product.hasCECertification,
+            isCollect: product.isCollect,
+            myProduct: product.myProduct,
+            currency: product.currency,
+            description: product.description || '',
+            deliveryCycle: product.deliveryCycle,
+            // Champs V1 pour compatibilité
+            variants: product.variants || [],
+            weight: product.weight || product.productWeight || 0,
+            dimensions: product.dimensions || '',
+            brand: product.brand || '',
+            tags: product.tags || [],
+            reviews: product.reviews || [],
+            rating: product.rating || 0,
+            totalReviews: product.totalReviews || 0
+          };
+        });
+        
+        return {
+          products: mappedProducts,  // ✅ Utiliser les produits mappés
+          total: data.totalRecords || 0,
+          pageNumber: data.pageNumber || requestParams.page,
+          pageSize: data.pageSize || requestParams.size,
+          totalPages: data.totalPages || 0,
+          relatedCategories: contentData.relatedCategoryList || [],
+          warehouses: contentData.storeList || [],
+          keyWord: contentData.keyWord || keyword || options.keyWord,
+          searchHit: contentData.searchHit || ''
+        };
+      }
+
+      return {
+        products: [],
+        total: 0,
+        pageNumber: requestParams.page,
+        pageSize: requestParams.size,
+        totalPages: 0
+      };
+
+    } catch (error: any) {
+      this.logger.error('❌ Erreur recherche produits (V2):', error);
       
-      this.logger.log('✅ Réponse API CJ reçue');
-      this.logger.log('📊 Structure de la réponse:', {
-        hasData: !!response.data,
-        dataType: typeof response.data,
-        hasList: !!(response.data as any)?.list,
-        listLength: (response.data as any)?.list?.length || 0,
-        total: (response.data as any)?.total || 0
-      });
-      
-      const result = response.data as any;
-      this.logger.log('🎉 Client API CJ searchProducts terminé avec succès');
-      this.logger.log('🔍 === FIN CLIENT API CJ searchProducts ===');
-      
-      return result;
-    } catch (error) {
-      this.logger.error('❌ === ERREUR CLIENT API CJ searchProducts ===');
-      this.logger.error('💥 Erreur détaillée:', error);
-      this.logger.error('📊 Type d\'erreur:', typeof error);
-      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
-      this.logger.error('🔍 === FIN ERREUR CLIENT API CJ searchProducts ===');
+      // Gestion d'erreurs spécifique V2
+      if (error.code === 429 || error.code === 1600200) {
+        const retryDelay = this.getRetryDelay();
+        this.logger.warn(`⏳ Rate limit atteint, retry dans ${retryDelay}ms`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return this.searchProducts(keyword, options);
+      }
+
+      if (error.code === 401 || error.code === 1600001) {
+        this.logger.warn('🔄 Token expiré, rafraîchissement...');
+        await this.refreshAccessToken();
+        return this.searchProducts(keyword, options);
+      }
+
       throw error;
     }
   }
@@ -843,11 +942,14 @@ export class CJAPIClient {
     keyword: string,
     options: any = {}
   ): Promise<CJProduct[]> {
-    const products = await this.searchProducts(keyword, options);
+    const result = await this.searchProducts(keyword, options);
+    
+    // ✅ V2 utilise "products" au lieu de "list"
+    const products = result.products || [];
     
     // Enrichir avec les informations de stock
     const enrichedProducts = await Promise.all(
-      products.list.map(async (product) => {
+      products.map(async (product) => {
         try {
           const stockInfo = await this.getProductStock(product.variants[0]?.vid);
           return {

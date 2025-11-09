@@ -183,13 +183,34 @@ export const useCJDropshipping = () => {
     }
   };
 
-  const searchProducts = async (query: any): Promise<CJProduct[]> => {
+  const searchProducts = async (query: any): Promise<CJProduct[] | { products: CJProduct[]; total: number; pageNumber: number; pageSize: number; totalPages?: number }> => {
     setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/products/search', { params: query });
-      return data;
+      console.log('🔍 [HOOK] Réponse API reçue:', { 
+        isArray: Array.isArray(data), 
+        hasProducts: !!(data && data.products), 
+        productsLength: data?.products?.length || 0,
+        total: data?.total || 0,
+        structure: Object.keys(data || {})
+      });
+      
+      // ✅ V2 retourne { products, total, pageNumber, ... } au lieu d'un tableau direct
+      // Pour compatibilité, retourner les produits directement si c'est un tableau, sinon extraire products
+      if (Array.isArray(data)) {
+        console.log('✅ [HOOK] Format V1 (legacy) - tableau direct');
+        return data; // Format V1 (legacy)
+      } else if (data && data.products && Array.isArray(data.products)) {
+        console.log(`✅ [HOOK] Format V2 (nouveau) - ${data.products.length} produits sur ${data.total || 0} total`);
+        return data; // Format V2 (nouveau)
+      } else {
+        // Fallback : retourner un tableau vide si la structure est inattendue
+        console.warn('⚠️ [HOOK] Structure de réponse inattendue:', data);
+        return { products: [], total: 0, pageNumber: 1, pageSize: 10 };
+      }
     } catch (err: any) {
+      console.error('❌ [HOOK] Erreur lors de la recherche:', err);
       setError(err.response?.data?.message || 'Erreur lors de la recherche de produits');
       throw err;
     } finally {

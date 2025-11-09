@@ -293,27 +293,34 @@ export class CJWebhookService {
               },
               // Créer les variants comme ProductVariant
               productVariants: {
-                create: variants.map((v: any) => ({
-                  name: v.variantName || v.variantNameEn || '',
-                  sku: v.variantSku || '',
-                  price: parseFloat(v.sellPrice || v.variantSellPrice || '0'),
-                  weight: v.variantWeight || 0,
-                  dimensions: v.variantLength || v.variantWidth || v.variantHeight ? 
-                    JSON.stringify({
-                      length: v.variantLength,
-                      width: v.variantWidth,
-                      height: v.variantHeight
-                    }) : null,
-                  image: v.variantImage || null,
-                  status: v.variantStatus || 1,
-                  properties: JSON.stringify({
-                    key: v.variantKey || '',
-                    value1: v.variantValue1 || '',
-                    value2: v.variantValue2 || '',
-                    value3: v.variantValue3 || '',
-                  }),
-                  cjVariantId: v.vid || v.variantId || ''
-                })).filter((v: any) => v.cjVariantId) // Filtrer les variants sans cjVariantId
+                create: variants.map((v: any) => {
+                  // ✅ Convertir status en String si c'est un nombre
+                  const variantStatus = v.variantStatus !== null && v.variantStatus !== undefined
+                    ? (typeof v.variantStatus === 'number' ? String(v.variantStatus) : v.variantStatus)
+                    : null;
+                  
+                  return {
+                    name: v.variantName || v.variantNameEn || '',
+                    sku: v.variantSku || '',
+                    price: parseFloat(v.sellPrice || v.variantSellPrice || '0'),
+                    weight: v.variantWeight || 0,
+                    dimensions: v.variantLength || v.variantWidth || v.variantHeight ? 
+                      JSON.stringify({
+                        length: v.variantLength,
+                        width: v.variantWidth,
+                        height: v.variantHeight
+                      }) : null,
+                    image: v.variantImage || null,
+                    status: variantStatus,
+                    properties: JSON.stringify({
+                      key: v.variantKey || '',
+                      value1: v.variantValue1 || '',
+                      value2: v.variantValue2 || '',
+                      value3: v.variantValue3 || '',
+                    }),
+                    cjVariantId: v.vid || v.variantId || ''
+                  };
+                }).filter((v: any) => v.cjVariantId) // Filtrer les variants sans cjVariantId
               }
             },
             include: {
@@ -347,11 +354,28 @@ export class CJWebhookService {
       }
 
       // Mettre à jour ou créer la variante
+      // ✅ Convertir price et weight en Float si ce sont des strings
+      const variantPrice = params.variantSellPrice 
+        ? (typeof params.variantSellPrice === 'string' ? parseFloat(params.variantSellPrice) : params.variantSellPrice)
+        : null;
+      const variantWeight = params.variantWeight 
+        ? (typeof params.variantWeight === 'string' ? parseFloat(params.variantWeight) : params.variantWeight)
+        : null;
+      
+      // Vérifier que les valeurs sont valides (pas NaN)
+      const finalPrice = variantPrice !== null && !isNaN(variantPrice) ? variantPrice : null;
+      const finalWeight = variantWeight !== null && !isNaN(variantWeight) ? variantWeight : null;
+      
+      // ✅ Convertir status en String si c'est un nombre
+      const variantStatus = params.variantStatus !== null && params.variantStatus !== undefined
+        ? (typeof params.variantStatus === 'number' ? String(params.variantStatus) : params.variantStatus)
+        : null;
+      
       const variantData = {
         name: params.variantName,
         sku: params.variantSku,
-        price: params.variantSellPrice,
-        weight: params.variantWeight,
+        price: finalPrice,
+        weight: finalWeight,
         dimensions: params.variantLength || params.variantWidth || params.variantHeight ? 
           JSON.stringify({
             length: params.variantLength,
@@ -359,7 +383,7 @@ export class CJWebhookService {
             height: params.variantHeight
           }) : null,
         image: params.variantImage,
-        status: params.variantStatus,
+        status: variantStatus,
         properties: JSON.stringify({
           key: params.variantKey,
           value1: params.variantValue1,

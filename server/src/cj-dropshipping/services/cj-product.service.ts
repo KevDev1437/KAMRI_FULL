@@ -3,7 +3,7 @@ import { DuplicatePreventionService } from '../../common/services/duplicate-prev
 import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJProductSearchDto } from '../dto/cj-product-search.dto';
-import { CJProduct } from '../interfaces/cj-product.interface';
+import { CJProduct, CJProductSearchOptions, CJProductSearchResult } from '../interfaces/cj-product.interface';
 
 @Injectable()
 export class CJProductService {
@@ -161,22 +161,23 @@ export class CJProductService {
       const client = await this.initializeClient();
       this.logger.log('✅ Client CJ initialisé avec succès');
 
-      this.logger.log('📡 Appel API CJ getDefaultProducts...');
+      this.logger.log('📡 Appel API CJ getDefaultProducts (V2)...');
       const result = await client.searchProducts(undefined, {
-        pageNum: query.pageNum || 1,
-        pageSize: query.pageSize || 100,
+        page: query.pageNum || 1,
+        size: query.pageSize || 100,
         countryCode: query.countryCode,
-        sortBy: 'relevance',
+        sort: 'desc',
+        orderBy: 0, // Best match
       });
 
-      this.logger.log('📊 Résultat API CJ brut:', JSON.stringify({
+      this.logger.log('📊 Résultat API CJ V2 brut:', JSON.stringify({
         total: result.total,
-        pageNum: result.pageNum,
+        pageNumber: result.pageNumber,
         pageSize: result.pageSize,
-        listLength: result.list?.length || 0
+        productsLength: result.products?.length || 0
       }, null, 2));
 
-      const products = result.list || [];
+      const products = result.products || [];
       
       // Mettre en cache pour la première page
       if (query.pageNum === 1) {
@@ -203,20 +204,20 @@ export class CJProductService {
   }
 
   /**
-   * Rechercher des produits avec cache amélioré
+   * Rechercher des produits avec cache amélioré (API V2)
    */
-  async searchProducts(query: CJProductSearchDto): Promise<CJProduct[]> {
+  async searchProducts(query: CJProductSearchDto): Promise<CJProductSearchResult> {
     this.logger.log('🔍 === DÉBUT RECHERCHE PRODUITS CJ ===');
     this.logger.log('📝 Paramètres de recherche:', JSON.stringify(query, null, 2));
     
     // Créer une clé de cache basée sur les paramètres de recherche
-    const cacheKey = `search_${JSON.stringify(query)}`;
+    const cacheKey = `search_v2_${JSON.stringify(query)}`;
     
     // Vérifier le cache d'abord
-    const cachedProducts = this.getCachedSearch(cacheKey);
-    if (cachedProducts) {
+    const cachedResult = this.getCachedSearchResult(cacheKey);
+    if (cachedResult) {
       this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ (CACHE) ===');
-      return cachedProducts;
+      return cachedResult;
     }
     
     try {
@@ -227,45 +228,159 @@ export class CJProductService {
       // ✅ CORRECTION: Recherche simple sans trop de filtres
       this.logger.log('� Appel API CJ avec paramètres minimaux...');
       
-      const result = await client.searchProducts(query.keyword || query.productNameEn, {
-        pageNum: query.pageNum || 1,
-        pageSize: Math.min(query.pageSize || 20, 200), // Max 200 selon doc CJ
+      // ✅ Mapper les paramètres DTO vers CJProductSearchOptions (V2)
+      const searchOptions: CJProductSearchOptions = {
+        page: query.pageNum || 1,                    // ✅ Renommer pageNum → page
+        size: Math.min(query.pageSize || 10, 100),   // ✅ Limite à 100 (pas 200)
+        keyWord: query.keyword || query.productNameEn, // ✅ Utiliser keyWord en priorité
         categoryId: query.categoryId,
+        lv2categoryList: query.lv2categoryList,      // ✅ NOUVEAU
+        lv3categoryList: query.lv3categoryList,      // ✅ NOUVEAU
         minPrice: query.minPrice,
         maxPrice: query.maxPrice,
         countryCode: query.countryCode,
-        // Utiliser les nouveaux paramètres de la doc CJ
-        ...query.productType && { productType: query.productType },
-        ...query.deliveryTime && { deliveryTime: query.deliveryTime },
-        ...query.verifiedWarehouse && { verifiedWarehouse: query.verifiedWarehouse },
-        ...query.startInventory && { startInventory: query.startInventory },
-        ...query.endInventory && { endInventory: query.endInventory },
-        ...query.isFreeShipping !== undefined && { isFreeShipping: query.isFreeShipping },
-        ...query.searchType !== undefined && { searchType: query.searchType },
-        ...query.sort && { sort: query.sort },
-        ...query.orderBy && { orderBy: query.orderBy },
-      });
+        productType: query.productType ? Number(query.productType) : undefined,
+        productFlag: query.productFlag,              // ✅ NOUVEAU
+        startInventory: query.startInventory,
+        endInventory: query.endInventory,
+        verifiedWarehouse: query.verifiedWarehouse,
+        timeStart: query.timeStart,
+        timeEnd: query.timeEnd,
+        zonePlatform: query.zonePlatform,            // ✅ NOUVEAU
+        isWarehouse: query.isWarehouse,              // ✅ NOUVEAU
+        currency: query.currency,                     // ✅ NOUVEAU
+        isFreeShipping: query.isFreeShipping,
+        isSelfPickup: query.isSelfPickup,
+        hasCertification: query.hasCertification,     // ✅ NOUVEAU
+        customization: query.customization,          // ✅ NOUVEAU
+        sort: (query.sort as 'asc' | 'desc') || 'desc',
+        orderBy: this.mapOrderByToV2(query.orderBy), // ✅ Mapper vers nombres V2
+        supplierId: query.supplierId,
+        features: query.features || ['enable_category'], // ✅ NOUVEAU V2 : Retourner catégories par défaut
+        // Legacy support
+        pageNum: query.pageNum,
+        pageSize: query.pageSize,
+        productName: query.productNameEn,
+        productNameEn: query.productNameEn
+      };
+
+      // ✅ Appel API V2 avec les options typées
+      const result = await client.searchProducts(undefined, searchOptions);
       
-      const products = result.list || [];
+      // ✅ Mapper les produits pour normaliser les images (V2 peut retourner différentes structures)
+      const mappedProducts = (result.products || [])
+        .map((product: any) => {
+        // Normaliser productImage depuis différentes structures possibles (V2 utilise bigImage)
+        let productImage = product.productImage || product.bigImage || product.image || product.productImageEn || '';
+        
+        // Si c'est un array, prendre la première image
+        if (Array.isArray(productImage)) {
+          productImage = productImage.length > 0 ? productImage[0] : '';
+        }
+        // Si c'est une string JSON, parser
+        else if (typeof productImage === 'string' && productImage.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(productImage);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              productImage = parsed[0];
+            } else {
+              productImage = '';
+            }
+          } catch (e) {
+            // Si le parsing échoue, garder la valeur originale si c'est une URL valide
+            if (!productImage.startsWith('http')) {
+              productImage = '';
+            }
+          }
+        }
+        
+        // ✅ Normaliser le PID (peut être dans différents champs selon V2)
+        const normalizedPid = product.pid || product.productId || product.id || '';
+        
+        // ✅ VALIDATION : Ne pas inclure les produits sans PID valide
+        if (!normalizedPid || normalizedPid === 'undefined' || normalizedPid === 'null') {
+          this.logger.warn(`⚠️ Produit sans PID valide ignoré:`, {
+            productName: product.productName || product.productNameEn,
+            availableFields: Object.keys(product)
+          });
+          return null; // Retourner null pour filtrer ce produit
+        }
+        
+        return {
+          ...product,
+          productImage: productImage || '', // Toujours définir productImage (même si vide)
+          // S'assurer que tous les champs requis sont présents
+          pid: normalizedPid,
+          productId: normalizedPid, // Ajouter aussi productId pour compatibilité
+          productName: product.productName || product.productNameEn || '',
+          productNameEn: product.productNameEn || product.productName || '',
+          productSku: product.productSku || product.sku || '',
+          sellPrice: product.sellPrice || product.price || 0,
+          categoryName: product.categoryName || product.category || '',
+          description: product.description || '',
+          variants: product.variants || [],
+          weight: product.weight || product.productWeight || 0,
+          dimensions: product.dimensions || '',
+          brand: product.brand || '',
+          tags: product.tags || [],
+          reviews: product.reviews || [],
+          rating: product.rating || 0,
+          totalReviews: product.totalReviews || 0
+        };
+        })
+        .filter((product: any) => product !== null); // ✅ Filtrer les produits sans PID valide
+      
+      // ✅ Format de réponse V2
+      const response: CJProductSearchResult = {
+        products: mappedProducts,
+        total: result.total || 0,
+        pageNumber: result.pageNumber || query.pageNum || 1,
+        pageSize: result.pageSize || query.pageSize || 10,
+        totalPages: result.totalPages || 0,
+        relatedCategories: result.relatedCategories || [],
+        warehouses: result.warehouses || [],
+        keyWord: result.keyWord || query.keyword || query.productNameEn,
+        searchHit: result.searchHit || ''
+      };
       
       // Mettre en cache les résultats
-      this.setCachedSearch(cacheKey, products, query);
+      this.setCachedSearchResult(cacheKey, response, query);
       
-      this.logger.log(`📈 Résultat API CJ : ${products.length} produits reçus`);
-      this.logger.log(`📊 Total disponible : ${result.total || 0} produits`);
+      this.logger.log(`📈 Résultat API CJ V2 : ${response.products.length} produits reçus`);
+      this.logger.log(`📊 Total disponible : ${response.total} produits`);
+      this.logger.log(`📄 Page ${response.pageNumber}/${response.totalPages || 1}`);
       this.logger.log('🎉 Recherche terminée avec succès');
-      this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ ===');
+      this.logger.log('🔍 === FIN RECHERCHE PRODUITS CJ (V2) ===');
       
-      return products;
+      return response;
     } catch (error) {
-      this.logger.error('❌ === ERREUR RECHERCHE PRODUITS CJ ===');
+      this.logger.error('❌ === ERREUR RECHERCHE PRODUITS CJ (V2) ===');
       this.logger.error('💥 Erreur détaillée:', error);
       this.logger.error('📊 Type d\'erreur:', typeof error);
       this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
       this.logger.error('📊 Stack trace:', error instanceof Error ? error.stack : 'N/A');
-      this.logger.error('🔍 === FIN ERREUR RECHERCHE PRODUITS CJ ===');
+      this.logger.error('🔍 === FIN ERREUR RECHERCHE PRODUITS CJ (V2) ===');
       throw error;
     }
+  }
+
+  /**
+   * Mapper orderBy string vers nombres V2
+   */
+  private mapOrderByToV2(orderBy?: string | number): number {
+    if (typeof orderBy === 'number') {
+      return orderBy;
+    }
+    
+    const mapping: { [key: string]: number } = {
+      'createAt': 3,      // Create time
+      'listedNum': 1,     // Listing count
+      'sellPrice': 2,     // Sell price
+      'inventory': 4,      // Inventory
+      'default': 0         // Best match
+    };
+    
+    return mapping[orderBy || 'default'] || 0;
   }
 
   /**
@@ -961,6 +1076,62 @@ export class CJProductService {
       searchParams
     });
     this.logger.log(`💾 Mise en cache recherche: ${cacheKey} (${products.length} produits)`);
+  }
+
+  /**
+   * Obtenir un résultat de recherche V2 depuis le cache
+   */
+  private getCachedSearchResult(cacheKey: string): CJProductSearchResult | null {
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      // Convertir les données du cache en CJProductSearchResult
+      const products = cached.data as CJProduct[];
+      this.cacheStats.searchHits++;
+      this.logger.log(`📦 Cache HIT pour recherche V2: ${cacheKey}`);
+      return {
+        products: products,
+        total: cached.searchParams?.total || products.length, // ✅ Utiliser le total stocké dans searchParams
+        pageNumber: cached.searchParams?.pageNumber || cached.searchParams?.pageNum || 1,
+        pageSize: cached.searchParams?.pageSize || 10,
+        totalPages: cached.searchParams?.totalPages || 0,
+        relatedCategories: cached.searchParams?.relatedCategories || [],
+        warehouses: cached.searchParams?.warehouses || [],
+        keyWord: cached.searchParams?.keyWord || cached.searchParams?.keyword || cached.searchParams?.productNameEn,
+        searchHit: cached.searchParams?.searchHit || ''
+      };
+    }
+    
+    if (cached) {
+      this.searchCache.delete(cacheKey);
+    }
+    
+    this.cacheStats.searchMisses++;
+    this.logger.log(`❌ Cache MISS pour recherche V2: ${cacheKey}`);
+    return null;
+  }
+
+  /**
+   * Mettre en cache un résultat de recherche V2
+   */
+  private setCachedSearchResult(cacheKey: string, result: CJProductSearchResult, searchParams: any): void {
+    // Stocker les produits dans le cache
+    this.searchCache.set(cacheKey, {
+      data: result.products,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL.SEARCH,
+      searchParams: {
+        ...searchParams,
+        total: result.total,
+        pageNumber: result.pageNumber,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+        relatedCategories: result.relatedCategories,
+        warehouses: result.warehouses,
+        keyWord: result.keyWord,
+        searchHit: result.searchHit
+      }
+    });
+    this.logger.log(`💾 Mise en cache recherche V2: ${cacheKey} (${result.products.length} produits, total: ${result.total})`);
   }
 
   /**

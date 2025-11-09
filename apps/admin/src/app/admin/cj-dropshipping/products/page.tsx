@@ -28,10 +28,10 @@ export default function CJProductsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CJProductSearchFilters>({
     pageNum: 1,
-    pageSize: 100, // 100 produits par page (limite API CJ augmentée à 200)
+    pageSize: 100, // ✅ V2 limite à 100 (pas 200)
     searchType: 0, // 0=Tous les produits
     sort: 'desc',
-    orderBy: 'createAt',
+    orderBy: 3, // ✅ V2 utilise des nombres: 0=best match, 1=listing, 2=price, 3=time, 4=inventory
     // Paramètres legacy pour compatibilité
     keyword: '',
     minPrice: undefined,
@@ -163,7 +163,18 @@ export default function CJProductsPage() {
     setProducts([]); // Effacer les résultats précédents
     try {
       const results = await searchProducts(filters);
-      setProducts(results);
+      // ✅ V2 retourne { products, total, ... } au lieu d'un tableau direct
+      if (Array.isArray(results)) {
+        // Format V1 (legacy)
+        setProducts(results);
+      } else if (results && 'products' in results && Array.isArray(results.products)) {
+        // Format V2 (nouveau)
+        setProducts(results.products);
+        console.log(`✅ Recherche V2 : ${results.products.length} produits sur ${results.total || 0} total`);
+      } else {
+        console.warn('Structure de réponse inattendue:', results);
+        setProducts([]);
+      }
     } catch (err) {
       console.error('Erreur lors de la recherche:', err);
       setProducts([]); // Effacer en cas d'erreur
@@ -297,13 +308,24 @@ export default function CJProductsPage() {
 
   // Fonctions pour le modal de détails
   const handleShowDetails = async (product: CJProduct) => {
+    // ✅ VALIDATION : Vérifier que le PID existe
+    const pid = product.pid || (product as any).productId || '';
+    if (!pid || pid === 'undefined' || pid === 'null') {
+      toast.showToast({ 
+        title: 'Erreur', 
+        description: 'Ce produit n\'a pas d\'ID valide. Impossible de charger les détails.',
+        type: 'error' 
+      });
+      return;
+    }
+    
     try {
       setShowDetailsModal(true);
       setSelectedProduct(product); // Afficher d'abord les données de base
       setLoadingDetails(true);
       
       // Ensuite récupérer les détails complets
-      const detailedProduct = await getProductDetails(product.pid);
+      const detailedProduct = await getProductDetails(pid);
       setSelectedProduct(detailedProduct);
     } catch (error) {
       console.error('Erreur lors de la récupération des détails:', error);
@@ -896,13 +918,16 @@ export default function CJProductsPage() {
                 <div className="aspect-square bg-gray-100">
                   <img
                     src={(() => {
-                      // Gérer les images CJ qui peuvent être un tableau ou une string
+                      // ✅ Vérifier d'abord si productImage existe et n'est pas vide
+                      if (!product.productImage || product.productImage === '') {
+                        return '/placeholder-product.jpg';
+                      }
+                      
                       let imageUrl = product.productImage;
                       
                       // 🔧 CORRECTION : Vérifier d'abord si c'est un array
                       if (Array.isArray(imageUrl)) {
-                        imageUrl = imageUrl[0];
-                        console.log('📸 Tableau d\'images détecté, utilisation de la première:', imageUrl);
+                        imageUrl = imageUrl.length > 0 ? imageUrl[0] : '';
                       }
                       // Si c'est une string qui contient un tableau JSON
                       else if (typeof imageUrl === 'string' && imageUrl.includes('[')) {
@@ -910,26 +935,34 @@ export default function CJProductsPage() {
                           const parsed = JSON.parse(imageUrl);
                           if (Array.isArray(parsed) && parsed.length > 0) {
                             imageUrl = parsed[0];
-                            console.log('📸 JSON d\'images parsé, utilisation de la première:', imageUrl);
+                          } else {
+                            imageUrl = '';
                           }
                         } catch (e) {
-                          console.warn('Erreur parsing JSON image:', e);
+                          // Si le parsing échoue, vérifier si c'est une URL valide
+                          if (!imageUrl.startsWith('http')) {
+                            imageUrl = '';
+                          }
                         }
                       }
                       
                       // Vérifier que l'URL est valide
                       if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
-                        console.warn('Image invalide détectée:', product.productImage);
                         return '/placeholder-product.jpg';
                       }
                       
                       return imageUrl;
                     })()}
-                    alt={product.productNameEn}
+                    alt={product.productNameEn || product.productName || 'Product image'}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      console.warn('Erreur de chargement d\'image:', product.productImage);
-                      (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                      // ✅ Ne logger que si l'image était censée être valide (éviter les logs inutiles)
+                      const target = e.target as HTMLImageElement;
+                      if (target.src && !target.src.includes('placeholder-product.jpg') && target.src.startsWith('http')) {
+                        // Seulement logger en mode debug pour les vraies erreurs de chargement
+                        console.debug('Image non disponible:', product.pid || product.productSku);
+                      }
+                      target.src = '/placeholder-product.jpg';
                     }}
                   />
                 </div>
@@ -991,16 +1024,28 @@ export default function CJProductsPage() {
                   
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => handleImport(product.pid)}
-                      disabled={importing === product.pid}
+                      onClick={() => {
+                        const pid = product.pid || (product as any).productId || '';
+                        if (pid) {
+                          handleImport(pid);
+                        } else {
+                          toast.showToast({ 
+                            type: 'error', 
+                            title: 'Import', 
+                            description: '❌ Ce produit n\'a pas d\'ID valide.' 
+                          });
+                        }
+                      }}
+                      disabled={importing === (product.pid || (product as any).productId) || !(product.pid || (product as any).productId)}
                       className="flex-1 bg-green-600 hover:bg-green-700"
                     >
-                      {importing === product.pid ? 'Import...' : 'Importer'}
+                      {importing === (product.pid || (product as any).productId) ? 'Import...' : 'Importer'}
                     </Button>
                     
                     <Button
                       onClick={() => handleShowDetails(product)}
                       variant="outline"
+                      disabled={!(product.pid || (product as any).productId)}
                     >
                       Détails
                     </Button>
