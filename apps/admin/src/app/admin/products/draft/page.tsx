@@ -381,71 +381,326 @@ export default function DraftProductsPage() {
     
     // ✅ PRIORITÉ 1 : Extraire depuis la description markdown
     if (description) {
-      const colorMatch = description.match(/### 🎨 Couleurs disponibles\n([\s\S]*?)(?=\n\n|###|$)/i)
+      // Pattern 1 : Format markdown avec ### 🎨 Couleurs disponibles
+      let colorMatch = description.match(/### 🎨 Couleurs disponibles\n([\s\S]*?)(?=\n\n|###|$)/i)
+      
+      // Pattern 2 : Format "Color:" ou "Couleur:" (format simple)
+      if (!colorMatch) {
+        colorMatch = description.match(/Color:\s*([^\n]+)/i) || 
+                     description.match(/Couleur:\s*([^\n]+)/i) ||
+                     description.match(/Colour:\s*([^\n]+)/i)
+      }
       
       if (colorMatch && colorMatch[1]) {
         const colorsText = colorMatch[1]
-        const colorNames = colorsText
-          .split('\n')
-          .map(line => {
-            let color = line.trim().replace(/^-\s*/, '') // Enlever le "- " au début
-            // Nettoyer les codes (ex: "8808 leather red" → "leather red")
-            color = color.replace(/^[0-9]+[-_\s]*/i, '')
-            color = color.replace(/[-_\s]*[0-9]+$/i, '')
-            color = color.replace(/[-_\s]+/g, ' ').trim()
-            // Capitaliser la première lettre
-            if (color) {
-              color = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase()
-            }
-            return color
-          })
-          .filter(c => c && c.length > 0)
+        
+        // Déterminer si c'est le format markdown (avec lignes) ou format simple (avec virgules)
+        const isMarkdownFormat = colorsText.includes('\n')
+        
+        let colorNames: string[] = []
+        
+        if (isMarkdownFormat) {
+          // Format markdown : lignes séparées par \n
+          colorNames = colorsText
+            .split('\n')
+            .map(line => {
+              let color = line.trim().replace(/^-\s*/, '') // Enlever le "- " au début
+              
+              // ❌ EXCLURE les lignes qui ne sont pas des couleurs
+              // Exclure les lignes qui contiennent "**" (markdown bold)
+              if (color.includes('**')) return null
+              // Exclure les lignes qui contiennent ":" (labels)
+              if (color.includes(':')) return null
+              // Exclure les lignes trop longues (probablement pas des couleurs)
+              if (color.length > 30) return null
+              
+              // Nettoyer les codes (ex: "8808 leather red" → "leather red")
+              color = color.replace(/^[0-9]+[-_\s]*/i, '')
+              color = color.replace(/[-_\s]*[0-9]+$/i, '')
+              color = color.replace(/[-_\s]+/g, ' ').trim()
+              
+              // Vérifier que c'est bien une couleur (contient des lettres, pas seulement des symboles)
+              if (!/^[a-zA-Z\s]+$/.test(color)) return null
+              
+              // ❌ EXCLURE les tailles qui sont extraites comme couleurs
+              const sizePatterns = ['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'xi', 'xii', 'xiii']
+              const colorLower = color.toLowerCase().trim()
+              
+              // Si c'est une taille pure (ex: "M", "L", "XL", "XI")
+              if (sizePatterns.includes(colorLower)) {
+                return null
+              }
+              
+              // Si c'est une taille avec un préfixe/suffixe (ex: "Size M", "M Size")
+              if (colorLower.match(/^(size|taille)\s*[xslm]+$/i) || 
+                  colorLower.match(/^[xslm]+\s*(size|taille)$/i)) {
+                return null
+              }
+              
+              // Capitaliser la première lettre
+              if (color) {
+                color = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase()
+              }
+              return color
+            })
+            .filter((c): c is string => c !== null && c !== undefined && c.length > 0 && c.length < 30)
+        } else {
+          // Format simple : séparé par virgules (ex: "white gold Q911, yellow gold Q912")
+          // OU format avec détails : "Gold White Diamond (width 6mm), Platinum White Diamond (width 6mm)"
+          colorNames = colorsText
+            .split(',')
+            .map(color => {
+              let cleanColor = color.trim()
+              
+              // Enlever les détails entre parenthèses (ex: "(width 6mm)", "(length cm)", etc.)
+              cleanColor = cleanColor.replace(/\s*\([^)]*\)/g, '') // Enlever tout ce qui est entre parenthèses
+              
+              // Nettoyer les codes (ex: "white gold Q911" → "white gold")
+              // Enlever les codes comme Q911, Q912, etc.
+              cleanColor = cleanColor.replace(/\s*[A-Z]\d+\s*/gi, '') // Enlever "Q911", "Q912", etc.
+              cleanColor = cleanColor.replace(/^[0-9]+[-_\s]*/i, '')
+              cleanColor = cleanColor.replace(/[-_\s]*[0-9]+$/i, '')
+              
+              // Enlever les unités de mesure (mm, cm, inches, etc.)
+              cleanColor = cleanColor.replace(/\s*\d+\s*(mm|cm|inches?)\s*/gi, '')
+              
+              cleanColor = cleanColor.replace(/[-_\s]+/g, ' ').trim()
+              
+              // Vérifier que c'est bien une couleur (contient des lettres)
+              if (!/^[a-zA-Z\s]+$/.test(cleanColor) || cleanColor.length === 0) return null
+              
+              // ❌ EXCLURE les tailles qui sont extraites comme couleurs
+              const sizePatterns = ['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'xi', 'xii', 'xiii']
+              const cleanColorLower = cleanColor.toLowerCase().trim()
+              
+              // Si c'est une taille pure (ex: "M", "L", "XL", "XI")
+              if (sizePatterns.includes(cleanColorLower)) {
+                return null
+              }
+              
+              // Si c'est une taille avec un préfixe/suffixe (ex: "Size M", "M Size")
+              if (cleanColorLower.match(/^(size|taille)\s*[xslm]+$/i) || 
+                  cleanColorLower.match(/^[xslm]+\s*(size|taille)$/i)) {
+                return null
+              }
+              
+              // Capitaliser chaque mot (sauf les mots courts comme "and", "or", etc.)
+              const shortWords = ['and', 'or', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'with']
+              cleanColor = cleanColor
+                .split(' ')
+                .map(word => {
+                  const lowerWord = word.toLowerCase()
+                  if (shortWords.includes(lowerWord)) {
+                    return lowerWord
+                  }
+                  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                })
+                .join(' ')
+              
+              return cleanColor
+            })
+            .filter((c): c is string => c !== null && c !== undefined && c.length > 0 && c.length < 50) // Augmenter la limite à 50 pour les couleurs complexes
+        }
         
         // Essayer d'associer avec les images des variants si disponibles
+        // OU utiliser les images de la galerie du produit comme fallback
+        const productImages: string[] = []
+        
+        // Récupérer les images du produit (galerie)
+        if (product?.images && Array.isArray(product.images) && product.images.length > 0) {
+          product.images.forEach(img => {
+            if (typeof img === 'string') {
+              productImages.push(img)
+            } else if (img && typeof img === 'object' && 'url' in img) {
+              productImages.push(img.url)
+            }
+          })
+        } else if (product?.image) {
+          try {
+            const parsed = JSON.parse(product.image)
+            if (Array.isArray(parsed)) {
+              productImages.push(...parsed)
+            } else {
+              productImages.push(product.image)
+            }
+          } catch {
+            productImages.push(product.image)
+          }
+        }
+        
+        console.log('🔍 [DEBUG] Product images available:', productImages.length)
+        
         if (product?.productVariants && product.productVariants.length > 0) {
-          const colorMap = new Map<string, string>()
+          console.log('🔍 [DEBUG] Processing variants:', product.productVariants.length)
           
-          product.productVariants.forEach(variant => {
-            if (!variant.properties || !variant.image) return
+          // Créer une map couleur → image depuis les variants
+          const colorMap = new Map<string, string>()
+          const variantsWithImages: Array<{ color: string; image: string }> = []
+          
+          product.productVariants.forEach((variant, idx) => {
+            console.log(`🔍 [DEBUG] Variant ${idx}:`, { 
+              hasImage: !!variant.image, 
+              image: variant.image?.substring(0, 50),
+              properties: variant.properties 
+            })
+            
+            if (!variant.image) {
+              console.log(`⚠️ [DEBUG] Variant ${idx} n'a pas d'image`)
+              return // Ignorer les variants sans image
+            }
             
             try {
-              const properties = typeof variant.properties === 'string' 
-                ? JSON.parse(variant.properties) 
-                : variant.properties
+              let variantColor = ''
               
-              const colorValue = properties.value1 || ''
-              
-              // Vérifier que c'est bien une couleur (pas un nombre ou une taille)
-              if (colorValue && 
-                  !/^[0-9]+(-[0-9]+)?(\.[0-9]+)?$/.test(colorValue) && // Pas un nombre ou plage
-                  !/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(colorValue)) { // Pas une taille texte
+              // Essayer d'extraire la couleur depuis properties
+              if (variant.properties) {
+                const properties = typeof variant.properties === 'string' 
+                  ? JSON.parse(variant.properties) 
+                  : variant.properties
                 
-                if (!colorMap.has(colorValue)) {
-                  colorMap.set(colorValue, variant.image)
+                variantColor = (properties.value1 || '').trim()
+                
+                // Vérifier que c'est bien une couleur (pas un nombre ou une taille)
+                if (variantColor && 
+                    !/^[0-9]+(-[0-9]+)?(\.[0-9])?$/.test(variantColor) && // Pas un nombre ou plage
+                    !/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(variantColor)) { // Pas une taille texte
+                  
+                  if (!colorMap.has(variantColor.toLowerCase())) {
+                    colorMap.set(variantColor.toLowerCase(), variant.image)
+                    variantsWithImages.push({ color: variantColor, image: variant.image })
+                  }
                 }
               }
+              
+              // Si pas de couleur dans properties, garder quand même l'image pour distribution
+              if (!variantColor && variant.image) {
+                variantsWithImages.push({ color: '', image: variant.image })
+              }
             } catch (e) {
-              console.warn('Erreur parsing properties:', e)
+              // Si erreur de parsing, garder quand même l'image
+              if (variant.image) {
+                variantsWithImages.push({ color: '', image: variant.image })
+              }
             }
           })
           
           // Associer les couleurs de la description avec les images des variants
           const colorMapEntries = Array.from(colorMap.entries())
-          info.colors = colorNames.map(colorName => {
-            // Chercher une image correspondante
+          const allVariantImages = variantsWithImages.map(v => v.image).filter(Boolean)
+          
+          console.log('🔍 [DEBUG] Color map entries:', colorMapEntries)
+          console.log('🔍 [DEBUG] All variant images:', allVariantImages.length, allVariantImages.map(img => img?.substring(0, 50)))
+          console.log('🔍 [DEBUG] Color names from description:', colorNames)
+          
+          info.colors = colorNames.map((colorName, idx) => {
+            const colorNameLower = colorName.toLowerCase()
+            
+            // 1. Chercher une correspondance exacte ou partielle
             for (const [variantColor, variantImage] of colorMapEntries) {
-              if (variantColor.toLowerCase().includes(colorName.toLowerCase()) ||
-                  colorName.toLowerCase().includes(variantColor.toLowerCase())) {
+              const variantColorLower = variantColor.toLowerCase()
+              
+              // Correspondance exacte
+              if (variantColorLower === colorNameLower) {
+                console.log(`✅ [DEBUG] Correspondance exacte: "${colorName}" → variant "${variantColor}"`)
+                return { name: colorName, image: variantImage }
+              }
+              
+              // Correspondance partielle (ex: "leather red" contient "red")
+              if (variantColorLower.includes(colorNameLower) || 
+                  colorNameLower.includes(variantColorLower)) {
+                console.log(`✅ [DEBUG] Correspondance partielle: "${colorName}" → variant "${variantColor}"`)
+                return { name: colorName, image: variantImage }
+              }
+              
+              // Correspondance par mots-clés communs (couleurs de base)
+              const colorKeywords: { [key: string]: string[] } = {
+                'white': ['white', 'blanc', 'blanche', 'diamond'],
+                'black': ['black', 'noir', 'noire'],
+                'gray': ['gray', 'grey', 'gris', 'grise'],
+                'red': ['red', 'rouge'],
+                'blue': ['blue', 'bleu', 'bleue'],
+                'green': ['green', 'vert', 'verte'],
+                'yellow': ['yellow', 'jaune', 'gold'],
+                'pink': ['pink', 'rose'],
+                'purple': ['purple', 'violet', 'violette'],
+                'orange': ['orange'],
+                'brown': ['brown', 'marron', 'brun', 'brune'],
+                'gold': ['gold', 'or', 'doré', 'dorée'],
+                'platinum': ['platinum', 'platine'],
+                'silver': ['silver', 'argent', 'argenté', 'argentée'],
+              }
+              
+              // Extraire les mots-clés de la couleur (ex: "Gold White Diamond" → ["gold", "white", "diamond"])
+              const colorNameWords = colorNameLower.split(/\s+/).filter(w => w.length > 2)
+              const variantColorWords = variantColorLower.split(/\s+/).filter(w => w.length > 2)
+              
+              // Vérifier si au moins un mot-clé commun est présent
+              const hasCommonKeyword = colorNameWords.some(word => {
+                // Chercher dans les mots-clés de couleur
+                for (const [key, synonyms] of Object.entries(colorKeywords)) {
+                  if (synonyms.some(syn => word.includes(syn) || syn.includes(word))) {
+                    // Vérifier si le variant contient aussi ce mot-clé
+                    return variantColorWords.some(vWord => 
+                      synonyms.some(syn => vWord.includes(syn) || syn.includes(vWord))
+                    )
+                  }
+                }
+                // Vérifier correspondance directe de mots
+                return variantColorWords.some(vWord => word === vWord || word.includes(vWord) || vWord.includes(word))
+              })
+              
+              if (hasCommonKeyword) {
+                return { name: colorName, image: variantImage }
+              }
+              
+              // Fallback : correspondance par mots-clés simples
+              const colorNameKeywords = colorKeywords[colorNameLower] || []
+              const variantColorKeywords = colorKeywords[variantColorLower] || []
+              
+              if (colorNameKeywords.some(k => variantColorLower.includes(k)) ||
+                  variantColorKeywords.some(k => colorNameLower.includes(k))) {
                 return { name: colorName, image: variantImage }
               }
             }
-            // Si pas d'image trouvée, prendre la première disponible ou aucune
-            const firstImage = colorMapEntries.length > 0 ? colorMapEntries[0][1] : undefined
-            return { name: colorName, image: firstImage }
+            
+            // 2. Si pas de correspondance, distribuer les images de manière cyclique
+            if (allVariantImages.length > 0) {
+              const imageIndex = idx % allVariantImages.length
+              console.log(`✅ [DEBUG] Distribution cyclique pour "${colorName}": image ${imageIndex}/${allVariantImages.length}`)
+              return { name: colorName, image: allVariantImages[imageIndex] }
+            }
+            
+            // 3. Fallback : utiliser les images de la galerie du produit
+            if (productImages.length > 0) {
+              const imageIndex = idx % productImages.length
+              console.log(`✅ [DEBUG] Utilisation image galerie pour "${colorName}": image ${imageIndex}/${productImages.length}`)
+              return { name: colorName, image: productImages[imageIndex] }
+            }
+            
+            // 4. Fallback final : aucune image
+            console.log(`⚠️ [DEBUG] Aucune image trouvée pour "${colorName}"`)
+            return { name: colorName, image: undefined }
           })
+          
+          // 🔍 DEBUG : Log final des couleurs avec images
+          console.log('🔍 [DEBUG] Couleurs finales avec images:', info.colors.map(c => ({ 
+            name: c.name, 
+            hasImage: !!c.image, 
+            image: c.image?.substring(0, 50) 
+          })))
         } else {
-          // Pas de variants, juste les noms
-          info.colors = colorNames.map(name => ({ name }))
+          // Pas de variants : utiliser les images de la galerie du produit
+          if (productImages.length > 0) {
+            console.log('✅ [DEBUG] Pas de variants, utilisation images galerie:', productImages.length)
+            info.colors = colorNames.map((name, idx) => ({
+              name,
+              image: productImages[idx % productImages.length]
+            }))
+          } else {
+            // Pas de variants ni d'images, juste les noms
+            console.log('⚠️ [DEBUG] Pas de variants ni d\'images disponibles')
+            info.colors = colorNames.map(name => ({ name }))
+          }
         }
       }
     }
@@ -488,42 +743,84 @@ export default function DraftProductsPage() {
     
     // ✅ PRIORITÉ 1 : Extraire depuis la description markdown
     if (description) {
-      const sizeMatch = description.match(/### 🎯 Tailles disponibles\n([\s\S]*?)(?=\n\n|###|\*\*|$)/i)
+      // Pattern 1 : Format markdown avec ### 🎯 Tailles disponibles
+      let sizeMatch = description.match(/### 🎯 Tailles disponibles\n([\s\S]*?)(?=\n\n|###|\*\*|$)/i)
+      
+      // Pattern 2 : Format "Size:" ou "Taille:" (format simple)
+      if (!sizeMatch) {
+        sizeMatch = description.match(/Size:\s*([^\n]+)/i) || 
+                    description.match(/Taille:\s*([^\n]+)/i)
+      }
       
       if (sizeMatch && sizeMatch[1]) {
         const sizesText = sizeMatch[1]
-        info.sizes = sizesText
-          .split('\n')
-          .map(line => line.trim().replace(/^-\s*/, '')) // Enlever le "- " au début
+        
+        // Déterminer si c'est le format markdown (avec lignes) ou format simple (avec virgules)
+        const isMarkdownFormat = sizesText.includes('\n')
+        
+        let rawSizes: string[] = []
+        
+        if (isMarkdownFormat) {
+          // Format markdown : lignes séparées par \n
+          rawSizes = sizesText
+            .split('\n')
+            .map(line => line.trim().replace(/^-\s*/, '')) // Enlever le "- " au début
+        } else {
+          // Format simple : séparé par virgules (ex: "no.6, no.7, no.8, no.9, no.10")
+          rawSizes = sizesText
+            .split(',')
+            .map(s => s.trim())
+        }
+        
+        info.sizes = rawSizes
           .filter(s => {
             if (!s || s.length === 0) return false
+            
+            // Nettoyer les tailles (ex: "no.6" → "6", "no.7" → "7")
+            let cleanSize = s.replace(/^no\.\s*/i, '') // Enlever "no." au début
+            cleanSize = cleanSize.replace(/^#\s*/i, '') // Enlever "#" au début
+            cleanSize = cleanSize.replace(/^size\s*/i, '') // Enlever "size" au début
+            cleanSize = cleanSize.trim()
             
             // ✅ FILTRES STRICTS
             const isValidSize = (
               // Plages de pointures : 36-37, 38-39, etc.
-              /^[0-9]{2}-[0-9]{2}$/.test(s) ||
-              // Pointures simples : 36, 37, 42
-              /^[0-9]{1,3}(\.[0-9])?$/.test(s) ||
+              /^[0-9]{2}-[0-9]{2}$/.test(cleanSize) ||
+              // Pointures simples : 6, 7, 36, 37, 42
+              /^[0-9]{1,3}(\.[0-9])?$/.test(cleanSize) ||
               // Tailles texte : XS, S, M, L, XL, XXL
-              /^(XS|S|M|L|XL|XXL|XXXL)$/i.test(s) ||
+              /^(XS|S|M|L|XL|XXL|XXXL)$/i.test(cleanSize) ||
               // Codes internationaux : EU 42, US 10
-              /^(EU|US|UK)\s*[0-9]{1,3}$/i.test(s)
+              /^(EU|US|UK)\s*[0-9]{1,3}$/i.test(cleanSize) ||
+              // Format "no.6", "no.7", etc.
+              /^no\.\s*[0-9]{1,3}$/i.test(s)
             )
             
             // ✅ EXCLUSIONS
             const isNotSize = (
-              s.length > 20 || // Trop long
-              s.includes('*') || // Contient des astérisques
-              s.includes(':') || // Contient des deux-points
-              /[a-z]{5,}/i.test(s) || // Contient des mots longs
-              s.toLowerCase().includes('craft') ||
-              s.toLowerCase().includes('sole') ||
-              s.toLowerCase().includes('shoe') ||
-              s.toLowerCase().includes('depth') ||
-              s.toLowerCase().includes('mouth')
+              cleanSize.length > 20 || // Trop long
+              cleanSize.includes('*') || // Contient des astérisques
+              cleanSize.includes(':') || // Contient des deux-points
+              /[a-z]{5,}/i.test(cleanSize) || // Contient des mots longs
+              cleanSize.toLowerCase().includes('craft') ||
+              cleanSize.toLowerCase().includes('sole') ||
+              cleanSize.toLowerCase().includes('shoe') ||
+              cleanSize.toLowerCase().includes('depth') ||
+              cleanSize.toLowerCase().includes('mouth')
             )
             
-            return isValidSize && !isNotSize
+            if (isValidSize && !isNotSize) {
+              // Utiliser la taille nettoyée
+              return cleanSize || s
+            }
+            
+            return false
+          })
+          .map(s => {
+            // Nettoyer la taille finale
+            let cleanSize = s.replace(/^no\.\s*/i, '')
+            cleanSize = cleanSize.replace(/^#\s*/i, '')
+            return cleanSize.trim() || s.trim()
           })
         
         // Trier les tailles
@@ -854,7 +1151,14 @@ export default function DraftProductsPage() {
 
                         {/* ✅ Informations visuelles du produit */}
                         {(() => {
+                          // 🔍 DEBUG : Log des variants pour déboguer
+                          console.log('🔍 [DEBUG] Product variants:', product.productVariants)
+                          console.log('🔍 [DEBUG] Product description:', product.description?.substring(0, 200))
+                          
                           const productInfo = extractProductInfo(product.description || formData.description || '', product)
+                          
+                          // 🔍 DEBUG : Log des couleurs extraites
+                          console.log('🔍 [DEBUG] Colors extracted:', productInfo.colors)
                           
                           if (productInfo.colors.length === 0 && productInfo.sizes.length === 0 && 
                               productInfo.materials.length === 0 && productInfo.otherInfo.length === 0) {
@@ -866,43 +1170,67 @@ export default function DraftProductsPage() {
                               {/* Couleurs */}
                               {productInfo.colors.length > 0 && (
                                 <div>
-                                  <Label className="mb-3 block text-sm font-semibold text-gray-700">🎨 Couleurs disponibles</Label>
-                                  <div className="flex flex-wrap gap-2">
+                                  <Label className="mb-3 block text-sm font-semibold text-gray-700">
+                                    🎨 Couleurs disponibles
+                                  </Label>
+                                  <div className="flex flex-wrap gap-3">
                                     {productInfo.colors.map((color, idx) => (
                                       <div
                                         key={idx}
-                                        className="relative w-20 h-20 border-2 border-gray-300 rounded-lg bg-white hover:border-orange-500 transition-all cursor-pointer overflow-hidden group"
+                                        className="relative group cursor-pointer"
                                       >
-                                        {color.image ? (
-                                          <>
-                                            <img
-                                              src={color.image}
-                                              alt={`${color.name} variant`}
-                                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                              onError={(e) => {
-                                                // Si l'image ne charge pas, afficher un cercle de couleur en fallback
-                                                e.currentTarget.style.display = 'none'
-                                                const fallback = e.currentTarget.nextElementSibling as HTMLElement
-                                                if (fallback) {
-                                                  fallback.style.display = 'flex'
-                                                }
-                                              }}
-                                            />
+                                        {/* Carré avec image du variant */}
+                                        <div className="relative w-24 h-24 border-2 border-gray-300 rounded-lg overflow-hidden bg-white hover:border-orange-500 transition-all shadow-sm hover:shadow-md">
+                                          {color.image ? (
+                                            <>
+                                              {/* Image du variant */}
+                                              <img
+                                                src={color.image}
+                                                alt={`${color.name} variant`}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                                onError={(e) => {
+                                                  // Si l'image ne charge pas, afficher un cercle de couleur en fallback
+                                                  e.currentTarget.style.display = 'none'
+                                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                                                  if (fallback) {
+                                                    fallback.style.display = 'flex'
+                                                  }
+                                                }}
+                                              />
+                                              {/* Fallback si image ne charge pas */}
+                                              <div
+                                                className="hidden w-full h-full items-center justify-center"
+                                                style={{ backgroundColor: getColorValue(color.name) }}
+                                              >
+                                                <span className="text-xs font-medium text-white capitalize drop-shadow-lg">
+                                                  {color.name}
+                                                </span>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            /* Pas d'image : afficher cercle de couleur */
                                             <div
-                                              className="color-fallback hidden w-full h-full items-center justify-center rounded absolute inset-0"
+                                              className="w-full h-full flex items-center justify-center"
                                               style={{ backgroundColor: getColorValue(color.name) }}
                                             >
-                                              <span className="text-xs font-medium text-white capitalize drop-shadow">{color.name}</span>
+                                              <span className="text-xs font-medium text-white capitalize drop-shadow-lg">
+                                                {color.name}
+                                              </span>
                                             </div>
-                                          </>
-                                        ) : (
-                                          <div
-                                            className="w-full h-full items-center justify-center rounded flex"
-                                            style={{ backgroundColor: getColorValue(color.name) }}
-                                          >
-                                            <span className="text-xs font-medium text-white capitalize drop-shadow">{color.name}</span>
+                                          )}
+                                          
+                                          {/* Overlay semi-transparent avec nom de couleur */}
+                                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-2">
+                                            <span className="text-xs font-semibold text-white capitalize drop-shadow-lg px-2 py-1 bg-black/50 rounded">
+                                              {color.name}
+                                            </span>
                                           </div>
-                                        )}
+                                        </div>
+                                        
+                                        {/* Nom de la couleur en dessous (toujours visible) */}
+                                        <p className="text-xs text-center mt-1 font-medium text-gray-700 capitalize truncate max-w-[96px]">
+                                          {color.name}
+                                        </p>
                                       </div>
                                     ))}
                                   </div>
