@@ -4,10 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/contexts/ToastContext';
 import { apiClient } from '@/lib/apiClient';
-import { CheckCircle, Clock, Package, Store as StoreIcon, TrendingUp, XCircle } from 'lucide-react';
+import { apiClient as apiClientAuth } from '@/lib/api';
+import { CheckCircle, Clock, Package, Store as StoreIcon, TrendingUp, XCircle, Edit, Send } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 interface Store {
@@ -78,6 +80,11 @@ export default function StoresPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categories, setCategories] = useState<string[]>([]);
   const [syncingStatus, setSyncingStatus] = useState(false);
+  const [kamriCategories, setKamriCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [preparingProductId, setPreparingProductId] = useState<string | null>(null);
+  const [showPrepareModal, setShowPrepareModal] = useState(false);
+  const [selectedProductForPrepare, setSelectedProductForPrepare] = useState<StoreProduct | null>(null);
+  const [prepareFormData, setPrepareFormData] = useState({ categoryId: '', margin: 30 });
 
   // Récupérer les magasins
   const fetchStores = useCallback(async () => {
@@ -244,9 +251,104 @@ export default function StoresPage() {
     }
   }, [fetchStoreProducts, fetchStores]);
 
+  // Charger les catégories KAMRI pour la préparation
+  const loadKamriCategories = useCallback(async () => {
+    try {
+      const response = await apiClientAuth.getCategories();
+      if (response.data) {
+        const categoriesData = response.data.data || response.data;
+        const categoriesList = Array.isArray(categoriesData) ? categoriesData : [];
+        setKamriCategories(categoriesList);
+      }
+    } catch (error) {
+      console.error('Erreur chargement catégories KAMRI:', error);
+    }
+  }, []);
+
+  // Préparer un produit CJ pour publication (créer en draft)
+  const prepareProduct = useCallback(async (product: StoreProduct) => {
+    if (!prepareFormData.categoryId) {
+      toast.showToast({ type: 'error', title: 'Erreur', description: 'Veuillez sélectionner une catégorie' });
+      return;
+    }
+
+    setPreparingProductId(product.id);
+    try {
+      console.log('🚀 Préparation du produit:', product.id, prepareFormData);
+      const response = await apiClientAuth.prepareCJProduct(product.id, {
+        categoryId: prepareFormData.categoryId,
+        margin: prepareFormData.margin || 30,
+      });
+
+      console.log('📦 Réponse API complète:', JSON.stringify(response, null, 2));
+
+      // Vérifier si la réponse est valide
+      if (response.error) {
+        console.error('❌ Erreur dans la réponse:', response.error);
+        toast.showToast({
+          type: 'error',
+          title: 'Erreur',
+          description: response.error || 'Impossible de préparer le produit'
+        });
+        setPreparingProductId(null);
+        return;
+      }
+
+      if (response.data || response) {
+        console.log('✅ Produit préparé avec succès:', response.data || response);
+        toast.showToast({
+          type: 'success',
+          title: 'Succès',
+          description: 'Produit préparé avec succès ! Il est maintenant en draft.'
+        });
+        setShowPrepareModal(false);
+        setSelectedProductForPrepare(null);
+        setPrepareFormData({ categoryId: '', margin: 30 });
+        
+        // Recharger les produits
+        if (selectedStoreId) {
+          await fetchStoreProducts(selectedStoreId);
+          await fetchStores();
+        }
+        
+        // Attendre un peu avant de rediriger pour laisser le temps à la DB
+        setTimeout(() => {
+          console.log('🔄 Redirection vers la page draft...');
+          window.location.href = '/admin/products/draft';
+        }, 1000);
+      } else {
+        console.error('❌ Réponse invalide:', response);
+        toast.showToast({
+          type: 'error',
+          title: 'Erreur',
+          description: 'Réponse invalide du serveur'
+        });
+        setPreparingProductId(null);
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la préparation:', error);
+      toast.showToast({
+        type: 'error',
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de préparer le produit'
+      });
+      setPreparingProductId(null);
+    }
+  }, [prepareFormData, selectedStoreId, fetchStoreProducts, fetchStores, toast]);
+
+  const handlePrepareClick = (product: StoreProduct) => {
+    setSelectedProductForPrepare(product);
+    setPrepareFormData({ categoryId: '', margin: 30 });
+    setShowPrepareModal(true);
+    if (kamriCategories.length === 0) {
+      loadKamriCategories();
+    }
+  };
+
   useEffect(() => {
     fetchStores();
-  }, [fetchStores]);
+    loadKamriCategories();
+  }, [fetchStores, loadKamriCategories]);
 
   useEffect(() => {
     if (selectedStoreId) {
@@ -405,14 +507,34 @@ export default function StoresPage() {
                       >
                         {product.status}
                       </Badge>
-                      <Button
-                        variant={product.status === 'selected' ? 'secondary' : 'default'}
-                        className="w-full mt-2"
-                        onClick={() => toggleProductSelection(selectedStoreId!, product.id)}
-                        disabled={product.status === 'imported'}
-                      >
-                        {product.status === 'selected' ? 'Désélectionner' : 'Sélectionner'}
-                      </Button>
+                      <div className="flex flex-col gap-2 mt-2">
+                        <Button
+                          variant={product.status === 'selected' ? 'secondary' : 'default'}
+                          className="w-full"
+                          onClick={() => toggleProductSelection(selectedStoreId!, product.id)}
+                          disabled={product.status === 'imported'}
+                        >
+                          {product.status === 'selected' ? 'Désélectionner' : 'Sélectionner'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handlePrepareClick(product)}
+                          disabled={product.status === 'imported' || preparingProductId === product.id}
+                        >
+                          {preparingProductId === product.id ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-2"></div>
+                              Préparation...
+                            </>
+                          ) : (
+                            <>
+                              <Edit className="w-3 h-3 mr-1" />
+                              Préparer (Draft)
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))
@@ -496,6 +618,92 @@ export default function StoresPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Modal de préparation */}
+      {showPrepareModal && selectedProductForPrepare && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Préparer le produit pour publication</CardTitle>
+              <CardDescription>
+                Ce produit sera créé en draft pour que vous puissiez l'éditer avant publication.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="font-semibold mb-2">{selectedProductForPrepare.name}</p>
+                <p className="text-sm text-gray-600">
+                  Prix: {selectedProductForPrepare.price.toFixed(2)}€
+                  {selectedProductForPrepare.originalPrice && (
+                    <span className="line-through ml-2">{selectedProductForPrepare.originalPrice.toFixed(2)}€</span>
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="category">Catégorie KAMRI *</Label>
+                <Select
+                  value={prepareFormData.categoryId}
+                  onValueChange={(value) => setPrepareFormData({ ...prepareFormData, categoryId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kamriCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="margin">Marge (%)</Label>
+                <Input
+                  id="margin"
+                  type="number"
+                  min="0"
+                  max="500"
+                  value={prepareFormData.margin}
+                  onChange={(e) => setPrepareFormData({ ...prepareFormData, margin: Number(e.target.value) })}
+                />
+                {selectedProductForPrepare.originalPrice && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Prix calculé: {(selectedProductForPrepare.originalPrice * (1 + (prepareFormData.margin || 30) / 100)).toFixed(2)}€
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button variant="outline" onClick={() => {
+                  setShowPrepareModal(false);
+                  setSelectedProductForPrepare(null);
+                }}>
+                  Annuler
+                </Button>
+                <Button
+                  onClick={() => prepareProduct(selectedProductForPrepare)}
+                  disabled={!prepareFormData.categoryId || preparingProductId === selectedProductForPrepare.id}
+                >
+                  {preparingProductId === selectedProductForPrepare.id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Préparation...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Préparer
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

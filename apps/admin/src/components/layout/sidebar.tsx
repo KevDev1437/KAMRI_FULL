@@ -7,6 +7,7 @@ import {
     CheckCircle,
     ChevronLeft,
     ChevronRight,
+    Edit,
     FolderOpen,
     Globe,
     LayoutDashboard,
@@ -36,6 +37,11 @@ const navigation = [
     name: 'Validation',
     href: '/admin/products/validation',
     icon: CheckCircle,
+  },
+  {
+    name: 'Draft',
+    href: '/admin/products/draft',
+    icon: Edit,
   },
   {
     name: 'Catégories',

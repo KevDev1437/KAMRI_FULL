@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { PrepareProductDto } from './dto/prepare-product.dto';
+import { EditProductDto } from './dto/edit-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -505,6 +507,372 @@ export class ProductsService {
         data: []
       };
     }
+  }
+
+  // ===== NOUVELLES MÉTHODES POUR L'ÉDITION MANUELLE =====
+
+  /**
+   * Nettoyer le nom d'un produit
+   */
+  private cleanProductName(name: string): string {
+    if (!name) return '';
+    return name
+      .trim()
+      .replace(/\s+/g, ' ') // Espaces multiples
+      .replace(/[^\w\s-]/gi, '') // Caractères spéciaux (sauf tirets)
+      .substring(0, 200); // Limite de longueur
+  }
+
+  /**
+   * Nettoyer la description d'un produit
+   */
+  private cleanProductDescription(description: string): string {
+    if (!description) return '';
+    
+    // Supprimer les balises HTML
+    let cleaned = description
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim();
+    
+    return cleaned;
+  }
+
+  /**
+   * Calculer le prix avec marge
+   */
+  private calculatePriceWithMargin(originalPrice: number, margin: number): number {
+    if (!originalPrice || originalPrice <= 0) return 0;
+    return originalPrice * (1 + margin / 100);
+  }
+
+  /**
+   * Préparer un produit CJ pour publication
+   * Crée un Product (draft) depuis CJProductStore
+   */
+  async prepareCJProductForPublication(
+    cjStoreProductId: string,
+    prepareData: PrepareProductDto,
+    userId?: string
+  ) {
+    console.log('🚀 [PREPARE] Début préparation produit:', { cjStoreProductId, prepareData, userId });
+    
+    // 1. Récupérer le produit depuis CJProductStore
+    const cjProduct = await this.prisma.cJProductStore.findUnique({
+      where: { id: cjStoreProductId }
+    });
+
+    if (!cjProduct) {
+      console.error('❌ [PREPARE] Produit CJ non trouvé:', cjStoreProductId);
+      throw new NotFoundException('Produit CJ non trouvé dans le magasin');
+    }
+
+    console.log('✅ [PREPARE] Produit CJ trouvé:', { id: cjProduct.id, name: cjProduct.name, cjProductId: cjProduct.cjProductId });
+
+    // 2. Vérifier si le produit n'est pas déjà dans Product
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        cjProductId: cjProduct.cjProductId
+      }
+    });
+
+    if (existingProduct) {
+      console.warn('⚠️ [PREPARE] Produit déjà dans le catalogue:', existingProduct.id);
+      throw new BadRequestException('Ce produit CJ est déjà dans le catalogue');
+    }
+
+    // 3. Nettoyage automatique (Niveau 1)
+    const cleanedName = this.cleanProductName(cjProduct.name);
+    const cleanedDescription = this.cleanProductDescription(cjProduct.description || '');
+    const margin = prepareData.margin || 30;
+    const originalPrice = cjProduct.originalPrice || cjProduct.price;
+    const calculatedPrice = this.calculatePriceWithMargin(originalPrice, margin);
+
+    // 4. Préparer les données pour Product
+    const productData: any = {
+      name: cleanedName,
+      description: cleanedDescription,
+      price: calculatedPrice,
+      originalPrice: originalPrice,
+      image: cjProduct.image,
+      categoryId: prepareData.categoryId,
+      supplierId: prepareData.supplierId,
+      externalCategory: cjProduct.category,
+      source: 'cj-dropshipping',
+      status: 'draft', // Statut draft pour édition
+      margin: margin,
+      stock: 0, // Par défaut, sera mis à jour si nécessaire
+      
+      // Données CJ détaillées
+      cjProductId: cjProduct.cjProductId,
+      productSku: cjProduct.productSku,
+      productWeight: cjProduct.productWeight,
+      packingWeight: cjProduct.packingWeight,
+      productType: cjProduct.productType,
+      productUnit: cjProduct.productUnit,
+      productKeyEn: cjProduct.productKeyEn,
+      materialNameEn: cjProduct.materialNameEn,
+      packingNameEn: cjProduct.packingNameEn,
+      suggestSellPrice: cjProduct.suggestSellPrice,
+      listedNum: cjProduct.listedNum,
+      supplierName: cjProduct.supplierName,
+      createrTime: cjProduct.createrTime,
+      variants: cjProduct.variants,
+      cjReviews: cjProduct.reviews,
+      dimensions: cjProduct.dimensions,
+      brand: cjProduct.brand,
+      tags: cjProduct.tags,
+    };
+
+    console.log('💾 [PREPARE] Données du produit à créer:', {
+      name: productData.name,
+      price: productData.price,
+      status: productData.status,
+      categoryId: productData.categoryId,
+      cjProductId: productData.cjProductId
+    });
+
+    // 5. Créer le Product (draft)
+    try {
+      const product = await this.prisma.product.create({
+        data: {
+          ...productData,
+          cjMapping: {
+            create: {
+              cjProductId: cjProduct.cjProductId,
+              cjSku: cjProduct.productSku || cjProduct.cjProductId
+            }
+          }
+        },
+        include: {
+          category: true,
+          supplier: true,
+          cjMapping: true
+        }
+      });
+
+      console.log('✅ [PREPARE] Produit créé avec succès:', {
+        id: product.id,
+        name: product.name,
+        status: product.status,
+        categoryId: product.categoryId
+      });
+
+      // 6. Marquer comme importé dans CJProductStore
+      await this.prisma.cJProductStore.update({
+        where: { id: cjStoreProductId },
+        data: { status: 'imported' }
+      });
+
+      console.log('✅ [PREPARE] Produit CJ marqué comme importé');
+
+      return product;
+    } catch (error) {
+      console.error('❌ [PREPARE] Erreur lors de la création du produit:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Éditer un produit en draft
+   */
+  async editDraftProduct(
+    id: string,
+    editData: EditProductDto,
+    userId?: string
+  ) {
+    // 1. Vérifier que le produit existe et est en draft
+    const product = await this.prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produit non trouvé');
+    }
+
+    if (product.status !== 'draft') {
+      throw new BadRequestException('Seuls les produits en draft peuvent être édités');
+    }
+
+    // 2. Préparer les données de mise à jour
+    const updateData: any = {};
+
+    // Nom
+    if (editData.name !== undefined) {
+      updateData.name = this.cleanProductName(editData.name);
+    }
+
+    // Description
+    if (editData.description !== undefined) {
+      updateData.description = this.cleanProductDescription(editData.description);
+    }
+
+    // Marge et prix
+    if (editData.margin !== undefined) {
+      updateData.margin = editData.margin;
+      // Recalculer le prix si originalPrice existe
+      if (product.originalPrice) {
+        updateData.price = this.calculatePriceWithMargin(product.originalPrice, editData.margin);
+      }
+    }
+
+    // Catégorie
+    if (editData.categoryId !== undefined) {
+      updateData.categoryId = editData.categoryId;
+    }
+
+    // Image
+    if (editData.image !== undefined) {
+      updateData.image = editData.image;
+    }
+
+    // Images multiples (si fourni)
+    if (editData.images !== undefined && editData.images.length > 0) {
+      // Supprimer les anciennes images
+      await this.prisma.image.deleteMany({
+        where: { productId: id }
+      });
+
+      // Créer les nouvelles images
+      await this.prisma.image.createMany({
+        data: editData.images.map((url, index) => ({
+          productId: id,
+          url: url,
+          alt: `${product.name} - Image ${index + 1}`
+        }))
+      });
+    }
+
+    // Badge
+    if (editData.badge !== undefined) {
+      updateData.badge = editData.badge;
+    }
+
+    // Stock
+    if (editData.stock !== undefined) {
+      updateData.stock = editData.stock;
+    }
+
+    // Marquer comme édité
+    updateData.isEdited = true;
+    updateData.editedAt = new Date();
+    if (userId) {
+      updateData.editedBy = userId;
+    }
+
+    // 3. Mettre à jour le produit
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: updateData,
+      include: {
+        category: true,
+        supplier: true,
+        images: true,
+        cjMapping: true
+      }
+    });
+
+    return updatedProduct;
+  }
+
+  /**
+   * Publier un produit draft (passer à active)
+   */
+  async publishProduct(id: string) {
+    // 1. Vérifier que le produit existe et est en draft
+    const product = await this.prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produit non trouvé');
+    }
+
+    if (product.status !== 'draft') {
+      throw new BadRequestException('Seuls les produits en draft peuvent être publiés');
+    }
+
+    // 2. Vérifications avant publication
+    if (!product.categoryId) {
+      throw new BadRequestException('Une catégorie est requise pour publier le produit');
+    }
+
+    if (!product.name || product.name.trim() === '') {
+      throw new BadRequestException('Un nom est requis pour publier le produit');
+    }
+
+    if (product.price <= 0) {
+      throw new BadRequestException('Un prix valide est requis pour publier le produit');
+    }
+
+    // 3. Passer à active
+    const publishedProduct = await this.prisma.product.update({
+      where: { id },
+      data: { status: 'active' },
+      include: {
+        category: true,
+        supplier: true,
+        images: true,
+        cjMapping: true
+      }
+    });
+
+    return publishedProduct;
+  }
+
+  /**
+   * Obtenir tous les produits en draft (pour édition)
+   */
+  async getDraftProducts() {
+    console.log('📋 [GET-DRAFT] Récupération des produits draft...');
+    
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: 'draft'
+      },
+      include: {
+        category: true,
+        supplier: true,
+        images: true,
+        cjMapping: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    console.log(`📋 [GET-DRAFT] ${products.length} produit(s) draft trouvé(s)`);
+    if (products.length > 0) {
+      console.log('📋 [GET-DRAFT] Produits:', products.map(p => ({ id: p.id, name: p.name, status: p.status })));
+    }
+    
+    return products;
+  }
+
+  /**
+   * Obtenir un produit draft par ID
+   */
+  async getDraftProduct(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id, status: 'draft' },
+      include: {
+        category: true,
+        supplier: true,
+        images: true,
+        cjMapping: true
+      }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produit draft non trouvé');
+    }
+
+    return product;
   }
 }
 

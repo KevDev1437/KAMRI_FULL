@@ -93,7 +93,11 @@ export class ApiClient {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const url = `${API_BASE_URL}${endpoint}`;
+      console.log(`🌐 [API] Appel: ${options.method || 'GET'} ${url}`);
+      console.log(`🔑 [API] Token présent:`, !!this.token);
+      
+      const response = await fetch(url, {
         ...options,
         headers: {
           'Authorization': `Bearer ${this.token}`,
@@ -102,17 +106,51 @@ export class ApiClient {
         },
       });
 
-      const data = await response.json();
+      console.log(`📡 [API] Réponse status:`, response.status, response.statusText);
+
+      // Vérifier si la réponse est JSON
+      let data;
+      const contentType = response.headers.get('content-type');
+      const text = await response.text();
+      
+      // Si la réponse est vide, retourner un tableau vide
+      if (!text || text.trim() === '') {
+        console.log(`⚠️ [API] Réponse vide (status ${response.status}), retour d'un tableau vide`);
+        // Si c'est un GET et que la réponse est vide, c'est probablement un tableau vide
+        if (response.ok && (!options.method || options.method === 'GET')) {
+          data = [];
+        } else {
+          data = null;
+        }
+      } else if (contentType && contentType.includes('application/json')) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error(`❌ [API] Erreur parsing JSON:`, text);
+          return { error: `Réponse JSON invalide (${response.status})` };
+        }
+      } else {
+        // Essayer de parser quand même (certains serveurs ne mettent pas le content-type)
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error(`❌ [API] Réponse non-JSON:`, text);
+          return { error: `Réponse invalide du serveur (${response.status})` };
+        }
+      }
 
       if (response.ok) {
+        console.log(`✅ [API] Succès:`, data);
         return { data };
       } else {
+        console.error(`❌ [API] Erreur ${response.status}:`, data);
+        
         // If 401 attempt refresh once
         if (response.status === 401) {
           const refreshed = await this.attemptRefresh();
           if (refreshed) {
             // retry original request once
-            const retry = await fetch(`${API_BASE_URL}${endpoint}`, {
+            const retry = await fetch(url, {
               ...options,
               headers: {
                 'Authorization': `Bearer ${this.token}`,
@@ -133,7 +171,10 @@ export class ApiClient {
         return { error: data?.message || `Erreur API (${response.status})` };
       }
     } catch (error) {
-      return { error: 'Erreur réseau' };
+      console.error(`❌ [API] Erreur réseau:`, error);
+      console.error(`❌ [API] URL:`, `${API_BASE_URL}${endpoint}`);
+      console.error(`❌ [API] Message:`, error instanceof Error ? error.message : String(error));
+      return { error: `Erreur réseau: ${error instanceof Error ? error.message : 'Connexion impossible'}` };
     }
   }
 
@@ -359,6 +400,50 @@ export class ApiClient {
       : '/products/admin/ready-for-validation';
     
     return this.fetchWithAuth(url);
+  }
+
+  // ===== NOUVELLES MÉTHODES POUR L'ÉDITION MANUELLE =====
+
+  // Préparer un produit CJ pour publication
+  async prepareCJProduct(cjStoreProductId: string, data: { categoryId: string; margin?: number; supplierId?: string }) {
+    return this.fetchWithAuth(`/products/cj/prepare/${cjStoreProductId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Obtenir tous les produits en draft
+  async getDraftProducts() {
+    return this.fetchWithAuth('/products/draft');
+  }
+
+  // Obtenir un produit draft par ID
+  async getDraftProduct(id: string) {
+    return this.fetchWithAuth(`/products/draft/${id}`);
+  }
+
+  // Éditer un produit draft
+  async editDraftProduct(id: string, data: {
+    name?: string;
+    description?: string;
+    margin?: number;
+    categoryId?: string;
+    image?: string;
+    images?: string[];
+    badge?: string;
+    stock?: number;
+  }) {
+    return this.fetchWithAuth(`/products/draft/${id}/edit`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Publier un produit draft
+  async publishProduct(id: string) {
+    return this.fetchWithAuth(`/products/draft/${id}/publish`, {
+      method: 'PATCH',
+    });
   }
 
   // ✅ MÉTHODES CJ DROPSHIPPING

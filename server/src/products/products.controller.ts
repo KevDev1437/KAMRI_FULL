@@ -1,15 +1,20 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { GetUser } from '../auth/get-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateProductDto } from './dto/create-product.dto';
+import { EditProductDto } from './dto/edit-product.dto';
+import { PrepareProductDto } from './dto/prepare-product.dto';
 import { ProductsService } from './products.service';
 
 @ApiTags('products')
@@ -60,6 +65,31 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Product rejected successfully' })
   reject(@Param('id') id: string) {
     return this.productsService.reject(id);
+  }
+
+  // ===== NOUVEAUX ENDPOINTS POUR L'ÉDITION MANUELLE =====
+  // ⚠️ IMPORTANT: Ces routes doivent être AVANT @Get(':id') pour éviter les conflits
+
+  @Get('draft')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir tous les produits en draft (pour édition)' })
+  @ApiResponse({ status: 200, description: 'Produits draft récupérés avec succès' })
+  async getDraftProducts() {
+    console.log('📋 [CONTROLLER] getDraftProducts appelé');
+    const products = await this.productsService.getDraftProducts();
+    console.log('📋 [CONTROLLER] Produits retournés:', products.length);
+    return products;
+  }
+
+  @Get('draft/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir un produit draft par ID' })
+  @ApiResponse({ status: 200, description: 'Produit draft récupéré avec succès' })
+  @ApiResponse({ status: 404, description: 'Produit draft non trouvé' })
+  getDraftProduct(@Param('id') id: string) {
+    return this.productsService.getDraftProduct(id);
   }
 
   @Get(':id')
@@ -131,6 +161,57 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'CJ product stock retrieved successfully' })
   getCJProductStock(@Param('pid') pid: string, @Query('countryCode') countryCode: string) {
     return this.productsService.getCJProductStock(pid, countryCode);
+  }
+
+  // ===== NOUVEAUX ENDPOINTS POUR L'ÉDITION MANUELLE =====
+
+  @Post('cj/prepare/:cjStoreProductId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Préparer un produit CJ pour publication (créer en draft)' })
+  @ApiResponse({ status: 201, description: 'Produit préparé avec succès' })
+  @ApiResponse({ status: 404, description: 'Produit CJ non trouvé' })
+  @ApiResponse({ status: 400, description: 'Produit déjà dans le catalogue' })
+  async prepareCJProduct(
+    @Param('cjStoreProductId') cjStoreProductId: string,
+    @Body() prepareData: PrepareProductDto,
+    @GetUser() user?: any
+  ) {
+    return this.productsService.prepareCJProductForPublication(
+      cjStoreProductId,
+      prepareData,
+      user?.id || user?.sub
+    );
+  }
+
+  @Patch('draft/:id/edit')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Éditer un produit en draft' })
+  @ApiResponse({ status: 200, description: 'Produit édité avec succès' })
+  @ApiResponse({ status: 404, description: 'Produit non trouvé' })
+  @ApiResponse({ status: 400, description: 'Seuls les produits draft peuvent être édités' })
+  async editDraftProduct(
+    @Param('id') id: string,
+    @Body() editData: EditProductDto,
+    @GetUser() user?: any
+  ) {
+    return this.productsService.editDraftProduct(
+      id,
+      editData,
+      user?.id || user?.sub
+    );
+  }
+
+  @Patch('draft/:id/publish')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Publier un produit draft (passer à active)' })
+  @ApiResponse({ status: 200, description: 'Produit publié avec succès' })
+  @ApiResponse({ status: 404, description: 'Produit non trouvé' })
+  @ApiResponse({ status: 400, description: 'Seuls les produits draft peuvent être publiés' })
+  publishProduct(@Param('id') id: string) {
+    return this.productsService.publishProduct(id);
   }
 }
 

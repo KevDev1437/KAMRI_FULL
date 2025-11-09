@@ -97,6 +97,12 @@ model Product {
   // ✅ Tracking de l'import pour éviter doublons
   importStatus     String?  @default("new") // new, updated, imported, duplicate
   lastImportAt     DateTime? // Dernière date d'import
+  
+  // ✅ Édition manuelle avant publication
+  margin           Float?   // Marge appliquée (%)
+  isEdited         Boolean  @default(false) // Produit édité manuellement
+  editedAt         DateTime? // Date de dernière édition
+  editedBy         String?  // ID de l'admin qui a édité
 
   // Relations
   category      Category?     @relation(fields: [categoryId], references: [id])

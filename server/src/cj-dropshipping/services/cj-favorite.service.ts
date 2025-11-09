@@ -377,10 +377,14 @@ export class CJFavoriteService {
       }
       
       // ✅ UTILISER UPSERT INTELLIGENT pour le magasin CJ
+      // 🧹 NETTOYAGE AUTOMATIQUE (Niveau 1)
+      const cleanedName = this.cleanProductName((cjProduct as any).productNameEn || (cjProduct as any).productName);
+      const cleanedDescription = this.cleanProductDescription((cjProduct as any).description);
+      
       const storeProductData = {
         cjProductId: pid,
-        name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
-        description: (cjProduct as any).description,
+        name: cleanedName,
+        description: cleanedDescription,
         price: sellingPrice,
         originalPrice: originalPrice,
         image: Array.isArray((cjProduct as any).productImage) ? (cjProduct as any).productImage[0] : (cjProduct as any).productImage,
@@ -456,6 +460,38 @@ export class CJFavoriteService {
     if (cleaned.length > 200) {
       cleaned = cleaned.substring(0, 200) + '...';
     }
+    
+    return cleaned;
+  }
+
+  /**
+   * Nettoyer le nom d'un produit (Niveau 1 - Automatique)
+   */
+  private cleanProductName(name: string): string {
+    if (!name) return '';
+    return name
+      .trim()
+      .replace(/\s+/g, ' ') // Espaces multiples
+      .replace(/[^\w\s-]/gi, '') // Caractères spéciaux (sauf tirets)
+      .substring(0, 200); // Limite de longueur
+  }
+
+  /**
+   * Nettoyer la description d'un produit (Niveau 1 - Automatique)
+   */
+  private cleanProductDescription(description: string): string {
+    if (!description) return '';
+    
+    // Supprimer les balises HTML
+    let cleaned = description
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .trim();
     
     return cleaned;
   }
