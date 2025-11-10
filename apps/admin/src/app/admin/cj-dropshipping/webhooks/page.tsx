@@ -169,6 +169,109 @@ export default function CJWebhooksPage() {
     });
   };
 
+  // ✅ Nettoyer un nom de produit (peut être un array JSON stringifié)
+  const cleanProductName = (name: string | any): string => {
+    if (!name) return 'N/A';
+    
+    // Si c'est déjà une string, vérifier si c'est un JSON array
+    if (typeof name === 'string') {
+      // Si c'est un tableau JSON stringifié, extraire le premier élément
+      try {
+        if (name.startsWith('[') && name.endsWith(']')) {
+          const parsed = JSON.parse(name);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            name = parsed[0];
+          }
+        }
+      } catch (e) {
+        // Si ce n'est pas du JSON valide, garder le nom tel quel
+      }
+      
+      // Nettoyer les caractères spéciaux et HTML
+      return name
+        .replace(/<[^>]*>/g, '') // Supprimer les balises HTML
+        .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+        .replace(/&amp;/g, '&') // Remplacer &amp; par &
+        .replace(/&lt;/g, '<') // Remplacer &lt; par <
+        .replace(/&gt;/g, '>') // Remplacer &gt; par >
+        .replace(/&quot;/g, '"') // Remplacer &quot; par "
+        .replace(/&#39;/g, "'") // Remplacer &#39; par '
+        .trim();
+    }
+    
+    // Si c'est un array, prendre le premier élément
+    if (Array.isArray(name) && name.length > 0) {
+      return String(name[0]).trim();
+    }
+    
+    return String(name || 'N/A').trim();
+  };
+
+  // ✅ Nettoyer une description de produit
+  const cleanProductDescription = (description: string | any): string => {
+    if (!description) return '';
+    
+    let desc = typeof description === 'string' ? description : String(description);
+    
+    // Supprimer les balises HTML
+    desc = desc
+      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
+      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
+      .replace(/&amp;/g, '&') // Remplacer &amp; par &
+      .replace(/&lt;/g, '<') // Remplacer &lt; par <
+      .replace(/&gt;/g, '>') // Remplacer &gt; par >
+      .replace(/&quot;/g, '"') // Remplacer &quot; par "
+      .replace(/&#39;/g, "'") // Remplacer &#39; par '
+      .trim();
+    
+    // Limiter la longueur pour l'affichage
+    if (desc.length > 200) {
+      desc = desc.substring(0, 200) + '...';
+    }
+    
+    return desc;
+  };
+
+  // ✅ Nettoyer le payload complet pour l'affichage (récursif)
+  const cleanPayloadForDisplay = (obj: any): any => {
+    if (!obj) return obj;
+    
+    if (typeof obj === 'string') {
+      // Si c'est un JSON array stringifié, le parser et nettoyer
+      try {
+        if (obj.startsWith('[') && obj.endsWith(']')) {
+          const parsed = JSON.parse(obj);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return cleanProductName(parsed[0]);
+          }
+        }
+      } catch (e) {
+        // Pas un JSON valide, retourner tel quel
+      }
+      return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => cleanPayloadForDisplay(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const key in obj) {
+        if (key === 'productName' || key === 'productNameEn' || key === 'variantName') {
+          cleaned[key] = cleanProductName(obj[key]);
+        } else if (key === 'productDescription' || key === 'description') {
+          cleaned[key] = cleanProductDescription(obj[key]);
+        } else {
+          cleaned[key] = cleanPayloadForDisplay(obj[key]);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
+  };
+
   // Formater le payload JSON pour un affichage lisible
   const formatPayload = (payload: string | any): any => {
     if (typeof payload === 'string') {
@@ -190,7 +293,7 @@ export default function CJWebhooksPage() {
       return {
         pid: params.pid || 'N/A',
         vid: params.vid || 'N/A',
-        variantName: params.variantName || 'N/A',
+        variantName: cleanProductName(params.variantNameEn || params.variantName || 'N/A'), // ✅ Prioriser l'anglais, puis nettoyer le nom
         variantSku: params.variantSku || 'N/A',
         variantSellPrice: params.variantSellPrice || 'N/A',
         variantImage: params.variantImage || null,
@@ -206,11 +309,12 @@ export default function CJWebhooksPage() {
     } else if (log.type === 'PRODUCT') {
       return {
         pid: params.pid || 'N/A',
-        productName: params.productName || params.productNameEn || 'N/A',
+        productName: cleanProductName(params.productNameEn || params.productName || 'N/A'), // ✅ Prioriser l'anglais, puis nettoyer le nom
         productSku: params.productSku || 'N/A',
         productSellPrice: params.productSellPrice || 'N/A',
         productImage: params.productImage || null,
         categoryName: params.categoryName || 'N/A',
+        productDescription: cleanProductDescription(params.productDescription || ''), // ✅ Nettoyer la description
         fields: params.fields || []
       };
     } else if (log.type === 'STOCK') {
@@ -769,7 +873,7 @@ export default function CJWebhooksPage() {
                     </summary>
                     <div className="mt-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <pre className="text-xs whitespace-pre-wrap overflow-x-auto font-mono">
-                        {JSON.stringify(payload, null, 2)}
+                        {JSON.stringify(cleanPayloadForDisplay(payload), null, 2)}
                       </pre>
                     </div>
                   </details>

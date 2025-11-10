@@ -114,8 +114,9 @@ export class CJWebhookService {
     this.logger.log(`🔄 Champs modifiés: ${params.fields.join(', ')}`);
 
     try {
+      // ✅ PRIORISER productNameEn (anglais) avant productName (chinois)
       // Nettoyer le nom du produit (peut être un tableau JSON stringifié)
-      let productName = params.productName || params.productNameEn || `Produit CJ ${params.pid}`;
+      let productName = params.productNameEn || params.productName || `Produit CJ ${params.pid}`;
       try {
         // Si c'est un tableau JSON stringifié, extraire le premier élément
         if (productName.startsWith('[') && productName.endsWith(']')) {
@@ -168,7 +169,7 @@ export class CJWebhookService {
           webhookType: 'PRODUCT',
           webhookMessageId: messageId,
           changes: params.fields,
-          productName: params.productName || params.productNameEn || `Produit CJ ${params.pid}`
+          productName: params.productNameEn || params.productName || `Produit CJ ${params.pid}`
         });
       }
 
