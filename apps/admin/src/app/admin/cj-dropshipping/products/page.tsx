@@ -36,7 +36,7 @@ export default function CJProductsPage() {
     keyword: '',
     minPrice: undefined,
     maxPrice: undefined,
-    countryCode: 'US',
+    countryCode: undefined, // ✅ Par défaut : tous les pays (au lieu de 'US')
     sortBy: 'relevance',
     categoryId: undefined,
   });
@@ -62,6 +62,17 @@ export default function CJProductsPage() {
   const [loadingPidSearch, setLoadingPidSearch] = useState(false);
   const [pidProduct, setPidProduct] = useState<CJProduct | null>(null);
   const [importingPid, setImportingPid] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    stage: string;
+    current: number;
+    total: number;
+    percentage: number;
+    productName: string;
+    synced: number;
+    failed: number;
+    estimatedTimeRemaining: number;
+    speed: number;
+  } | null>(null);
   const toast = useToast();
 
   // Charger les catégories et produits lors de la connexion
@@ -93,7 +104,7 @@ export default function CJProductsPage() {
           const defaultProducts = await getDefaultProducts({
             pageNum: 1,
             pageSize: 50,
-            countryCode: 'US'
+            countryCode: undefined // ✅ Tous les pays par défaut
           });
           setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
         }
@@ -121,7 +132,7 @@ export default function CJProductsPage() {
       const moreProducts = await getDefaultProducts({
         pageNum: nextPage,
         pageSize: 50,
-        countryCode: 'US'
+        countryCode: undefined // ✅ Tous les pays par défaut
       });
       
       console.log(`📦 ${moreProducts.length} nouveaux produits reçus pour la page ${nextPage}`);
@@ -828,39 +839,288 @@ export default function CJProductsPage() {
           </Button>
 
           <Button
-            onClick={async () => {
-              try {
-                setSyncing(true);
-                const result = await syncFavorites();
-                toast.showToast({ type: 'success', title: 'Favoris', description: `✅ ${result.message}` });
-                if (result.synced > 0) {
-                  // Recharger les produits après synchronisation (remplacer au lieu d'ajouter)
-                  const defaultProducts = await getDefaultProducts({
-                    pageNum: 1,
-                    pageSize: 100,
-                    countryCode: 'US'
-                  });
-                  setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
-                  setCurrentPage(1); // Reset pagination
-                  setHasMoreProducts(true); // Réinitialiser la pagination
-                  
-                  // Rafraîchir les notifications du header
-                  window.dispatchEvent(new Event('refreshStoreNotifications'));
-                }
-              } catch (error) {
-                toast.showToast({ type: 'error', title: 'Favoris', description: '❌ Erreur lors de la synchronisation des favoris' });
-              } finally {
-                setSyncing(false);
+            onClick={() => {
+              if (!confirm('Synchroniser tous vos favoris CJ ? Cela peut prendre plusieurs minutes selon le nombre de favoris.')) {
+                return;
               }
+              
+              setSyncing(true);
+              setSyncProgress(null);
+              
+              // Connexion SSE
+              const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+              const eventSource = new EventSource(`${API_URL}/cj-dropshipping/sync-favorites-progress`);
+              
+              eventSource.onmessage = (event) => {
+                try {
+                  const data = JSON.parse(event.data);
+                  
+                  if (data.done) {
+                    // Synchronisation terminée
+                    setSyncing(false);
+                    setSyncProgress(null);
+                    eventSource.close();
+                    
+                    if (data.success) {
+                      toast.showToast({
+                        type: 'success',
+                        title: `✅ ${data.synced} favoris synchronisés`,
+                        description: `Importation terminée en ${data.duration}s`
+                      });
+                    } else {
+                      toast.showToast({
+                        type: 'warning',
+                        title: `⚠️ Synchronisation partielle`,
+                        description: `${data.synced} favoris importés, ${data.failed} échecs sur ${data.total} total`
+                      });
+                    }
+                    
+                    // Recharger les produits
+                    if (data.synced > 0) {
+                      getDefaultProducts({
+                        pageNum: 1,
+                        pageSize: 100,
+                        countryCode: undefined
+                      }).then((defaultProducts) => {
+                        setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
+                        setCurrentPage(1);
+                        setHasMoreProducts(true);
+                        window.dispatchEvent(new Event('refreshStoreNotifications'));
+                      });
+                    }
+                    
+                  } else {
+                    // Mise à jour de la progression
+                    setSyncProgress(data);
+                  }
+                  
+                } catch (error) {
+                  console.error('Erreur parsing SSE:', error);
+                }
+              };
+              
+              eventSource.onerror = (error) => {
+                console.error('Erreur SSE:', error);
+                
+                setSyncing(false);
+                setSyncProgress(null);
+                eventSource.close();
+                
+                toast.showToast({
+                  type: 'error',
+                  title: 'Erreur de synchronisation',
+                  description: 'La connexion a été interrompue'
+                });
+              };
             }}
             disabled={syncing}
             variant="outline"
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
           >
-            {syncing ? 'Synchronisation...' : 'Synchroniser les favoris CJ'}
+            {syncing ? (
+              <>
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+                <span>Synchronisation...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                <span>Synchroniser les favoris CJ</span>
+              </>
+            )}
           </Button>
         </div>
       </Card>
+
+      {/* Modal de progression temps réel */}
+      {syncProgress && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl animate-in fade-in duration-300">
+            {/* Header avec icône animée */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {syncProgress.stage === 'fetching' ? (
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-purple-600 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                    </div>
+                  )}
+                  {/* Cercle de progression tournant */}
+                  <svg className="absolute inset-0 w-12 h-12 -rotate-90">
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="22"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      className="text-purple-200"
+                    />
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="22"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeDasharray={`${2 * Math.PI * 22}`}
+                      strokeDashoffset={`${2 * Math.PI * 22 * (1 - syncProgress.percentage / 100)}`}
+                      className="text-purple-600 transition-all duration-300"
+                    />
+                  </svg>
+                </div>
+                
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {syncProgress.stage === 'fetching' ? 'Récupération des favoris...' : 'Import en cours...'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {syncProgress.stage === 'fetching' 
+                      ? 'Chargement depuis CJ Dropshipping' 
+                      : `${syncProgress.current} / ${syncProgress.total} produits`}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <div className="text-4xl font-bold text-purple-600">
+                  {syncProgress.percentage}%
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {syncProgress.speed.toFixed(2)} prod/s
+                </div>
+              </div>
+            </div>
+            
+            {/* Barre de progression principale */}
+            <div className="mb-8">
+              <div className="flex justify-between text-sm text-gray-600 mb-3">
+                <span className="font-medium">Progression</span>
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {Math.floor(syncProgress.estimatedTimeRemaining / 60)}min{' '}
+                  {syncProgress.estimatedTimeRemaining % 60}s restantes
+                </span>
+              </div>
+              
+              <div className="relative w-full bg-gray-200 rounded-full h-6 overflow-hidden shadow-inner">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-600 via-purple-500 to-purple-400 transition-all duration-500 ease-out flex items-center justify-end px-3"
+                  style={{ width: `${syncProgress.percentage}%` }}
+                >
+                  <span className="text-white text-xs font-bold drop-shadow">
+                    {syncProgress.percentage}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Produit actuel */}
+            {syncProgress.stage === 'importing' && (
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 border border-purple-100">
+                <p className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">
+                  Produit en cours d'import
+                </p>
+                <p className="text-base font-medium text-gray-900 truncate flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  {syncProgress.productName}
+                </p>
+              </div>
+            )}
+            
+            {/* Statistiques en grille */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {/* Total */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200">
+                <div className="flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold text-blue-600">
+                  {syncProgress.total}
+                </p>
+                <p className="text-xs text-blue-800 font-medium mt-1">Total</p>
+              </div>
+              
+              {/* Réussis */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200">
+                <div className="flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold text-green-600">
+                  {syncProgress.synced}
+                </p>
+                <p className="text-xs text-green-800 font-medium mt-1">Réussis</p>
+              </div>
+              
+              {/* Échecs */}
+              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center border border-red-200">
+                <div className="flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold text-red-600">
+                  {syncProgress.failed}
+                </p>
+                <p className="text-xs text-red-800 font-medium mt-1">Échecs</p>
+              </div>
+            </div>
+            
+            {/* Message d'information */}
+            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200 mb-6">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm text-purple-900 font-medium mb-1">
+                    💡 Astuce
+                  </p>
+                  <p className="text-xs text-purple-800">
+                    Vous pouvez fermer cette fenêtre en toute sécurité. La synchronisation continuera en arrière-plan et vous recevrez une notification à la fin.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Bouton fermer (optionnel) */}
+            <button
+              onClick={() => {
+                if (confirm('Êtes-vous sûr de vouloir fermer cette fenêtre ? La synchronisation continuera en arrière-plan.')) {
+                  setSyncProgress(null);
+                }
+              }}
+              className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Fermer et continuer en arrière-plan
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Résultats de recherche */}
       {products.length > 0 && (

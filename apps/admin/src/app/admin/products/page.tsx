@@ -113,7 +113,7 @@ export default function ProductsPage() {
   const [cjSelectedCategory, setCJSelectedCategory] = useState('Toutes')
   const [cjMinPrice, setCJMinPrice] = useState<number>(0)
   const [cjMaxPrice, setCJMaxPrice] = useState<number>(1000)
-  const [cjCountryCode, setCJCountryCode] = useState('US')
+  const [cjCountryCode, setCJCountryCode] = useState<string | undefined>(undefined) // ✅ Tous les pays par défaut
   const [isCJLoading, setIsCJLoading] = useState(false)
   const [cjPageNum, setCJPageNum] = useState(1)
   const [cjTotal, setCJTotal] = useState(0)

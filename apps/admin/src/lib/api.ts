@@ -520,7 +520,7 @@ export class ApiClient {
   }
 
   async getCJProductStock(pid: string, countryCode?: string) {
-    const url = `/cj-dropshipping/products/${pid}/stock?countryCode=${countryCode || 'US'}`;
+    const url = `/cj-dropshipping/products/${pid}/stock${countryCode ? `?countryCode=${countryCode}` : ''}`;
     return this.fetchWithAuth(url);
   }
 

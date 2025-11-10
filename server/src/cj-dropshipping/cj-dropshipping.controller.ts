@@ -10,10 +10,13 @@ import {
     Post,
     Put,
     Query,
-    Req
+    Req,
+    Sse,
+    MessageEvent
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 // 🔧 ANCIEN SERVICE SUPPRIMÉ - Remplacé par CJMainService
 import { UpdateCJConfigDto } from './dto/cj-config.dto';
@@ -21,6 +24,7 @@ import { CJOrderCreateDto } from './dto/cj-order-create.dto';
 import { CJProductSearchDto } from './dto/cj-product-search.dto';
 import { CJWebhookDto } from './dto/cj-webhook.dto';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
+import { CJSyncProgressEvent, CJSyncResult } from './interfaces/cj-sync-progress.interface';
 // 🔧 NOUVEAUX SERVICES REFACTORISÉS
 import { CJMainService } from './services/cj-main.service';
 import { CJWebhookService } from './services/cj-webhook.service';
@@ -620,9 +624,61 @@ export class CJDropshippingController {
       return {
         success: false,
         synced: 0,
+        failed: 0,
+        total: 0,
+        errors: [],
         message: `Erreur lors de la synchronisation des favoris: ${error instanceof Error ? error.message : String(error)}`
       };
     }
+  }
+
+  /**
+   * Synchroniser les favoris CJ avec progression en temps réel (SSE)
+   * @returns Observable d'événements de progression
+   */
+  @Sse('sync-favorites-progress')
+  @ApiOperation({ summary: 'Synchroniser les favoris CJ avec progression en temps réel (SSE)' })
+  @ApiResponse({ status: 200, description: 'Stream d\'événements de progression' })
+  async syncFavoritesWithProgress(): Promise<Observable<MessageEvent>> {
+    this.logger.log('📡 === DÉBUT SSE SYNC FAVORIS CJ ===');
+    
+    return new Observable((observer) => {
+      // Accéder au service via CJMainService
+      const favoriteService = (this.cjMainService as any).cjFavoriteService;
+      
+      favoriteService.syncFavoritesWithProgress((event: CJSyncProgressEvent) => {
+        // Envoyer l'événement de progression au client
+        observer.next({
+          data: event
+        } as MessageEvent);
+      })
+      .then((result: CJSyncResult) => {
+        // Envoyer le résultat final
+        observer.next({
+          data: result
+        } as MessageEvent);
+        
+        this.logger.log('✅ SSE sync favoris terminé avec succès');
+        observer.complete();
+      })
+      .catch((error) => {
+        this.logger.error('❌ Erreur SSE sync favoris:', error);
+        
+        observer.next({
+          data: {
+            done: true,
+            success: false,
+            synced: 0,
+            failed: 0,
+            total: 0,
+            duration: 0,
+            message: `Erreur: ${error instanceof Error ? error.message : String(error)}`
+          } as CJSyncResult
+        } as MessageEvent);
+        
+        observer.error(error);
+      });
+    });
   }
 
   @Get('favorites/status')

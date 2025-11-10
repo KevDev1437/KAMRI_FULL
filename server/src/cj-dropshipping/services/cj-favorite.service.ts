@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DuplicatePreventionService } from '../../common/services/duplicate-prevention.service';
 import { CJAPIClient } from '../cj-api-client';
+import { CJSyncProgressEvent, CJSyncResult } from '../interfaces/cj-sync-progress.interface';
 
 @Injectable()
 export class CJFavoriteService {
@@ -49,7 +50,7 @@ export class CJFavoriteService {
   }
 
   /**
-   * Récupère la liste de mes produits (favoris CJ)
+   * Récupère la liste de mes produits (favoris CJ) avec pagination complète
    */
   async getMyProducts(params: {
     keyword?: string;
@@ -61,88 +62,28 @@ export class CJFavoriteService {
     hasPacked?: number;
     hasVirPacked?: number;
   } = {}): Promise<{ success: boolean; products: any[]; total: number }> {
-    this.logger.log('📦 === DÉBUT RÉCUPÉRATION FAVORIS CJ ===');
+    this.logger.log('📦 === DÉBUT RÉCUPÉRATION FAVORIS CJ (AVEC PAGINATION) ===');
     this.logger.log('📝 Paramètres de recherche:', JSON.stringify(params, null, 2));
     
     try {
       const client = await this.initializeClient();
-      this.logger.log('🔗 Client CJ initialisé, appel API...');
+      this.logger.log('🔗 Client CJ initialisé, appel API avec pagination complète...');
       
-      // 🔄 RÉCUPÉRATION SIMPLIFIÉE : Maximum 10 favoris (1 page)
-      this.logger.log('📦 Récupération des favoris CJ (limité à 10)...');
-        
-      const result = await client.makeRequest('GET', '/product/myProduct/query', {
-        pageNumber: 1,
-        pageSize: 10 // Limite fixe de l'API CJ
+      // ✅ Récupération de TOUS les favoris (toutes les pages)
+      this.logger.log('📡 Récupération de tous les favoris CJ (toutes les pages)...');
+      const myProducts = await client.getMyProducts({
+        keyword: params.keyword,
+        categoryId: params.categoryId,
+        startAt: params.startAt,
+        endAt: params.endAt,
+        isListed: params.isListed,
+        visiable: params.visiable,
+        hasPacked: params.hasPacked,
+        hasVirPacked: params.hasVirPacked,
+        pageSize: 100 // Max par page
       });
-        
-      if (result.code !== 200) {
-        this.logger.error('❌ Erreur récupération favoris:', result.message);
-        return {
-          success: false,
-          products: [],
-          total: 0
-        };
-      }
       
-      const data = result.data as any;
-      const totalRecords = data.totalRecords || 0;
-      const favorites = data.content || [];
-      
-      this.logger.log(`📦 Page 1: ${favorites.length} favoris récupérés`);
-      this.logger.log(`📊 Total API: ${totalRecords} favoris`);
-      
-      // Utiliser les données récupérées
-      const responseData = {
-        totalRecords: totalRecords,
-        content: favorites
-      };
-      
-      // Traitement des données récupérées
-      if (responseData.totalRecords > 0) {
-        this.logger.log(`✅ ${responseData.totalRecords} favoris trouvés`);
-        
-        // Transformer les données selon la structure CJ (myProduct/query API)
-        const transformedProducts = responseData.content.map((product: any) => {
-          return {
-            pid: product.productId,
-            productName: product.nameEn || product.productName,
-            productNameEn: product.nameEn || product.productName,
-            productSku: product.sku || product.productSku,
-            sellPrice: product.sellPrice,
-            productImage: product.bigImage || product.productImage,
-            categoryName: product.defaultArea || product.categoryName || 'CJ Dropshipping',
-            description: this.cleanDescription(product.description || ''),
-            variants: product.variants || [],
-            rating: product.rating || 0,
-            totalReviews: product.totalReviews || product.reviews?.length || 0,
-            weight: product.weight || product.productWeight || 0,
-            dimensions: product.dimensions || '',
-            brand: product.brand || '',
-            tags: product.tags || [],
-            reviews: product.reviews || [],
-            // Informations supplémentaires comme dans le script test
-            productWeight: product.productWeight,
-            packingWeight: product.packingWeight,
-            productType: product.productType,
-            productUnit: product.productUnit,
-            productKeyEn: product.productKeyEn,
-            materialNameEn: product.materialNameEn,
-            packingNameEn: product.packingNameEn,
-            suggestSellPrice: product.suggestSellPrice,
-            listedNum: product.listedNum,
-            supplierName: product.supplierName,
-            createrTime: product.createrTime,
-            status: product.status
-          };
-        });
-        
-        return {
-          success: true,
-          products: transformedProducts,
-          total: responseData.totalRecords
-        };
-      } else {
+      if (!myProducts || myProducts.length === 0) {
         this.logger.log('ℹ️ Aucun favori trouvé');
         return {
           success: true,
@@ -150,6 +91,52 @@ export class CJFavoriteService {
           total: 0
         };
       }
+      
+      this.logger.log(`📦 ${myProducts.length} favoris récupérés depuis CJ (toutes les pages)`);
+      
+      // Transformer les données selon la structure CJ (myProduct/query API)
+      const transformedProducts = myProducts.map((product: any) => {
+        return {
+          pid: product.productId,
+          productId: product.productId, // ✅ Garder productId pour dédoublonnage
+          productName: product.nameEn || product.productName,
+          productNameEn: product.nameEn || product.productName,
+          productSku: product.sku || product.productSku,
+          sellPrice: product.sellPrice,
+          productImage: product.bigImage || product.productImage,
+          categoryName: product.defaultArea || product.categoryName || 'CJ Dropshipping',
+          description: this.cleanDescription(product.description || ''),
+          variants: product.variants || [],
+          rating: product.rating || 0,
+          totalReviews: product.totalReviews || product.reviews?.length || 0,
+          weight: product.weight || product.productWeight || 0,
+          dimensions: product.dimensions || '',
+          brand: product.brand || '',
+          tags: product.tags || [],
+          reviews: product.reviews || [],
+          // Informations supplémentaires
+          productWeight: product.productWeight,
+          packingWeight: product.packingWeight,
+          productType: product.productType,
+          productUnit: product.productUnit,
+          productKeyEn: product.productKeyEn,
+          materialNameEn: product.materialNameEn,
+          packingNameEn: product.packingNameEn,
+          suggestSellPrice: product.suggestSellPrice,
+          listedNum: product.listedNum,
+          supplierName: product.supplierName,
+          createrTime: product.createrTime,
+          status: product.status
+        };
+      });
+      
+      this.logger.log(`✅ ${transformedProducts.length} favoris transformés`);
+      
+      return {
+        success: true,
+        products: transformedProducts,
+        total: transformedProducts.length
+      };
     } catch (error) {
       this.logger.error('❌ === ERREUR RÉCUPÉRATION FAVORIS ===');
       this.logger.error(`💥 Erreur: ${error instanceof Error ? error.message : String(error)}`);
@@ -160,141 +147,273 @@ export class CJFavoriteService {
   }
 
   /**
-   * Synchroniser les favoris CJ avec KAMRI
+   * Synchroniser les favoris CJ avec KAMRI (avec pagination complète)
    */
-  async syncFavorites(): Promise<{ success: boolean; synced: number; message: string }> {
-    this.logger.log('🔄 === DÉBUT SYNCHRONISATION FAVORIS CJ ===');
-    this.logger.log('📝 Étape 1: Récupération des favoris depuis CJ...');
+  async syncFavorites(): Promise<{ success: boolean; synced: number; failed: number; total: number; errors: Array<{ pid: string; name: string; error: string }>; message: string }> {
+    this.logger.log('🔄 === DÉBUT SYNCHRONISATION FAVORIS CJ (AVEC PAGINATION) ===');
     
     try {
-      // Récupérer tous les favoris CJ
-      const favorites = await this.getMyProducts();
+      // Initialisation du client
+      const client = await this.initializeClient();
       
-      this.logger.log('📊 Résultat getMyProducts:', {
-        success: favorites.success,
-        totalProducts: favorites.products?.length || 0,
-        total: favorites.total || 0
+      // ✅ Récupération de TOUS les favoris (toutes les pages)
+      this.logger.log('📡 Récupération de tous les favoris CJ...');
+      const myProducts = await client.getMyProducts({
+        pageSize: 100 // Max par page
       });
       
-      if (!favorites.success) {
-        this.logger.error('❌ Échec de la récupération des favoris CJ');
-        return {
-          success: false,
-          synced: 0,
-          message: 'Erreur lors de la récupération des favoris CJ'
-        };
-      }
-      
-      if (favorites.products.length === 0) {
-        this.logger.log('ℹ️ Aucun favori CJ trouvé');
+      if (!myProducts || myProducts.length === 0) {
         return {
           success: true,
           synced: 0,
-          message: 'Aucun favori CJ trouvé'
+          failed: 0,
+          total: 0,
+          errors: [],
+          message: 'Aucun favori trouvé sur CJ'
         };
       }
-
-      // 🔧 CORRECTION : Dédoublonner une dernière fois avant import
-      const uniqueFavorites = favorites.products.filter((product: any, index: number, self: any[]) => 
-        index === self.findIndex(p => p.pid === product.pid)
+      
+      this.logger.log(`📦 ${myProducts.length} favoris récupérés depuis CJ`);
+      
+      // Dédoublonnage par productId (au lieu de pid)
+      const uniqueProducts = Array.from(
+        new Map(myProducts.map(p => [p.productId || p.pid, p])).values()
       );
       
-      // 🔍 DEBUG : Analyser les doublons
-      this.logger.log(`🔍 Analyse des doublons:`);
-      this.logger.log(`📊 Total avant dédoublonnage: ${favorites.products.length}`);
-      this.logger.log(`📊 Total après dédoublonnage: ${uniqueFavorites.length}`);
+      this.logger.log(`🔍 ${uniqueProducts.length} favoris uniques après dédoublonnage`);
       
-      // Vérifier les PIDs pour identifier les doublons
-      const pids = favorites.products.map(p => p.pid);
-      const uniquePids = [...new Set(pids)];
-      this.logger.log(`📊 PIDs uniques: ${uniquePids.length}, PIDs totaux: ${pids.length}`);
-      
-      if (pids.length !== uniquePids.length) {
-        this.logger.log(`⚠️ DOUBLONS DÉTECTÉS dans les PIDs`);
-        const duplicates = pids.filter((pid, index) => pids.indexOf(pid) !== index);
-        this.logger.log(`🔄 PIDs dupliqués: ${duplicates.join(', ')}`);
-      }
-      
-      console.log(`🔍 Favoris finaux dédoublonnés: ${favorites.products.length} → ${uniqueFavorites.length}`);
-      
-      this.logger.log(`📦 ${uniqueFavorites.length} favoris uniques trouvés, début de l'import...`);
-      console.log(`🚀 === DÉBUT IMPORT DES FAVORIS ===`);
-      console.log(`📊 Total favoris à importer: ${uniqueFavorites.length}`);
-      
+      // Import avec progression
+      const total = uniqueProducts.length;
       let synced = 0;
-      const errors = [];
-
-      // Importer chaque favori vers KAMRI (marquer comme favori)
-      for (let i = 0; i < uniqueFavorites.length; i++) {
-        const favorite = uniqueFavorites[i];
-        this.logger.log(`🔄 Traitement favori ${i + 1}/${uniqueFavorites.length}: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
+      let failed = 0;
+      const errors: Array<{ pid: string; name: string; error: string }> = [];
+      
+      // Obtenir le tier pour le délai
+      const config = await this.prisma.cJConfig.findFirst();
+      const tier = config?.tier || 'free';
+      const delay = this.getTierDelay(tier);
+      
+      for (let i = 0; i < uniqueProducts.length; i++) {
+        const product = uniqueProducts[i];
+        const pid = product.productId || product.pid;
+        const progress = Math.round(((i + 1) / total) * 100);
         
-        console.log(`\n📦 === FAVORI ${i + 1}/${uniqueFavorites.length} ===`);
-        console.log(`📝 Nom: ${favorite.nameEn || favorite.productName || 'Sans nom'}`);
-        console.log(`📝 SKU: ${favorite.productSku}`);
-        console.log(`📝 ProductId: ${favorite.pid}`);
-        console.log(`📝 Prix: ${favorite.sellPrice}`);
-        console.log(`📝 Image: ${favorite.productImage ? '✅' : '❌'}`);
+        this.logger.log(`🔄 [${i + 1}/${total}] (${progress}%) - Import ${product.nameEn || product.productNameEn || pid}...`);
         
         try {
-          this.logger.log(`📝 Import du favori: PID=${favorite.pid}, SKU=${favorite.productSku}`);
-          const importResult = await this.importProduct(favorite.pid, undefined, 0, true); // isFavorite = true, marge = 0
+          await this.importProduct(pid, undefined, 0, true);
           synced++;
-          console.log(`✅ Favori ${i + 1} importé avec succès`);
-          this.logger.log(`✅ Favori ${i + 1} importé avec succès: ${favorite.nameEn || favorite.productName}`);
-          
-          // Attendre entre les imports pour éviter le rate limiting
-          if (i < uniqueFavorites.length - 1) {
-            console.log(`⏳ Attente 3 secondes avant le prochain import...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
+          this.logger.log(`✅ [${i + 1}/${total}] Import réussi`);
         } catch (error) {
-          errors.push(favorite.productSku || favorite.pid);
-          console.log(`❌ Erreur import favori ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
-          this.logger.error(`❌ Erreur import favori ${i + 1} (${favorite.productSku || favorite.pid}):`, error);
-          
-          // Attendre même en cas d'erreur pour éviter le rate limiting
-          if (i < uniqueFavorites.length - 1) {
-            console.log(`⏳ Attente 3 secondes après erreur...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
+          failed++;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          errors.push({
+            pid: pid,
+            name: product.nameEn || product.productNameEn || pid,
+            error: errorMessage
+          });
+          this.logger.error(`❌ [${i + 1}/${total}] Échec: ${errorMessage}`);
+        }
+        
+        // Rate limiting adapté selon le tier
+        if (i < uniqueProducts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
-
-      this.logger.log('📊 === RÉSULTAT SYNCHRONISATION ===');
-      this.logger.log(`✅ Favoris importés: ${synced}`);
-      this.logger.log(`❌ Erreurs: ${errors.length}`);
       
-      console.log(`\n🎉 === RÉSULTAT FINAL SYNCHRONISATION ===`);
-      console.log(`✅ Favoris importés avec succès: ${synced}`);
-      console.log(`❌ Erreurs d'import: ${errors.length}`);
-      console.log(`📊 Total traités: ${uniqueFavorites.length}`);
-      console.log(`📊 Taux de succès: ${((synced / uniqueFavorites.length) * 100).toFixed(1)}%`);
+      this.logger.log('🎉 === FIN SYNCHRONISATION FAVORIS CJ ===');
+      this.logger.log(`📊 Résultat final : ${synced} réussis, ${failed} échecs sur ${total} total`);
       
       if (errors.length > 0) {
-        console.log(`\n❌ Erreurs détaillées:`);
-        errors.forEach((error, index) => {
-          console.log(`  ${index + 1}. ${error}`);
-        });
-        this.logger.log('🔍 Erreurs détaillées:', errors);
+        this.logger.error(`❌ ${errors.length} erreurs détaillées:`, JSON.stringify(errors, null, 2));
       }
-
-      return {
-        success: true,
-        synced,
-        message: `${synced} favoris importés avec succès${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`
-      };
-    } catch (error) {
-      this.logger.error('❌ === ERREUR CRITIQUE SYNCHRONISATION FAVORIS ===');
-      this.logger.error(`💥 Erreur: ${error instanceof Error ? error.message : String(error)}`);
-      this.logger.error(`📊 Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
-      this.logger.error('🔍 === FIN ERREUR SYNCHRONISATION ===');
       
       return {
+        success: failed === 0,
+        synced,
+        failed,
+        total,
+        errors,
+        message: `${synced}/${total} favoris synchronisés${failed > 0 ? ` (${failed} échecs)` : ''}`
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur synchronisation favoris:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper pour obtenir le délai selon le tier
+   */
+  private getTierDelay(tier: string): number {
+    const delays: { [key: string]: number } = {
+      'advanced': 500,   // 0.5s
+      'prime': 1000,     // 1s
+      'plus': 1500,      // 1.5s
+      'free': 3000       // 3s
+    };
+    
+    return delays[tier] || 3000;
+  }
+
+  /**
+   * Synchroniser les favoris CJ avec callback de progression
+   * @param onProgress Fonction callback pour envoyer la progression
+   */
+  async syncFavoritesWithProgress(
+    onProgress: (event: CJSyncProgressEvent) => void
+  ): Promise<CJSyncResult> {
+    this.logger.log('🔄 === DÉBUT SYNCHRONISATION FAVORIS CJ (AVEC PROGRESSION) ===');
+    
+    const startTime = Date.now();
+    
+    try {
+      // ===== ÉTAPE 1 : RÉCUPÉRATION =====
+      onProgress({
+        stage: 'fetching',
+        current: 0,
+        total: 0,
+        percentage: 0,
+        productName: 'Récupération de vos favoris CJ...',
+        synced: 0,
+        failed: 0,
+        estimatedTimeRemaining: 0,
+        speed: 0
+      });
+      
+      // Initialisation du client
+      const client = await this.initializeClient();
+      
+      // Récupération de TOUS les favoris (toutes les pages)
+      this.logger.log('📡 Récupération de tous les favoris CJ...');
+      const myProducts = await client.getMyProducts({
+        pageSize: 100
+      });
+      
+      if (!myProducts || myProducts.length === 0) {
+        const result: CJSyncResult = {
+          done: true,
+          success: false,
+          synced: 0,
+          failed: 0,
+          total: 0,
+          duration: (Date.now() - startTime) / 1000,
+          message: 'Aucun favori trouvé sur CJ'
+        };
+        return result;
+      }
+      
+      this.logger.log(`📦 ${myProducts.length} favoris récupérés depuis CJ`);
+      
+      // Dédoublonnage
+      const uniqueProducts = Array.from(
+        new Map(myProducts.map(p => [p.productId || p.pid, p])).values()
+      );
+      
+      this.logger.log(`🔍 ${uniqueProducts.length} favoris uniques après dédoublonnage`);
+      
+      // ===== ÉTAPE 2 : IMPORT =====
+      const total = uniqueProducts.length;
+      let synced = 0;
+      let failed = 0;
+      const errors: Array<{ pid: string; name: string; error: string }> = [];
+      
+      // Obtenir le tier pour le délai
+      const config = await this.prisma.cJConfig.findFirst();
+      const tier = config?.tier || 'free';
+      const delay = this.getTierDelay(tier);
+      
+      // Import avec progression
+      for (let i = 0; i < uniqueProducts.length; i++) {
+        const product = uniqueProducts[i];
+        const pid = product.productId || product.pid;
+        const productName = product.nameEn || product.productNameEn || pid;
+        
+        // Calcul du temps écoulé et estimation
+        const elapsed = Date.now() - startTime;
+        const avgTimePerProduct = elapsed / (i + 1);
+        const remainingProducts = total - i - 1;
+        const estimatedTimeRemaining = Math.round((remainingProducts * avgTimePerProduct) / 1000);
+        const speed = (i + 1) / (elapsed / 1000); // produits par seconde
+        const percentage = Math.round(((i + 1) / total) * 100);
+        
+        // Envoyer la progression AVANT l'import
+        onProgress({
+          stage: 'importing',
+          current: i + 1,
+          total: total,
+          percentage: percentage,
+          productName: productName,
+          synced: synced,
+          failed: failed,
+          estimatedTimeRemaining: estimatedTimeRemaining,
+          speed: parseFloat(speed.toFixed(2))
+        });
+        
+        this.logger.log(`🔄 [${i + 1}/${total}] (${percentage}%) - Import ${productName}...`);
+        
+        // Import du produit
+        try {
+          await this.importProduct(pid, undefined, 0, true);
+          synced++;
+          this.logger.log(`✅ [${i + 1}/${total}] Import réussi`);
+        } catch (error) {
+          failed++;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          errors.push({
+            pid: pid,
+            name: productName,
+            error: errorMessage
+          });
+          this.logger.error(`❌ [${i + 1}/${total}] Échec: ${errorMessage}`);
+        }
+        
+        // Rate limiting (sauf pour le dernier)
+        if (i < uniqueProducts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      // ===== RÉSULTAT FINAL =====
+      const duration = (Date.now() - startTime) / 1000;
+      
+      this.logger.log('🎉 === FIN SYNCHRONISATION FAVORIS CJ ===');
+      this.logger.log(`📊 Résultat final : ${synced} réussis, ${failed} échecs sur ${total} total`);
+      this.logger.log(`⏱️ Durée totale : ${Math.round(duration)}s`);
+      
+      if (errors.length > 0) {
+        this.logger.error(`❌ ${errors.length} erreurs détaillées:`, JSON.stringify(errors, null, 2));
+      }
+      
+      const result: CJSyncResult = {
+        done: true,
+        success: failed === 0,
+        synced,
+        failed,
+        total,
+        duration: Math.round(duration),
+        errors: errors.length > 0 ? errors : undefined,
+        message: `${synced}/${total} favoris synchronisés${failed > 0 ? ` (${failed} échecs)` : ''} en ${Math.round(duration)}s`
+      };
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur synchronisation favoris:', error);
+      
+      const duration = (Date.now() - startTime) / 1000;
+      const result: CJSyncResult = {
+        done: true,
         success: false,
         synced: 0,
-        message: `Erreur synchronisation: ${error instanceof Error ? error.message : String(error)}`
+        failed: 0,
+        total: 0,
+        duration: Math.round(duration),
+        message: `Erreur de synchronisation: ${error instanceof Error ? error.message : String(error)}`
       };
+      
+      return result;
     }
   }
 

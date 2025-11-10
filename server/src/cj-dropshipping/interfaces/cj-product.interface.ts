@@ -132,6 +132,65 @@ export interface CJWarehouse {
   countryCode: string;
 }
 
+/**
+ * Options pour récupérer My Products (favoris)
+ */
+export interface CJMyProductsOptions {
+  keyword?: string;       // Filtrer par nom/SKU
+  categoryId?: string;    // Filtrer par catégorie
+  startAt?: string;       // Date début (format: yyyy-MM-dd hh:mm:ss)
+  endAt?: string;         // Date fin
+  isListed?: number;      // 0 ou 1
+  visiable?: number;      // 0 ou 1
+  hasPacked?: number;     // 0 ou 1
+  hasVirPacked?: number;  // 0 ou 1
+  pageSize?: number;      // Max 100
+}
+
+/**
+ * Structure d'un produit My Product (favori CJ)
+ */
+export interface CJMyProduct {
+  productId: string;           // ID du produit
+  bigImage: string;            // Image principale
+  nameEn: string;              // Nom anglais
+  sku: string;                 // SKU du produit
+  vid: string;                 // ID du variant
+  packWeight: string;          // Poids avec emballage (g)
+  weight: string;              // Poids produit (g)
+  sellPrice: string;           // Prix de vente
+  discountPrice?: string;      // Prix réduit
+  discountPriceRate?: string;  // Taux de réduction
+  totalPrice: string;          // Prix total
+  productType: string;         // Type de produit
+  propertyKeyList: string[];   // Propriétés logistiques
+  defaultArea: string;         // Entrepôt par défaut
+  areaId: string;              // ID entrepôt
+  areaCountryCode: string;     // Code pays entrepôt
+  listedShopNum: string;       // Nombre de boutiques listées
+  createAt: number;            // Timestamp ajout aux favoris
+  hasPacked: number;           // A un packaging
+  hasVirPacked: number;        // A un packaging virtuel
+  shopMethod: string;          // Méthode d'expédition
+  trialFreight: string;        // Frais de test
+  freightDiscount: string;      // Réduction livraison
+  lengthList?: number[];       // Liste des longueurs (mm)
+  heightList?: number[];       // Liste des hauteurs (mm)
+  widthList?: number[];        // Liste des largeurs (mm)
+  volumeList?: number[];       // Liste des volumes (mm³)
+}
+
+/**
+ * Réponse paginée My Products
+ */
+export interface CJMyProductsResponse {
+  pageSize: number;
+  pageNumber: number;
+  totalRecords: number;
+  totalPages: number;
+  content: CJMyProduct[];
+}
+
 export interface CJProductImportResult {
   productId: string;
   cjProductId: string;

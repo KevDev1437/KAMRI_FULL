@@ -932,6 +932,119 @@ export class CJAPIClient {
   }
 
   /**
+   * Récupérer TOUS les produits favoris (My Products) avec pagination complète
+   * @param options Options de filtrage
+   */
+  async getMyProducts(options?: {
+    keyword?: string;
+    categoryId?: string;
+    startAt?: string;
+    endAt?: string;
+    isListed?: number;
+    visiable?: number;
+    hasPacked?: number;
+    hasVirPacked?: number;
+    pageSize?: number;
+  }): Promise<any[]> {
+    this.logger.log('📦 === RÉCUPÉRATION COMPLÈTE MY PRODUCTS (FAVORIS CJ) ===');
+    
+    const pageSize = options?.pageSize || 100; // Max 100 par page
+    let allProducts: any[] = [];
+    let currentPage = 1;
+    let totalPages = 1;
+    
+    try {
+      do {
+        this.logger.log(`📄 Récupération page ${currentPage}/${totalPages}...`);
+        
+        await this.handleRateLimit();
+        
+        // Construction des paramètres
+        const params: any = {
+          pageNumber: currentPage,
+          pageSize: pageSize
+        };
+        
+        if (options?.keyword) params.keyword = options.keyword;
+        if (options?.categoryId) params.categoryId = options.categoryId;
+        if (options?.startAt) params.startAt = options.startAt;
+        if (options?.endAt) params.endAt = options.endAt;
+        if (options?.isListed !== undefined) params.isListed = options.isListed;
+        if (options?.visiable !== undefined) params.visiable = options.visiable;
+        if (options?.hasPacked !== undefined) params.hasPacked = options.hasPacked;
+        if (options?.hasVirPacked !== undefined) params.hasVirPacked = options.hasVirPacked;
+        
+        // Construction de l'URL
+        const queryString = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryString.append(key, String(value));
+          }
+        });
+        
+        const endpoint = `/product/myProduct/query?${queryString.toString()}`;
+        
+        this.logger.log(`📡 Endpoint: ${endpoint}`);
+        
+        const response = await this.makeRequest('GET', endpoint);
+        
+        if (response && response.code === 200 && response.data) {
+          const data = response.data as any;
+          
+          // Mise à jour du total de pages
+          totalPages = data.totalPages || 1;
+          const totalRecords = data.totalRecords || 0;
+          
+          this.logger.log(`📊 Page ${currentPage}/${totalPages} - ${data.content?.length || 0} produits`);
+          this.logger.log(`📊 Total disponible : ${totalRecords} favoris`);
+          
+          // Ajout des produits de cette page
+          if (data.content && Array.isArray(data.content)) {
+            allProducts = allProducts.concat(data.content);
+          }
+          
+          currentPage++;
+          
+        } else {
+          this.logger.warn('⚠️ Réponse vide ou invalide');
+          break;
+        }
+        
+        // Pause entre les pages
+        if (currentPage <= totalPages) {
+          const delay = this.getOptimalDelay();
+          this.logger.log(`⏰ Pause de ${delay}ms avant page suivante...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+      } while (currentPage <= totalPages);
+      
+      this.logger.log(`✅ ${allProducts.length} favoris récupérés au total`);
+      
+      return allProducts;
+      
+    } catch (error: any) {
+      this.logger.error('❌ Erreur récupération My Products:', error);
+      
+      // Gestion d'erreurs
+      if (error.code === 429 || error.code === 1600200) {
+        const retryDelay = this.getRetryDelay();
+        this.logger.warn(`⏳ Rate limit atteint, retry dans ${retryDelay}ms`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return this.getMyProducts(options);
+      }
+      
+      if (error.code === 401 || error.code === 1600001) {
+        this.logger.warn('🔄 Token expiré, rafraîchissement...');
+        await this.refreshAccessToken();
+        return this.getMyProducts(options);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
    * Méthodes utilitaires
    */
 
