@@ -139,7 +139,7 @@ export class SuppliersService {
         const { CJMainService } = await import('../cj-dropshipping/services/cj-main.service');
         const { CJAPIClient } = await import('../cj-dropshipping/cj-api-client');
         const cjApiClient = new CJAPIClient({} as any);
-        const cjService = new CJMainService(this.prisma, cjApiClient, null, null, null, null, null);
+        const cjService = new CJMainService(this.prisma, cjApiClient, null, null, null, null, null, null);
         const result = await cjService.testConnection();
         
         return result;

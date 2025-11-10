@@ -26,6 +26,7 @@ import { CJProductSearchDto } from './dto/cj-product-search.dto';
 import { CJWebhookDto } from './dto/cj-webhook.dto';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 import { CJSyncProgressEvent, CJSyncResult } from './interfaces/cj-sync-progress.interface';
+import { CJSourcingCreateRequest } from './interfaces/cj-sourcing.interface';
 // 🔧 NOUVEAUX SERVICES REFACTORISÉS
 import { CJMainService } from './services/cj-main.service';
 import { CJWebhookService } from './services/cj-webhook.service';
@@ -207,7 +208,7 @@ export class CJDropshippingController {
     this.logger.log('📝 PID:', pid);
     
     try {
-      const result = await this.cjMainService.cjProductService.getProductDetailsWithReviews(pid);
+      const result = await this.cjMainService.getProductDetailsWithReviews(pid);
       this.logger.log('✅ Controller getProductDetailsWithReviews terminé avec succès');
       this.logger.log('🔍 === FIN CONTROLLER getProductDetailsWithReviews ===');
       return result;
@@ -227,8 +228,7 @@ export class CJDropshippingController {
     this.logger.log('📝 PID:', pid);
     
     try {
-      const client = await this.cjMainService.cjProductService['initializeClient']();
-      const reviews = await client.getAllProductReviews(pid);
+      const reviews = await this.cjMainService.getProductReviews(pid);
       
       this.logger.log(`✅ ${reviews.length} reviews récupérés`);
       this.logger.log('🔍 === FIN CONTROLLER getProductReviews ===');
@@ -994,5 +994,180 @@ export class CJDropshippingController {
     }
   }
 
+  // ============================================================================
+  // PRODUCT SOURCING ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Créer une demande de sourcing
+   * POST /api/cj-dropshipping/sourcing
+   */
+  @Post('sourcing')
+  @ApiOperation({ summary: 'Créer une demande de sourcing produit' })
+  @ApiResponse({ status: 200, description: 'Demande de sourcing créée avec succès' })
+  async createSourcingRequest(@Body() data: CJSourcingCreateRequest) {
+    this.logger.log(`📡 === ENDPOINT CREATE SOURCING ===`);
+    this.logger.log(`📦 Produit: ${data.productName}`);
+    
+    try {
+      const result = await this.cjMainService.cjSourcingService.createSourcingRequest(data);
+      
+      return {
+        success: true,
+        message: 'Demande de sourcing créée avec succès',
+        data: result
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur création sourcing:', error);
+      throw new HttpException(
+        (error as any)?.message || 'Erreur création demande sourcing',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Récupérer toutes les demandes
+   * GET /api/cj-dropshipping/sourcing
+   */
+  @Get('sourcing')
+  @ApiOperation({ summary: 'Récupérer toutes les demandes de sourcing' })
+  @ApiResponse({ status: 200, description: 'Liste des demandes de sourcing' })
+  async getAllSourcingRequests() {
+    this.logger.log(`📡 Récupération toutes les demandes sourcing`);
+    
+    try {
+      const requests = await this.cjMainService.cjSourcingService.getAllRequests();
+      
+      return {
+        success: true,
+        data: requests,
+        total: requests.length
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération demandes:', error);
+      throw new HttpException(
+        'Erreur récupération demandes',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Récupérer les demandes en attente
+   * GET /api/cj-dropshipping/sourcing/pending
+   */
+  @Get('sourcing/pending')
+  @ApiOperation({ summary: 'Récupérer les demandes de sourcing en attente' })
+  @ApiResponse({ status: 200, description: 'Liste des demandes en attente' })
+  async getPendingSourcingRequests() {
+    this.logger.log(`📡 Récupération demandes en attente`);
+    
+    try {
+      const requests = await this.cjMainService.cjSourcingService.getPendingRequests();
+      
+      return {
+        success: true,
+        data: requests,
+        total: requests.length
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération demandes en attente:', error);
+      throw new HttpException(
+        'Erreur récupération demandes en attente',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Mettre à jour le statut d'une demande
+   * POST /api/cj-dropshipping/sourcing/:id/update-status
+   */
+  @Post('sourcing/:id/update-status')
+  @ApiOperation({ summary: 'Mettre à jour le statut d\'une demande de sourcing' })
+  @ApiResponse({ status: 200, description: 'Statut mis à jour' })
+  async updateSourcingStatus(@Param('id') id: string) {
+    this.logger.log(`📡 Mise à jour statut: ${id}`);
+    
+    try {
+      const result = await this.cjMainService.cjSourcingService.updateRequestStatus(id);
+      
+      return {
+        success: true,
+        message: result.statusChanged ? 'Statut mis à jour' : 'Aucun changement',
+        data: result
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur mise à jour statut:', error);
+      throw new HttpException(
+        (error as any)?.message || 'Erreur mise à jour statut',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Mettre à jour toutes les demandes en attente
+   * POST /api/cj-dropshipping/sourcing/update-all
+   */
+  @Post('sourcing/update-all')
+  @ApiOperation({ summary: 'Mettre à jour toutes les demandes de sourcing en attente' })
+  @ApiResponse({ status: 200, description: 'Mise à jour globale effectuée' })
+  async updateAllPendingSourcing() {
+    this.logger.log(`📡 Mise à jour toutes les demandes en attente`);
+    
+    try {
+      const result = await this.cjMainService.cjSourcingService.updateAllPendingRequests();
+      
+      return {
+        success: true,
+        message: `${result.updated} demandes mises à jour, ${result.found} produits trouvés`,
+        data: result
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur mise à jour globale:', error);
+      throw new HttpException(
+        'Erreur mise à jour globale',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Marquer comme importé
+   * POST /api/cj-dropshipping/sourcing/:id/mark-imported
+   */
+  @Post('sourcing/:id/mark-imported')
+  @ApiOperation({ summary: 'Marquer une demande de sourcing comme importée' })
+  @ApiResponse({ status: 200, description: 'Demande marquée comme importée' })
+  async markSourcingAsImported(
+    @Param('id') id: string,
+    @Body('importedProductId') importedProductId: string
+  ) {
+    this.logger.log(`📡 Marquer comme importé: ${id}`);
+    
+    try {
+      const result = await this.cjMainService.cjSourcingService.markAsImported(id, importedProductId);
+      
+      return {
+        success: true,
+        message: 'Demande marquée comme importée',
+        data: result
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur marquage importé:', error);
+      throw new HttpException(
+        'Erreur marquage importé',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
 }
 

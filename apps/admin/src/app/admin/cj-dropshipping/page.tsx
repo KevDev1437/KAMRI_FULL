@@ -221,6 +221,12 @@ export default function CJDropshippingPage() {
             >
               Gestion du cache
             </Button>
+            <Button
+              onClick={() => window.location.href = '/admin/cj-dropshipping/sourcing'}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              Product Sourcing
+            </Button>
           </div>
         </Card>
       </div>

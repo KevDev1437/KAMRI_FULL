@@ -496,4 +496,50 @@ model ProductUpdateNotification {
   @@map("product_update_notifications")
 }
 
+// ✅ Modèle pour les demandes de sourcing CJ
+model CJSourcingRequest {
+  id                String    @id @default(cuid())
+  
+  // IDs de référence
+  cjSourcingId      String?   @unique // ID CJ de la demande
+  sourceNumber      String?   // Numéro court de recherche
+  
+  // IDs de votre système (optionnels)
+  thirdProductId    String?   // Votre product ID
+  thirdVariantId    String?   // Votre variant ID
+  thirdProductSku   String?   // Votre SKU
+  
+  // Informations du produit demandé
+  productName       String    // Nom du produit (requis)
+  productImage      String    // URL de l'image (requis)
+  productUrl        String?   // URL du produit source (AliExpress, etc.)
+  price             Float?    // Prix actuel
+  remark            String?   // Remarques (urgent, quantité, etc.)
+  
+  // Statut de la recherche
+  status            String    @default("pending") // pending, processing, found, failed
+  statusChinese     String?   // Statut en chinois (de l'API)
+  
+  // Résultat (si trouvé)
+  cjProductId       String?   // Product ID CJ (quand trouvé)
+  cjVariantSku      String?   // SKU du variant CJ (quand trouvé)
+  imported          Boolean   @default(false) // Si déjà importé
+  importedProductId String?   // ID du produit importé dans votre système
+  
+  // Métadonnées
+  shopId            String?   // ID de votre boutique
+  shopName          String?   // Nom de votre boutique
+  
+  // Dates
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastCheckedAt     DateTime? // Dernière vérification du statut
+  foundAt           DateTime? // Date de découverte du produit
+  
+  @@index([status])
+  @@index([cjSourcingId])
+  @@index([imported])
+  @@map("cj_sourcing_requests")
+}
+
 

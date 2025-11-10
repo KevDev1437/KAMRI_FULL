@@ -6,6 +6,7 @@ import { CJFavoriteService } from './cj-favorite.service';
 import { CJOrderService } from './cj-order.service';
 import { CJProductService } from './cj-product.service';
 import { CJWebhookService } from './cj-webhook.service';
+import { CjSourcingService } from './cj-sourcing.service';
 
 @Injectable()
 export class CJMainService {
@@ -18,7 +19,8 @@ export class CJMainService {
     private cjProductService: CJProductService,
     private cjFavoriteService: CJFavoriteService,
     private cjOrderService: CJOrderService,
-    private cjWebhookService: CJWebhookService
+    private cjWebhookService: CJWebhookService,
+    public cjSourcingService: CjSourcingService
   ) {}
 
   // ===== DÉLÉGATION VERS LES SERVICES SPÉCIALISÉS =====
@@ -85,6 +87,11 @@ export class CJMainService {
 
   async getProductDetailsWithReviews(pid: string) {
     return this.cjProductService.getProductDetailsWithReviews(pid);
+  }
+
+  async getProductReviews(pid: string) {
+    const client = await this.cjProductService['initializeClient']();
+    return client.getAllProductReviews(pid);
   }
 
   async getProductVariantStock(pid: string, variantId?: string, countryCode?: string) {

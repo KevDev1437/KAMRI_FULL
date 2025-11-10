@@ -13,6 +13,13 @@ import {
   CJReviewsResponse,
   mapCJReview
 } from './interfaces/cj-product.interface';
+import {
+  CJSourcingCreateRequest,
+  CJSourcingCreateResponse,
+  CJSourcingQueryRequest,
+  CJSourcingQueryResponse,
+  CJSourcingDetails
+} from './interfaces/cj-sourcing.interface';
 
 export class CJAPIError extends Error {
   constructor(
@@ -1063,19 +1070,19 @@ export class CJAPIClient {
       const response = await this.makeRequest('GET', endpoint);
       
       if (response && response.code === 0 && response.data) {
-        const data = response.data;
+        const data = response.data as any;
         
         // Mapper les reviews pour le frontend
         const mappedReviews = (data.list || []).map((review: CJReview) => 
           mapCJReview(review)
         );
         
-        this.logger.log(`✅ ${mappedReviews.length} reviews récupérés (total: ${data.total})`);
+        this.logger.log(`✅ ${mappedReviews.length} reviews récupérés (total: ${data.total || 0})`);
         
         return {
-          pageNum: data.pageNum,
-          pageSize: data.pageSize,
-          total: data.total,
+          pageNum: data.pageNum || "1",
+          pageSize: data.pageSize || String(pageSize),
+          total: data.total || "0",
           list: mappedReviews
         };
       }
@@ -1412,12 +1419,12 @@ export class CJAPIClient {
   async getProductWithStock(pid: string): Promise<CJProduct> {
     const product = await this.getProductDetails(pid);
     const variants = await this.getProductVariants(pid);
-    const reviews = await this.getProductReviews(pid);
+    const reviewsResponse = await this.getProductReviews(pid, 1, 100);
     
     return {
       ...product,
       variants,
-      reviews,
+      reviews: reviewsResponse.list || [],
     };
   }
 
@@ -1731,6 +1738,110 @@ export class CJAPIClient {
       tokenExpiry: this.tokenExpiry || undefined,
       tier: this.config.tier || 'free',
     };
+  }
+
+  // ============================================================================
+  // PRODUCT SOURCING
+  // ============================================================================
+
+  /**
+   * Créer une demande de sourcing produit
+   * Endpoint: POST /product/sourcing/create
+   * 
+   * @param request Données de la demande
+   * @returns Réponse avec cjSourcingId
+   */
+  async createSourcingRequest(request: CJSourcingCreateRequest): Promise<CJSourcingCreateResponse> {
+    this.logger.log(`📝 === CRÉATION DEMANDE SOURCING ===`);
+    this.logger.log(`📦 Produit: ${request.productName}`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = '/product/sourcing/create';
+      const response = await this.makeRequest('POST', endpoint, {
+        data: request
+      });
+      
+      if (response && response.code === 0 && response.data) {
+        const data = response.data as any;
+        this.logger.log(`✅ Demande créée: ${data.cjSourcingId}`);
+        
+        return {
+          success: true,
+          code: response.code,
+          message: response.message,
+          data: {
+            cjSourcingId: data.cjSourcingId,
+            result: data.result || 'success'
+          },
+          requestId: response.requestId || ''
+        };
+      }
+      
+      throw new Error(response?.message || 'Erreur création demande sourcing');
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur création sourcing:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vérifier le statut d'une ou plusieurs demandes de sourcing
+   * Endpoint: POST /product/sourcing/query
+   * 
+   * @param sourceIds Liste des IDs de demandes
+   * @returns Détails des demandes
+   */
+  async querySourcingRequests(sourceIds: string[]): Promise<CJSourcingDetails[]> {
+    this.logger.log(`🔍 === VÉRIFICATION STATUT SOURCING ===`);
+    this.logger.log(`📋 ${sourceIds.length} demande(s) à vérifier`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = '/product/sourcing/query';
+      const response = await this.makeRequest('POST', endpoint, {
+        data: {
+          sourceIds: sourceIds
+        }
+      });
+      
+      if (response && response.code === 0 && response.data) {
+        // L'API peut retourner un objet ou un array
+        const data = Array.isArray(response.data) ? response.data : [response.data];
+        
+        this.logger.log(`✅ ${data.length} résultat(s) récupéré(s)`);
+        
+        // Logger les statuts
+        data.forEach((item: CJSourcingDetails) => {
+          this.logger.log(`   - ${item.sourceId}: ${item.sourceStatusStr}`);
+          if (item.cjProductId) {
+            this.logger.log(`     ✅ Produit trouvé: ${item.cjProductId}`);
+          }
+        });
+        
+        return data;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur vérification sourcing:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Vérifier le statut d'une seule demande
+   * 
+   * @param sourceId ID de la demande
+   * @returns Détails de la demande ou null
+   */
+  async querySingleSourcingRequest(sourceId: string): Promise<CJSourcingDetails | null> {
+    const results = await this.querySourcingRequests([sourceId]);
+    return results.length > 0 ? results[0] : null;
   }
 }
 

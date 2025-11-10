@@ -8,6 +8,7 @@ import { CJMainService } from './cj-main.service';
 import { CJOrderService } from './cj-order.service';
 import { CJProductService } from './cj-product.service';
 import { CJWebhookService } from './cj-webhook.service';
+import { CjSourcingService } from './cj-sourcing.service';
 
 @Module({
   imports: [CommonModule], // ✅ Importer le module commun pour DuplicatePreventionService
@@ -19,6 +20,7 @@ import { CJWebhookService } from './cj-webhook.service';
     CJFavoriteService,
     CJOrderService,
     CJWebhookService,
+    CjSourcingService,
     CJMainService,
   ],
   exports: [
@@ -27,6 +29,7 @@ import { CJWebhookService } from './cj-webhook.service';
     CJFavoriteService,
     CJOrderService,
     CJWebhookService,
+    CjSourcingService,
     CJMainService,
   ],
 })

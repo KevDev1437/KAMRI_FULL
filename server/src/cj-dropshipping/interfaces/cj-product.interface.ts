@@ -274,9 +274,14 @@ export function filterAndSortReviews(
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       break;
-    case 'helpful':
-      filtered.sort((a, b) => (b.helpful || 0) - (a.helpful || 0));
-      break;
+      case 'helpful':
+        // Les reviews CJ n'ont pas de champ helpful, on trie par date
+        filtered.sort((a, b) => {
+          const dateA = a.commentDate || a.createdAt || 0;
+          const dateB = b.commentDate || b.createdAt || 0;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
+        });
+        break;
     case 'rating':
       filtered.sort((a, b) => b.rating - a.rating);
       break;
