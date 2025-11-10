@@ -5,8 +5,8 @@ import { CJConfigService } from './cj-config.service';
 import { CJFavoriteService } from './cj-favorite.service';
 import { CJOrderService } from './cj-order.service';
 import { CJProductService } from './cj-product.service';
-import { CJWebhookService } from './cj-webhook.service';
 import { CjSourcingService } from './cj-sourcing.service';
+import { CJWebhookService } from './cj-webhook.service';
 
 @Injectable()
 export class CJMainService {
