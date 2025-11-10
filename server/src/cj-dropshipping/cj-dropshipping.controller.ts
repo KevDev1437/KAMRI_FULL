@@ -4,6 +4,7 @@ import {
     Controller,
     Get,
     HttpCode,
+    HttpException,
     HttpStatus,
     Logger,
     Param,
@@ -198,6 +199,53 @@ export class CJDropshippingController {
     }
   }
 
+  @Get('products/:pid/details-with-reviews')
+  @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ avec tous ses reviews' })
+  @ApiResponse({ status: 200, description: 'Détails du produit avec tous les reviews paginés' })
+  async getProductDetailsWithReviews(@Param('pid') pid: string) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER getProductDetailsWithReviews ===');
+    this.logger.log('📝 PID:', pid);
+    
+    try {
+      const result = await this.cjMainService.cjProductService.getProductDetailsWithReviews(pid);
+      this.logger.log('✅ Controller getProductDetailsWithReviews terminé avec succès');
+      this.logger.log('🔍 === FIN CONTROLLER getProductDetailsWithReviews ===');
+      return result;
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER getProductDetailsWithReviews ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductDetailsWithReviews ===');
+      throw error;
+    }
+  }
+
+  @Get('products/:pid/reviews')
+  @ApiOperation({ summary: 'Obtenir tous les reviews d\'un produit CJ' })
+  @ApiResponse({ status: 200, description: 'Liste de tous les reviews paginés' })
+  async getProductReviews(@Param('pid') pid: string) {
+    this.logger.log('🔍 === DÉBUT CONTROLLER getProductReviews ===');
+    this.logger.log('📝 PID:', pid);
+    
+    try {
+      const client = await this.cjMainService.cjProductService['initializeClient']();
+      const reviews = await client.getAllProductReviews(pid);
+      
+      this.logger.log(`✅ ${reviews.length} reviews récupérés`);
+      this.logger.log('🔍 === FIN CONTROLLER getProductReviews ===');
+      
+      return {
+        success: true,
+        reviews: reviews,
+        total: reviews.length
+      };
+    } catch (error) {
+      this.logger.error('❌ === ERREUR CONTROLLER getProductReviews ===');
+      this.logger.error('💥 Erreur:', error);
+      this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductReviews ===');
+      throw error;
+    }
+  }
+
   @Get('products/:pid/variant-stock')
   @ApiOperation({ summary: 'Obtenir le stock des variantes d\'un produit CJ' })
   @ApiResponse({ status: 200, description: 'Stock des variantes' })
@@ -275,6 +323,42 @@ export class CJDropshippingController {
   @ApiResponse({ status: 200, description: 'Synchronisation de l\'inventaire effectuée' })
   async syncInventory(@Body() body: { productIds?: string[] }) {
     return this.cjMainService.syncInventory(body.productIds || []);
+  }
+
+  /**
+   * Synchroniser le stock des variants d'un produit manuellement
+   */
+  @Post('products/:productId/sync-variants-stock')
+  @ApiOperation({ summary: 'Synchroniser le stock des variants d\'un produit manuellement' })
+  @ApiResponse({ status: 200, description: 'Stock des variants synchronisé' })
+  async syncProductVariantsStock(
+    @Param('productId') productId: string
+  ) {
+    this.logger.log(`📡 === REQUÊTE SYNC STOCK VARIANTS ===`);
+    this.logger.log(`   Product ID: ${productId}`);
+    
+    try {
+      const result = await this.cjMainService.syncProductVariantsStock(productId);
+      
+      this.logger.log(`✅ Sync terminée: ${result.updated} variants mis à jour`);
+      
+      return {
+        success: result.success,
+        message: result.message,
+        data: {
+          updated: result.updated,
+          failed: result.failed,
+          total: result.total
+        }
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur endpoint sync stock variants:', error);
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Erreur synchronisation stock',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   // ===== COMMANDES =====

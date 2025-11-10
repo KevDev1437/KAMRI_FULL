@@ -25,6 +25,9 @@ export function ProductDetailsModal({
   // TOUS LES HOOKS DOIVENT ÊTRE AU DÉBUT
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [reviewFilter, setReviewFilter] = useState<number>(0); // 0 = toutes, 1-5 = note spécifique
+  const [showOnlyWithPhotos, setShowOnlyWithPhotos] = useState(false);
+  const [reviewSort, setReviewSort] = useState<'recent' | 'helpful' | 'rating'>('recent');
   
   // Parser les variants avec useMemo pour éviter les re-calculs
   const parsedVariants = useMemo(() => {
@@ -48,6 +51,52 @@ export function ProductDetailsModal({
   }, [product?.variants]);
 
   // Parser les tags de la même manière
+
+  // Filtrer et trier les reviews
+  const getFilteredReviews = useMemo(() => {
+    if (!product?.reviews) return [];
+    
+    let filtered = Array.isArray(product.reviews) ? [...product.reviews] : [];
+    
+    // Filtrer par note (utiliser score ou rating)
+    if (reviewFilter > 0) {
+      filtered = filtered.filter((r: any) => {
+        const rating = parseInt(r.score || r.rating || "0", 10);
+        return rating === reviewFilter;
+      });
+    }
+    
+    // Filtrer par photos (utiliser commentUrls ou images)
+    if (showOnlyWithPhotos) {
+      filtered = filtered.filter((r: any) => {
+        const hasImages = (r.commentUrls && r.commentUrls.length > 0) || (r.images && r.images.length > 0);
+        return hasImages;
+      });
+    }
+    
+    // Trier
+    switch (reviewSort) {
+      case 'recent':
+        filtered.sort((a: any, b: any) => {
+          const dateA = a.commentDate || a.createdAt || 0;
+          const dateB = b.commentDate || b.createdAt || 0;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
+        });
+        break;
+      case 'helpful':
+        filtered.sort((a: any, b: any) => (b.helpful || 0) - (a.helpful || 0));
+        break;
+      case 'rating':
+        filtered.sort((a: any, b: any) => {
+          const ratingA = parseInt(a.score || a.rating || "0", 10);
+          const ratingB = parseInt(b.score || b.rating || "0", 10);
+          return ratingB - ratingA;
+        });
+        break;
+    }
+    
+    return filtered;
+  }, [product?.reviews, reviewFilter, showOnlyWithPhotos, reviewSort]);
   const parsedTags = useMemo(() => {
     if (!product?.tags) return [];
     
@@ -675,34 +724,294 @@ export function ProductDetailsModal({
           </div>
         )}
 
-        {/* Avis */}
+        {/* ✅ SECTION REVIEWS AMÉLIORÉE */}
         {product.reviews && product.reviews.length > 0 && (
-          <div>
-            <h4 className="text-lg font-semibold text-gray-900 mb-3">
-              Customer Reviews ({product.reviews.length})
-            </h4>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {product.reviews.slice(0, 5).map((review: any, index: number) => (
-                <div key={index} className="border-l-4 border-blue-200 pl-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
+          <div className="space-y-6">
+            {/* En-tête avec statistiques */}
+            <div className="flex items-center justify-between">
+              <h4 className="text-xl font-bold text-gray-900">
+                Avis Clients
+              </h4>
+              <span className="text-sm text-gray-500">
+                {product.reviews.length} avis
+              </span>
+            </div>
+            
+            {/* Statistiques des notes */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Note moyenne */}
+                <div className="text-center">
+                  <div className="text-5xl font-bold text-gray-900 mb-2">
+                    {(() => {
+                      const totalRating = product.reviews.reduce((sum: number, r: any) => {
+                        return sum + parseInt(r.score || r.rating || "0", 10);
+                      }, 0);
+                      const avg = totalRating / product.reviews.length;
+                      return avg.toFixed(1);
+                    })()}
+                  </div>
+                  <div className="flex items-center justify-center gap-1 mb-2">
+                    {[...Array(5)].map((_, i) => {
+                      const avgRating = product.reviews.reduce((sum: number, r: any) => {
+                        return sum + parseInt(r.score || r.rating || "0", 10);
+                      }, 0) / product.reviews.length;
+                      
+                      return (
                         <Star 
-                          key={i} 
-                          className={`w-3 h-3 ${
-                            i < (review.rating || 0) 
-                              ? 'text-yellow-500 fill-current' 
+                          key={i}
+                          className={`w-5 h-5 ${
+                            i < Math.round(avgRating)
+                              ? 'text-yellow-500 fill-current'
                               : 'text-gray-300'
-                          }`} 
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Basé sur {product.reviews.length} avis
+                  </p>
+                </div>
+                
+                {/* Répartition des notes */}
+                <div className="space-y-2">
+                  {[5, 4, 3, 2, 1].map(rating => {
+                    const count = product.reviews.filter((r: any) => 
+                      parseInt(r.score || r.rating || "0", 10) === rating
+                    ).length;
+                    const percentage = (count / product.reviews.length) * 100;
+                    
+                    return (
+                      <div key={rating} className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-700 w-8">
+                          {rating}★
+                        </span>
+                        <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-yellow-400 transition-all duration-300"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 w-12 text-right">
+                          {count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Badge avec photos */}
+              {(() => {
+                const withPhotosCount = product.reviews.filter((r: any) => 
+                  (r.commentUrls?.length > 0) || (r.images?.length > 0)
+                ).length;
+                  
+                return withPhotosCount > 0 ? (
+                  <div className="mt-4">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
+                      </svg>
+                      {withPhotosCount} avec photos
+                    </span>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+            
+            {/* Filtres */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setReviewFilter(0);
+                  setShowOnlyWithPhotos(false);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg border-2 transition-all ${
+                  reviewFilter === 0 && !showOnlyWithPhotos
+                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                    : 'border-gray-300 hover:border-blue-500 hover:text-blue-600'
+                }`}
+              >
+                Tous les avis
+              </button>
+              {[5, 4, 3, 2, 1].map(rating => (
+                <button
+                  key={rating}
+                  onClick={() => {
+                    setReviewFilter(rating);
+                    setShowOnlyWithPhotos(false);
+                  }}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border-2 transition-all flex items-center gap-1 ${
+                    reviewFilter === rating
+                      ? 'border-blue-500 text-blue-600 bg-blue-50'
+                      : 'border-gray-300 hover:border-blue-500 hover:text-blue-600'
+                  }`}
+                >
+                  {rating}★
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setShowOnlyWithPhotos(!showOnlyWithPhotos);
+                  setReviewFilter(0);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg border-2 transition-all flex items-center gap-1 ${
+                  showOnlyWithPhotos
+                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                    : 'border-gray-300 hover:border-blue-500 hover:text-blue-600'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
+                </svg>
+                Avec photos
+              </button>
+              <select
+                value={reviewSort}
+                onChange={(e) => setReviewSort(e.target.value as 'recent' | 'helpful' | 'rating')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border-2 border-gray-300 hover:border-blue-500 transition-all"
+              >
+                <option value="recent">Plus récents</option>
+                <option value="helpful">Plus utiles</option>
+                <option value="rating">Meilleures notes</option>
+              </select>
+            </div>
+            
+            {/* Liste des reviews */}
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              {getFilteredReviews.map((review: any, index: number) => (
+                <div 
+                  key={index}
+                  className="bg-white border-2 border-gray-100 rounded-xl p-5 hover:border-blue-200 transition-all"
+                >
+                  {/* En-tête du review */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {(review.userName || 'A')[0].toUpperCase()}
+                      </div>
+                      
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">
+                            {review.userName || 'Client anonyme'}
+                          </span>
+                          {review.verified && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                              </svg>
+                              Vérifié
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          {/* Étoiles */}
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star 
+                                key={i}
+                                className={`w-4 h-4 ${
+                                  i < (review.rating || 0)
+                                    ? 'text-yellow-500 fill-current'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          {/* Date */}
+                          <span className="text-xs text-gray-500">
+                            {review.createdAt ? new Date(review.createdAt).toLocaleDateString('fr-FR', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            }) : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Utile */}
+                    {review.helpful > 0 && (
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                        </svg>
+                        {review.helpful}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Titre du review */}
+                  {review.title && (
+                    <h5 className="font-semibold text-gray-900 mb-2">
+                      {review.title}
+                    </h5>
+                  )}
+                  
+                  {/* Commentaire */}
+                  <p className="text-gray-700 leading-relaxed mb-3">
+                    {review.comment}
+                  </p>
+                  
+                  {/* Variante */}
+                  {review.variantName && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-700 mb-3">
+                      <span className="font-medium mr-1">Variante:</span>
+                      {review.variantName}
+                    </div>
+                  )}
+                  
+                  {/* Images */}
+                  {review.images && review.images.length > 0 && (
+                    <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                      {review.images.map((img: string, imgIndex: number) => (
+                        <img
+                          key={imgIndex}
+                          src={img}
+                          alt={`Review ${imgIndex + 1}`}
+                          className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 cursor-pointer transition-all hover:scale-105"
+                          onClick={() => {
+                            // Ouvrir en grand
+                            window.open(img, '_blank');
+                          }}
                         />
                       ))}
                     </div>
-                    <span className="text-sm font-medium">{review.userName || 'Anonymous'}</span>
-                  </div>
-                  <p className="text-sm text-gray-700">{review.comment}</p>
+                  )}
+                  
+                  {/* Réponse du vendeur */}
+                  {review.sellerReply && (
+                    <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd"/>
+                        </svg>
+                        <span className="text-sm font-semibold text-blue-900">
+                          Réponse du vendeur
+                        </span>
+                        <span className="text-xs text-blue-600">
+                          {new Date(review.sellerReply.date).toLocaleDateString('fr-FR')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-blue-800">
+                        {review.sellerReply.comment}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+            
+            {/* Bouton "Voir plus" si beaucoup de reviews */}
+            {getFilteredReviews.length > 10 && (
+              <button className="w-full py-3 px-4 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all">
+                Voir tous les avis ({getFilteredReviews.length})
+              </button>
+            )}
           </div>
         )}
 

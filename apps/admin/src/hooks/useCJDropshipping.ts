@@ -36,11 +36,43 @@ export interface CJVariant {
 }
 
 export interface CJReview {
+  // Identifiants
   id: string;
-  rating: number;
-  comment: string;
+  reviewId?: string;
+  
+  // Auteur
   userName: string;
+  userAvatar?: string;
+  userId?: string;
+  
+  // Contenu
+  rating: number;
+  title?: string;
+  comment: string;
+  
+  // Médias
+  images?: string[];
+  videos?: string[];
+  
+  // Métadonnées
   createdAt: string;
+  updatedAt?: string;
+  verified?: boolean;
+  helpful?: number;
+  
+  // Variante concernée
+  variantName?: string;
+  variantKey?: string;
+  
+  // Pays/Localisation
+  country?: string;
+  countryCode?: string;
+  
+  // Réponse du vendeur
+  sellerReply?: {
+    comment: string;
+    date: string;
+  };
 }
 
 export interface CJOrder {

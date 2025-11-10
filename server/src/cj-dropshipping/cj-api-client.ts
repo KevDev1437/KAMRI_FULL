@@ -7,7 +7,11 @@ import {
   CJProductSearchResult,
   CJProduct,
   CJVariant,
-  CJReview
+  CJVariantStock,
+  CJProductInventoryResponse,
+  CJReview,
+  CJReviewsResponse,
+  mapCJReview
 } from './interfaces/cj-product.interface';
 
 export class CJAPIError extends Error {
@@ -809,6 +813,231 @@ export class CJAPIClient {
   }
 
   /**
+   * Obtenir les détails d'un variant par son VID (endpoint 2.2)
+   * @param vid Variant ID
+   */
+  async getVariantById(vid: string): Promise<CJVariant> {
+    this.logger.log(`🔍 Récupération variant par VID: ${vid}`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/variant/queryByVid?vid=${vid}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.data) {
+        this.logger.log(`✅ Variant ${vid} récupéré`);
+        return response.data as CJVariant;
+      }
+      
+      throw new Error(`Variant ${vid} introuvable`);
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération variant ${vid}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir le stock d'un variant par son VID (endpoint 3.1)
+   * @param vid Variant ID
+   * @returns Stock par entrepôt
+   */
+  async getVariantStock(vid: string): Promise<CJVariantStock[]> {
+    this.logger.log(`📦 Récupération stock variant: ${vid}`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/stock/queryByVid?vid=${vid}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.data) {
+        const stocks = Array.isArray(response.data) ? response.data : [];
+        
+        // Calculer le stock total
+        const totalStock = stocks.reduce(
+          (sum, stock) => sum + (stock.totalInventoryNum || stock.storageNum || 0), 
+          0
+        );
+        
+        this.logger.log(`✅ Stock variant ${vid}: ${totalStock} unités dans ${stocks.length} entrepôts`);
+        
+        return stocks;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération stock variant ${vid}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtenir le stock d'un produit par SKU (endpoint 3.2)
+   * @param sku SKU du produit ou variant
+   * @returns Stock par entrepôt
+   */
+  async getProductStockBySku(sku: string): Promise<CJVariantStock[]> {
+    this.logger.log(`📦 Récupération stock par SKU: ${sku}`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/stock/queryBySku?sku=${sku}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.data) {
+        const stocks = Array.isArray(response.data) ? response.data : [];
+        
+        const totalStock = stocks.reduce(
+          (sum, stock) => sum + (stock.totalInventoryNum || 0), 
+          0
+        );
+        
+        this.logger.log(`✅ Stock SKU ${sku}: ${totalStock} unités dans ${stocks.length} entrepôts`);
+        
+        return stocks;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération stock SKU ${sku}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * ⚡ MÉTHODE OPTIMISÉE : Obtenir le stock de TOUS les variants d'un produit en 1 requête (endpoint 3.3)
+   * @param pid Product ID
+   * @returns Map<vid, stock détaillé>
+   */
+  async getProductInventoryBulk(pid: string): Promise<Map<string, { stock: number; warehouses: CJVariantStock[] }>> {
+    this.logger.log(`⚡ === RÉCUPÉRATION STOCK BULK (PID: ${pid}) ===`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/stock/getInventoryByPid?pid=${pid}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.data) {
+        const data = response.data as CJProductInventoryResponse;
+        
+        if (!data.variantInventories || data.variantInventories.length === 0) {
+          this.logger.warn('⚠️ Aucun stock variant trouvé');
+          return new Map();
+        }
+        
+        const stockMap = new Map<string, { stock: number; warehouses: CJVariantStock[] }>();
+        
+        // Parser les stocks de chaque variant
+        for (const variantInv of data.variantInventories) {
+          const vid = variantInv.vid;
+          
+          // Normaliser les noms de champs (3.3 utilise des noms différents)
+          const warehouses: CJVariantStock[] = variantInv.inventory.map(inv => ({
+            countryCode: inv.countryCode,
+            totalInventoryNum: inv.totalInventory,      // ⚠️ Mapping
+            cjInventoryNum: inv.cjInventory,            // ⚠️ Mapping
+            factoryInventoryNum: inv.factoryInventory,  // ⚠️ Mapping
+            totalInventory: inv.totalInventory,
+            cjInventory: inv.cjInventory,
+            factoryInventory: inv.factoryInventory,
+            verifiedWarehouse: inv.verifiedWarehouse
+          }));
+          
+          // Calculer le stock total
+          const totalStock = warehouses.reduce(
+            (sum, w) => sum + (w.totalInventory || w.totalInventoryNum || 0),
+            0
+          );
+          
+          stockMap.set(vid, {
+            stock: totalStock,
+            warehouses: warehouses
+          });
+          
+          this.logger.log(`  ✅ Variant ${vid}: ${totalStock} en stock`);
+        }
+        
+        this.logger.log(`✅ Stock de ${stockMap.size} variants récupéré en 1 requête`);
+        
+        return stockMap;
+        
+      }
+      
+      return new Map();
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération stock bulk:`, error);
+      return new Map();
+    }
+  }
+
+  /**
+   * Obtenir les variants d'un produit AVEC leur stock (méthode optimisée utilisant bulk)
+   * @param pid Product ID
+   * @returns Variants enrichis avec stock
+   */
+  async getProductVariantsWithStock(pid: string): Promise<CJVariant[]> {
+    this.logger.log(`📦 === RÉCUPÉRATION VARIANTS AVEC STOCK (PID: ${pid}) ===`);
+    
+    try {
+      // 1. Récupérer les variants (endpoint 2.1)
+      const variants = await this.getProductVariants(pid);
+      
+      if (!variants || variants.length === 0) {
+        this.logger.log('⚠️ Aucun variant trouvé');
+        return [];
+      }
+      
+      this.logger.log(`📊 ${variants.length} variants trouvés`);
+      
+      // 2. Récupérer le stock de TOUS les variants en 1 requête (endpoint 3.3) ⚡
+      const stockMap = await this.getProductInventoryBulk(pid);
+      
+      // 3. Enrichir chaque variant avec son stock
+      const variantsWithStock: CJVariant[] = variants.map(variant => {
+        const stockData = stockMap.get(variant.vid);
+        
+        if (stockData) {
+          return {
+            ...variant,
+            stock: stockData.stock,
+            warehouseStock: stockData.warehouses
+          };
+        } else {
+          this.logger.warn(`⚠️ Pas de stock trouvé pour variant ${variant.vid}`);
+          return {
+            ...variant,
+            stock: 0,
+            warehouseStock: []
+          };
+        }
+      });
+      
+      const totalStock = variantsWithStock.reduce((sum, v) => sum + (v.stock || 0), 0);
+      this.logger.log(`✅ ${variantsWithStock.length} variants enrichis - Stock total: ${totalStock}`);
+      
+      return variantsWithStock;
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération variants avec stock:`, error);
+      
+      // Fallback : retourner les variants sans stock plutôt que d'échouer
+      try {
+        const variants = await this.getProductVariants(pid);
+        return variants.map(v => ({ ...v, stock: 0, warehouseStock: [] }));
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  /**
    * Obtenir le stock d'un produit
    */
   async getProductStock(vid: string): Promise<any> {
@@ -817,11 +1046,109 @@ export class CJAPIClient {
   }
 
   /**
-   * Obtenir les avis d'un produit
+   * Obtenir les avis d'un produit (nouvelle API paginée)
+   * Endpoint: GET /product/productComments
    */
-  async getProductReviews(pid: string): Promise<CJReview[]> {
-    const response = await this.makeRequest('GET', `/product/review/${pid}`);
-    return response.data as any;
+  async getProductReviews(
+    pid: string,
+    pageNum: number = 1,
+    pageSize: number = 100
+  ): Promise<CJReviewsResponse> {
+    this.logger.log(`📝 Récupération reviews du produit: ${pid} (page ${pageNum}, size ${pageSize})`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/productComments?pid=${pid}&pageNum=${pageNum}&pageSize=${pageSize}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 0 && response.data) {
+        const data = response.data;
+        
+        // Mapper les reviews pour le frontend
+        const mappedReviews = (data.list || []).map((review: CJReview) => 
+          mapCJReview(review)
+        );
+        
+        this.logger.log(`✅ ${mappedReviews.length} reviews récupérés (total: ${data.total})`);
+        
+        return {
+          pageNum: data.pageNum,
+          pageSize: data.pageSize,
+          total: data.total,
+          list: mappedReviews
+        };
+      }
+      
+      // Retour vide si pas de reviews
+      return {
+        pageNum: "1",
+        pageSize: String(pageSize),
+        total: "0",
+        list: []
+      };
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération reviews ${pid}:`, error);
+      
+      // Retour vide en cas d'erreur
+      return {
+        pageNum: "1",
+        pageSize: String(pageSize),
+        total: "0",
+        list: []
+      };
+    }
+  }
+
+  /**
+   * Obtenir TOUS les reviews d'un produit (toutes les pages)
+   * Récupère automatiquement toutes les pages si plus de 100 reviews
+   */
+  async getAllProductReviews(pid: string): Promise<CJReview[]> {
+    this.logger.log(`📝 === RÉCUPÉRATION TOUS LES REVIEWS (PID: ${pid}) ===`);
+    
+    try {
+      // Première page pour connaître le total
+      const firstPage = await this.getProductReviews(pid, 1, 100);
+      
+      const total = parseInt(firstPage.total || "0", 10);
+      const allReviews = [...firstPage.list];
+      
+      if (total === 0) {
+        this.logger.log('⚠️ Aucun review trouvé');
+        return [];
+      }
+      
+      this.logger.log(`📊 Total de reviews: ${total}`);
+      
+      // Si plus de 100 reviews, récupérer les autres pages
+      if (total > 100) {
+        const totalPages = Math.ceil(total / 100);
+        this.logger.log(`📄 Récupération de ${totalPages} pages...`);
+        
+        for (let page = 2; page <= totalPages; page++) {
+          this.logger.log(`🔄 Page ${page}/${totalPages}...`);
+          
+          const pageData = await this.getProductReviews(pid, page, 100);
+          allReviews.push(...pageData.list);
+          
+          // Rate limiting entre les pages
+          if (page < totalPages) {
+            const delay = 500; // 500ms entre les pages pour éviter le rate limit
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      this.logger.log(`✅ ${allReviews.length} reviews récupérés au total`);
+      
+      return allReviews;
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération tous les reviews:`, error);
+      return [];
+    }
   }
 
  

@@ -3,7 +3,7 @@ import { DuplicatePreventionService } from '../../common/services/duplicate-prev
 import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJProductSearchDto } from '../dto/cj-product-search.dto';
-import { CJProduct, CJProductSearchOptions, CJProductSearchResult } from '../interfaces/cj-product.interface';
+import { CJProduct, CJProductSearchOptions, CJProductSearchResult, calculateReviewStats } from '../interfaces/cj-product.interface';
 
 @Injectable()
 export class CJProductService {
@@ -687,6 +687,44 @@ export class CJProductService {
   }
 
   /**
+   * Obtenir les détails d'un produit CJ avec tous ses reviews
+   */
+  async getProductDetailsWithReviews(pid: string) {
+    this.logger.log(`📦 === RÉCUPÉRATION PRODUIT + REVIEWS (PID: ${pid}) ===`);
+    
+    try {
+      // 1. Récupérer les détails du produit
+      const productDetails = await this.getProductDetails(pid);
+      
+      if (!productDetails) {
+        throw new Error('Produit introuvable');
+      }
+      
+      // 2. Récupérer tous les reviews
+      const client = await this.initializeClient();
+      const reviews = await client.getAllProductReviews(pid);
+      
+      // 3. Calculer les statistiques
+      const stats = calculateReviewStats(reviews);
+      
+      this.logger.log(`✅ Produit récupéré avec ${reviews.length} reviews`);
+      this.logger.log(`📊 Note moyenne: ${stats.averageRating}/5`);
+      
+      return {
+        ...productDetails,
+        reviews: reviews,
+        rating: stats.averageRating,
+        totalReviews: stats.totalReviews,
+        reviewStats: stats
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération produit avec reviews:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Récupérer le stock des variantes d'un produit avec cache (selon doc CJ)
    */
   async getProductVariantStock(pid: string, variantId?: string, countryCode?: string): Promise<any> {
@@ -821,7 +859,7 @@ export class CJProductService {
       dimensions: cjProduct.dimensions || '',
       brand: cjProduct.brand || '',
       tags: cjProduct.tags || [],
-      reviews: cjProduct.reviews || [],
+      reviews: [], // Les reviews seront récupérés séparément via getAllProductReviews()
       
       // Champs supplémentaires de l'API
       productWeight: cjProduct.productWeight,
@@ -1252,6 +1290,143 @@ export class CJProductService {
         categories: this.cacheStats.categoriesHits / (this.cacheStats.categoriesHits + this.cacheStats.categoriesMisses) * 100,
       }
     };
+  }
+
+  /**
+   * Synchroniser le stock de tous les variants d'un produit
+   * @param productId ID du produit KAMRI (CJProductStore)
+   */
+  async syncProductVariantsStock(productId: string) {
+    this.logger.log(`🔄 === SYNCHRONISATION STOCK VARIANTS (Product: ${productId}) ===`);
+    
+    try {
+      // Récupérer le produit avec son ID CJ
+      const product = await this.prisma.cJProductStore.findUnique({
+        where: { id: productId }
+      });
+      
+      if (!product || !product.cjProductId) {
+        throw new Error('Produit introuvable ou sans ID CJ');
+      }
+      
+      this.logger.log(`📦 Produit trouvé: ${product.name} (CJ PID: ${product.cjProductId})`);
+      
+      // Initialiser le client CJ
+      const client = await this.initializeClient();
+      
+      // Récupérer les variants avec stock depuis CJ (méthode optimisée)
+      const variantsWithStock = await client.getProductVariantsWithStock(product.cjProductId);
+      
+      if (!variantsWithStock || variantsWithStock.length === 0) {
+        this.logger.warn('⚠️ Aucun variant trouvé sur CJ');
+        return { 
+          success: false, 
+          message: 'Aucun variant trouvé',
+          updated: 0,
+          failed: 0,
+          total: 0
+        };
+      }
+      
+      this.logger.log(`📊 ${variantsWithStock.length} variants trouvés sur CJ`);
+      
+      let updated = 0;
+      let failed = 0;
+      
+      // Récupérer le produit KAMRI associé (s'il existe)
+      const kamriProduct = await this.prisma.product.findFirst({
+        where: { cjProductId: product.cjProductId }
+      });
+      
+      // Mettre à jour chaque variant
+      for (const variant of variantsWithStock) {
+        try {
+          // Parser variantKey
+          let parsedKey = variant.variantKey;
+          try {
+            if (parsedKey && parsedKey.startsWith('[')) {
+              const parsed = JSON.parse(parsedKey);
+              parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+            }
+          } catch {
+            // Garder la valeur originale
+          }
+          
+          const variantData = {
+            name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
+            sku: variant.variantSku,
+            price: variant.variantSellPrice,
+            weight: variant.variantWeight,
+            dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+              ? JSON.stringify({
+                  length: variant.variantLength,
+                  width: variant.variantWidth,
+                  height: variant.variantHeight,
+                  volume: variant.variantVolume
+                })
+              : null,
+            image: variant.variantImage,
+            stock: variant.stock || 0,
+            properties: JSON.stringify({
+              key: parsedKey,
+              property: variant.variantProperty,
+              standard: variant.variantStandard,
+              unit: variant.variantUnit
+            }),
+            status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
+            lastSyncAt: new Date()
+          };
+          
+          if (kamriProduct) {
+            await this.prisma.productVariant.upsert({
+              where: {
+                cjVariantId: variant.vid
+              },
+              update: variantData,
+              create: {
+                ...variantData,
+                cjVariantId: variant.vid,
+                productId: kamriProduct.id
+              }
+            });
+          }
+          
+          // Mettre à jour le champ variants JSON dans CJProductStore
+          const currentVariants = product.variants ? JSON.parse(product.variants) : [];
+          const updatedVariants = currentVariants.map((v: any) => 
+            v.vid === variant.vid ? { ...v, stock: variant.stock, warehouseStock: variant.warehouseStock } : v
+          );
+          
+          await this.prisma.cJProductStore.update({
+            where: { id: productId },
+            data: {
+              variants: JSON.stringify(updatedVariants)
+            }
+          });
+          
+          updated++;
+          this.logger.log(`  ✅ Variant ${variant.vid}: stock ${variant.stock}, prix ${variant.variantSellPrice}`);
+          
+        } catch (error) {
+          failed++;
+          this.logger.error(`  ❌ Erreur MAJ variant ${variant.vid}:`, error);
+        }
+      }
+      
+      this.logger.log(`🎉 Synchronisation terminée: ${updated} réussis, ${failed} échecs sur ${variantsWithStock.length} total`);
+      
+      return {
+        success: failed === 0,
+        updated,
+        failed,
+        total: variantsWithStock.length,
+        message: `${updated} variants synchronisés${failed > 0 ? `, ${failed} échecs` : ''}`
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur synchronisation stock variants:', error);
+      throw error;
+    }
   }
 }
 

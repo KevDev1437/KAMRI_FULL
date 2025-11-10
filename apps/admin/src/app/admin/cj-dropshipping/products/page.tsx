@@ -335,8 +335,28 @@ export default function CJProductsPage() {
       setSelectedProduct(product); // Afficher d'abord les données de base
       setLoadingDetails(true);
       
-      // Ensuite récupérer les détails complets
+      // Ensuite récupérer les détails complets avec tous les reviews
       const detailedProduct = await getProductDetails(pid);
+      
+      // Récupérer tous les reviews séparément
+      try {
+        const reviewsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/cj-dropshipping/products/${pid}/reviews`);
+        if (reviewsResponse.ok) {
+          const reviewsData = await reviewsResponse.json();
+          if (reviewsData.reviews && reviewsData.reviews.length > 0) {
+            detailedProduct.reviews = reviewsData.reviews;
+            // Recalculer la note moyenne
+            const totalRating = reviewsData.reviews.reduce((sum: number, r: any) => {
+              return sum + parseInt(r.score || r.rating || "0", 10);
+            }, 0);
+            detailedProduct.rating = totalRating / reviewsData.reviews.length;
+            detailedProduct.totalReviews = reviewsData.reviews.length;
+          }
+        }
+      } catch (error) {
+        console.error('Erreur récupération reviews:', error);
+      }
+      
       setSelectedProduct(detailedProduct);
     } catch (error) {
       console.error('Erreur lors de la récupération des détails:', error);

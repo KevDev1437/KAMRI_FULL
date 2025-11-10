@@ -556,6 +556,117 @@ export class CJFavoriteService {
         status: storeProductData.status,
         action: storeResult.isNew ? 'NOUVEAU' : 'MISE_À_JOUR'
       });
+
+      // ===================================================================
+      // ✅ ENRICHIR LES VARIANTS AVEC LEUR STOCK (MÉTHODE OPTIMISÉE)
+      // ===================================================================
+      this.logger.log('📦 === ENRICHISSEMENT VARIANTS AVEC STOCK ===');
+
+      try {
+        // Récupérer les variants AVEC stock en 1 requête optimisée
+        const variantsWithStock = await client.getProductVariantsWithStock(pid);
+        
+        if (variantsWithStock && variantsWithStock.length > 0) {
+          this.logger.log(`✅ ${variantsWithStock.length} variants enrichis avec stock`);
+          
+          // Calculer le stock total
+          const totalStock = variantsWithStock.reduce((sum, v) => sum + (v.stock || 0), 0);
+          this.logger.log(`📊 Stock total du produit: ${totalStock} unités`);
+          
+          // 1. Mettre à jour le champ variants JSON avec les données enrichies
+          await this.prisma.cJProductStore.update({
+            where: { cjProductId: pid },
+            data: {
+              variants: JSON.stringify(variantsWithStock)
+            }
+          });
+          
+          this.logger.log('✅ Champ variants mis à jour avec stock');
+          
+          // 2. Créer/mettre à jour les ProductVariant structurés dans la base
+          let variantsSaved = 0;
+          let variantsFailed = 0;
+          
+          // Récupérer le produit KAMRI associé (s'il existe)
+          const kamriProduct = await this.prisma.product.findFirst({
+            where: { cjProductId: pid }
+          });
+          
+          for (const variant of variantsWithStock) {
+            try {
+              // Parser variantKey si c'est un JSON string
+              let parsedKey = variant.variantKey;
+              try {
+                if (parsedKey && parsedKey.startsWith('[')) {
+                  const parsed = JSON.parse(parsedKey);
+                  parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+                }
+              } catch {
+                // Garder la valeur originale si parsing échoue
+              }
+              
+              const variantData = {
+                name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
+                sku: variant.variantSku,
+                price: variant.variantSellPrice,
+                weight: variant.variantWeight,
+                dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+                  ? JSON.stringify({
+                      length: variant.variantLength,
+                      width: variant.variantWidth,
+                      height: variant.variantHeight,
+                      volume: variant.variantVolume
+                    })
+                  : null,
+                image: variant.variantImage,
+                stock: variant.stock || 0,
+                properties: JSON.stringify({
+                  key: parsedKey,
+                  property: variant.variantProperty,
+                  standard: variant.variantStandard,
+                  unit: variant.variantUnit
+                }),
+                status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
+                lastSyncAt: new Date()
+              };
+              
+              if (kamriProduct) {
+                // Si le produit KAMRI existe, créer/mettre à jour le variant
+                await this.prisma.productVariant.upsert({
+                  where: {
+                    cjVariantId: variant.vid
+                  },
+                  update: variantData,
+                  create: {
+                    ...variantData,
+                    cjVariantId: variant.vid,
+                    productId: kamriProduct.id
+                  }
+                });
+              }
+              
+              variantsSaved++;
+              this.logger.log(`  ✅ Variant ${variant.vid} sauvegardé (stock: ${variant.stock})`);
+              
+            } catch (error) {
+              variantsFailed++;
+              this.logger.error(`  ❌ Erreur sauvegarde variant ${variant.vid}:`, error);
+            }
+          }
+          
+          this.logger.log(`✅ Variants sauvegardés: ${variantsSaved} réussis, ${variantsFailed} échecs`);
+          this.logger.log('🎉 === FIN ENRICHISSEMENT VARIANTS ===');
+          
+        } else {
+          this.logger.warn('⚠️ Aucun variant avec stock trouvé pour ce produit');
+        }
+        
+      } catch (error) {
+        this.logger.error('❌ Erreur enrichissement variants avec stock:', error);
+        // Ne pas bloquer l'import si l'enrichissement échoue
+        this.logger.warn('⚠️ Import du produit réussi mais sans enrichissement des variants');
+      }
+
       this.logger.log('🎉 Import terminé avec succès');
       this.logger.log('🔍 === FIN IMPORT PRODUIT CJ ===');
       

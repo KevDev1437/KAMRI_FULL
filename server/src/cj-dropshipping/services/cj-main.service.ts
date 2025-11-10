@@ -83,12 +83,20 @@ export class CJMainService {
     return this.cjProductService.getProductDetails(pid);
   }
 
+  async getProductDetailsWithReviews(pid: string) {
+    return this.cjProductService.getProductDetailsWithReviews(pid);
+  }
+
   async getProductVariantStock(pid: string, variantId?: string, countryCode?: string) {
     return this.cjProductService.getProductVariantStock(pid, variantId, countryCode);
   }
 
   async getImportedProducts(filters?: any) {
     return this.cjProductService.getImportedProducts(filters);
+  }
+
+  async syncProductVariantsStock(productId: string) {
+    return this.cjProductService.syncProductVariantsStock(productId);
   }
 
   // Favoris
