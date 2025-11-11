@@ -1,15 +1,171 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CJOrderService } from '../cj-dropshipping/services/cj-order.service';
+import { CJAPIClient } from '../cj-dropshipping/cj-api-client';
 
 @Injectable()
 export class OrderCJIntegrationService {
   private readonly logger = new Logger(OrderCJIntegrationService.name);
+  private cjApiClient: CJAPIClient | null = null;
 
   constructor(
     private prisma: PrismaService,
     private cjOrderService: CJOrderService, // Utiliser CJOrderService qui charge la config depuis la base
   ) {}
+
+  /**
+   * Initialiser le client API CJ (lazy loading)
+   */
+  private async getCJAPIClient(): Promise<CJAPIClient> {
+    if (!this.cjApiClient) {
+      // Récupérer le client depuis CJOrderService
+      const client = await (this.cjOrderService as any).initializeClient();
+      this.cjApiClient = client;
+    }
+    return this.cjApiClient;
+  }
+
+  /**
+   * Récupérer le VID réel depuis l'API CJ pour un produit et SKU donné
+   * @param cjProductId ID du produit CJ (pid)
+   * @param variantSku SKU du variant (optionnel, utilisé pour trouver le bon variant)
+   * @param storedVid VID stocké en base (utilisé comme fallback)
+   * @returns VID valide depuis l'API CJ ou le VID stocké si l'API échoue
+   */
+  private async getCJVariantIdFromAPI(
+    cjProductId: string,
+    variantSku?: string | null,
+    storedVid?: string | null
+  ): Promise<string | null> {
+    this.logger.log(`🔍 Récupération VID depuis API CJ pour produit ${cjProductId}, SKU ${variantSku || 'N/A'}`);
+    
+    try {
+      const client = await this.getCJAPIClient();
+      
+      // Appeler l'API CJ pour récupérer les variants du produit
+      const variants = await client.getProductVariants(cjProductId);
+      
+      if (!variants || variants.length === 0) {
+        this.logger.warn(`⚠️ Aucun variant trouvé dans l'API CJ pour produit ${cjProductId}`);
+        // Fallback sur le VID stocké si disponible
+        return storedVid || null;
+      }
+      
+      // Si on a un SKU, chercher le variant correspondant
+      if (variantSku) {
+        const matchingVariant = variants.find(
+          (v: any) => v.variantSku === variantSku || v.variantSku === variantSku?.trim()
+        );
+        
+        if (matchingVariant && matchingVariant.vid) {
+          const apiVid = String(matchingVariant.vid).trim();
+          this.logger.log(`✅ VID trouvé depuis API pour SKU ${variantSku}: ${apiVid}`);
+          
+          // Vérifier si le VID a changé
+          if (storedVid && storedVid !== apiVid) {
+            this.logger.warn(`⚠️ VID a changé ! Stocké: ${storedVid}, API: ${apiVid}`);
+          }
+          
+          return apiVid;
+        }
+      }
+      
+      // Si pas de SKU ou variant non trouvé, utiliser le premier variant disponible
+      if (variants[0] && variants[0].vid) {
+        const apiVid = String(variants[0].vid).trim();
+        this.logger.log(`✅ VID trouvé depuis API (premier variant): ${apiVid}`);
+        return apiVid;
+      }
+      
+      this.logger.warn(`⚠️ Aucun VID valide trouvé dans l'API CJ pour produit ${cjProductId}`);
+      return storedVid || null;
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération VID depuis API CJ:`, error.message);
+      // En cas d'erreur, utiliser le VID stocké comme fallback
+      if (storedVid) {
+        this.logger.warn(`⚠️ Utilisation du VID stocké comme fallback: ${storedVid}`);
+        return storedVid;
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Valider si un VID est suspect (format invalide)
+   */
+  private isVidSuspect(vid: string): boolean {
+    if (!vid) return true;
+    
+    const trimmed = vid.trim();
+    
+    // VID suspects : contiennent des underscores ou commencent par "TH"
+    if (trimmed.includes('_') || trimmed.startsWith('TH')) {
+      return true;
+    }
+    
+    // VID valides : UUID (avec tirets) ou nombres longs
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(trimmed);
+    const isNumeric = /^\d+$/.test(trimmed);
+    const isValidFormat = /^[0-9a-fA-F\-]+$/i.test(trimmed);
+    
+    return !(isUUID || isNumeric || isValidFormat);
+  }
+
+  /**
+   * Vérifier si un produit CJ existe et est disponible
+   * @param cjProductId ID du produit CJ (pid)
+   * @param cjVariantId ID du variant CJ (vid)
+   * @returns true si le produit existe et est disponible, false sinon
+   */
+  private async verifyCJProductExists(
+    cjProductId: string,
+    cjVariantId: string
+  ): Promise<boolean> {
+    this.logger.log(`🔍 Vérification disponibilité produit CJ: ${cjProductId}, variant: ${cjVariantId}`);
+    
+    try {
+      const client = await this.getCJAPIClient();
+      
+      // Récupérer les variants du produit depuis l'API CJ
+      const variants = await client.getProductVariants(cjProductId);
+      
+      if (!variants || variants.length === 0) {
+        this.logger.warn(`❌ Produit ${cjProductId} introuvable ou sans variants dans CJ`);
+        return false;
+      }
+      
+      // Chercher le variant spécifique
+      const variant = variants.find(
+        (v: any) => v.vid === cjVariantId || String(v.vid) === String(cjVariantId)
+      );
+      
+      if (!variant) {
+        this.logger.warn(`❌ Variant ${cjVariantId} introuvable dans le produit ${cjProductId}`);
+        this.logger.log(`📋 Variants disponibles: ${variants.map((v: any) => v.vid).join(', ')}`);
+        return false;
+      }
+      
+      // Vérifier le stock (si disponible dans la réponse)
+      // Note: Le stock peut ne pas être disponible dans getProductVariants
+      // On vérifie juste que le variant existe
+      const hasStock = variant.stock === undefined || variant.stock === null || variant.stock > 0;
+      
+      if (!hasStock) {
+        this.logger.warn(`⚠️ Variant ${cjVariantId} en rupture de stock (stock: ${variant.stock})`);
+        // On retourne quand même true car le stock peut être vérifié ailleurs
+        // et certains produits peuvent être commandés même avec stock 0
+      }
+      
+      this.logger.log(`✅ Produit ${cjProductId} et variant ${cjVariantId} vérifiés et disponibles`);
+      return true;
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur vérification produit CJ ${cjProductId}:`, error.message);
+      // En cas d'erreur, on retourne false pour être sûr
+      return false;
+    }
+  }
 
   /**
    * Détecter si une commande contient des produits CJ
@@ -154,17 +310,53 @@ export class OrderCJIntegrationService {
             this.logger.warn(`⚠️ Utilisation du premier variant (peut-être inactif): vid=${vid}`);
           }
         }
-      } else {
-        // Si pas de variant, on ne peut pas créer la commande CJ
-        // Le vid est obligatoire selon l'API CJ
-        this.logger.error(`❌ Produit ${product.id} (${product.name}) n'a pas de variant CJ avec cjVariantId`);
-        errors.push({
-          item: item.id,
-          productId: product.id,
-          productName: product.name,
-          error: 'Produit sans variant CJ actif. Veuillez synchroniser les variants du produit.',
-        });
-        continue;
+      }
+
+      // ✨ NOUVEAU : Vérifier si le VID est suspect et le récupérer depuis l'API si nécessaire
+      if (vid && this.isVidSuspect(vid)) {
+        this.logger.warn(`⚠️ VID suspect détecté: "${vid}" - Récupération depuis l'API CJ...`);
+        const cjProductId = product.cjMapping?.cjProductId || product.cjProductId;
+        if (cjProductId) {
+          const apiVid = await this.getCJVariantIdFromAPI(cjProductId, sku, vid);
+          if (apiVid && !this.isVidSuspect(apiVid)) {
+            vid = apiVid;
+            this.logger.log(`✅ VID corrigé depuis l'API: ${vid}`);
+          } else {
+            this.logger.error(`❌ VID de l'API également suspect ou non trouvé pour produit ${product.id}`);
+          }
+        }
+      }
+
+      // Si pas de variant trouvé en base, essayer de récupérer depuis l'API CJ
+      if (!vid) {
+        this.logger.warn(`⚠️ Produit ${product.id} n'a pas de variant en base - Tentative récupération depuis API CJ...`);
+        const cjProductId = product.cjMapping?.cjProductId || product.cjProductId;
+        if (cjProductId) {
+          const apiVid = await this.getCJVariantIdFromAPI(cjProductId, sku, null);
+          if (apiVid && !this.isVidSuspect(apiVid)) {
+            vid = apiVid;
+            sku = product.productSku || sku;
+            this.logger.log(`✅ VID récupéré depuis API CJ: ${vid}`);
+          } else {
+            this.logger.error(`❌ Impossible de récupérer un VID valide depuis l'API CJ pour produit ${product.id}`);
+            errors.push({
+              item: item.id,
+              productId: product.id,
+              productName: product.name,
+              error: 'Produit sans variant CJ. Veuillez synchroniser les variants du produit.',
+            });
+            continue;
+          }
+        } else {
+          this.logger.error(`❌ Produit ${product.id} (${product.name}) n'a pas de cjProductId`);
+          errors.push({
+            item: item.id,
+            productId: product.id,
+            productName: product.name,
+            error: 'Produit sans cjProductId. Impossible de récupérer les variants depuis CJ.',
+          });
+          continue;
+        }
       }
 
       if (!vid || vid.trim() === '') {
@@ -200,6 +392,25 @@ export class OrderCJIntegrationService {
           error: 'VID vide après traitement',
         });
         continue;
+      }
+
+      // ✨ NOUVEAU : Vérifier que le produit existe et est disponible dans CJ
+      const cjProductId = product.cjMapping?.cjProductId || product.cjProductId;
+      if (cjProductId) {
+        const isAvailable = await this.verifyCJProductExists(cjProductId, trimmedVid);
+        
+        if (!isAvailable) {
+          this.logger.error(`❌ Produit ${cjProductId} ou variant ${trimmedVid} non disponible sur CJ`);
+          errors.push({
+            item: item.id,
+            productId: product.id,
+            productName: product.name,
+            error: `Produit CJ ${cjProductId} ou variant ${trimmedVid} non disponible ou introuvable sur CJ`,
+          });
+          continue;
+        }
+      } else {
+        this.logger.warn(`⚠️ Impossible de vérifier la disponibilité: pas de cjProductId pour produit ${product.id}`);
       }
 
       // Récupérer les images du produit pour productionImgList
@@ -244,12 +455,22 @@ export class OrderCJIntegrationService {
 
       this.logger.log(`✅ Produit ${product.id} ajouté avec vid="${trimmedVid}", quantity=${item.quantity}, images=${productionImgList.length}`);
 
-      cjProducts.push({
+      // Construire l'objet produit
+      const productData: any = {
         vid: trimmedVid,
         quantity: item.quantity,
         storeLineItemId: item.id, // ID de OrderItem pour le mapping
-        productionImgList: productionImgList.length > 0 ? productionImgList : undefined, // Optionnel mais requis par CJ
-      });
+      };
+
+      // ⚠️ IMPORTANT: productionImgList doit toujours être envoyé, même s'il est vide
+      // Selon l'erreur 5021 "productionImgList is empty, order cannot be created"
+      // CJ exige ce champ même s'il est vide (tableau vide plutôt que undefined)
+      // Note: Ce champ n'est pas documenté dans les paramètres de base mais est requis
+      productData.productionImgList = productionImgList.length > 0 
+        ? productionImgList.filter(img => img && img.trim() !== '')
+        : []; // Toujours envoyer un tableau (vide si pas d'images)
+
+      cjProducts.push(productData);
     }
 
     if (cjProducts.length === 0) {
@@ -357,11 +578,23 @@ export class OrderCJIntegrationService {
           // S'assurer que quantity est un nombre
           const quantity = Number(p.quantity);
           
-          return {
+          const productPayload: any = {
             vid: vid,
             quantity: quantity,
-            storeLineItemId: p.storeLineItemId || undefined, // Ne pas envoyer si vide
           };
+
+          // storeLineItemId - optionnel
+          if (p.storeLineItemId) {
+            productPayload.storeLineItemId = p.storeLineItemId;
+          }
+
+          // productionImgList - toujours envoyer (même vide) pour éviter l'erreur 5021
+          // Selon l'erreur, CJ exige ce champ même s'il est vide
+          productPayload.productionImgList = p.productionImgList && p.productionImgList.length > 0 
+            ? p.productionImgList.filter(img => img && img.trim() !== '') 
+            : []; // Envoyer un tableau vide plutôt que undefined
+
+          return productPayload;
         });
 
       if (validProducts.length === 0) {

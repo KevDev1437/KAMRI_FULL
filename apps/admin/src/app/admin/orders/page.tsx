@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CJOrderBadge } from '@/components/orders/CJOrderBadge'
+import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal'
 
 interface Order {
   id: string
@@ -46,6 +47,7 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('Tous')
   const [creatingCJ, setCreatingCJ] = useState<string | null>(null)
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
@@ -315,7 +317,11 @@ export default function OrdersPage() {
 
               {/* Actions */}
               <div className="flex justify-end space-x-2 mt-4">
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedOrderId(order.id)}
+                >
                   <Eye className="w-3 h-3 mr-1" />
                   Voir détails
                 </Button>
@@ -327,6 +333,15 @@ export default function OrdersPage() {
           </Card>
         ))}
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          orderId={selectedOrderId}
+          isOpen={!!selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+        />
+      )}
 
       {/* Empty State */}
       {filteredOrders.length === 0 && (
