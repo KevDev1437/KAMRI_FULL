@@ -108,16 +108,37 @@ export class ApiClient {
 
       console.log(`📡 [API] Réponse status:`, response.status, response.statusText);
 
-      // Vérifier si la réponse est JSON
-      let data;
+      // Lire le body une seule fois
       const contentType = response.headers.get('content-type');
       const text = await response.text();
+
+      // Si la réponse n'est pas OK, gérer l'erreur
+      if (!response.ok) {
+        let errorMessage = `Erreur ${response.status}: ${response.statusText}`;
+        
+        try {
+          if (text && contentType?.includes('application/json')) {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } else if (text) {
+            errorMessage = text;
+          }
+        } catch (parseError) {
+          // Si le parsing échoue, utiliser le message par défaut
+        }
+        
+        console.error(`❌ [API] Erreur HTTP ${response.status}:`, errorMessage);
+        return { error: errorMessage };
+      }
+
+      // Vérifier si la réponse est JSON (on arrive ici seulement si response.ok === true)
+      let data;
       
       // Si la réponse est vide, retourner un tableau vide
       if (!text || text.trim() === '') {
-        console.log(`⚠️ [API] Réponse vide (status ${response.status}), retour d'un tableau vide`);
+        console.log(`⚠️ [API] Réponse vide, retour d'un tableau vide`);
         // Si c'est un GET et que la réponse est vide, c'est probablement un tableau vide
-        if (response.ok && (!options.method || options.method === 'GET')) {
+        if (!options.method || options.method === 'GET') {
           data = [];
         } else {
           data = null;
@@ -127,7 +148,7 @@ export class ApiClient {
           data = JSON.parse(text);
         } catch (e) {
           console.error(`❌ [API] Erreur parsing JSON:`, text);
-          return { error: `Réponse JSON invalide (${response.status})` };
+          return { error: `Réponse JSON invalide` };
         }
       } else {
         // Essayer de parser quand même (certains serveurs ne mettent pas le content-type)
@@ -135,41 +156,12 @@ export class ApiClient {
           data = JSON.parse(text);
         } catch (e) {
           console.error(`❌ [API] Réponse non-JSON:`, text);
-          return { error: `Réponse invalide du serveur (${response.status})` };
+          return { error: `Réponse invalide du serveur` };
         }
       }
 
-      if (response.ok) {
-        console.log(`✅ [API] Succès:`, data);
-        return { data };
-      } else {
-        console.error(`❌ [API] Erreur ${response.status}:`, data);
-        
-        // If 401 attempt refresh once
-        if (response.status === 401) {
-          const refreshed = await this.attemptRefresh();
-          if (refreshed) {
-            // retry original request once
-            const retry = await fetch(url, {
-              ...options,
-              headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json',
-                ...options.headers,
-              },
-            });
-            try {
-              const retryData = await retry.json();
-              if (retry.ok) return { data: retryData };
-              return { error: retryData.message || `Erreur API (${retry.status})` };
-            } catch (e) {
-              return { error: `Erreur API (${retry.status})` };
-            }
-          }
-        }
-
-        return { error: data?.message || `Erreur API (${response.status})` };
-      }
+      console.log(`✅ [API] Succès:`, data);
+      return { data };
     } catch (error) {
       console.error(`❌ [API] Erreur réseau:`, error);
       console.error(`❌ [API] URL:`, `${API_BASE_URL}${endpoint}`);
@@ -341,7 +333,7 @@ export class ApiClient {
   }
 
   async getOrder(id: string) {
-    return this.fetchWithAuth(`/orders/${id}`);
+    return this.fetchWithAuth(`/orders/order/${id}`);
   }
 
   async createOrder(items: Array<{ productId: string; quantity: number; price: number }>) {

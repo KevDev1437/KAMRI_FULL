@@ -270,8 +270,27 @@ export class OrdersController {
 
   @Get('order/:id')
   @ApiOperation({ summary: 'Get order by ID' })
-  getOrder(@Param('id') id: string) {
-    return this.ordersService.getOrder(id);
+  async getOrder(@Param('id') id: string) {
+    try {
+      const order = await this.ordersService.getOrder(id);
+      
+      if (!order) {
+        throw new HttpException(
+          'Commande introuvable',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      
+      return order;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Erreur lors de la récupération de la commande',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

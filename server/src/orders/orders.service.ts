@@ -125,20 +125,95 @@ export class OrdersService {
   }
 
   async getOrder(id: string) {
-    return this.prisma.order.findUnique({
+    const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
+        user: {
+          include: {
+            addresses: {
+              where: {
+                isDefault: true,
+              },
+              take: 1,
+            },
+          },
+        },
         items: {
           include: {
             product: {
               include: {
                 images: true,
+                supplier: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            productVariant: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
               },
             },
           },
         },
       },
     });
+
+    if (!order) {
+      return null;
+    }
+
+    // Transformer les données pour correspondre à l'interface frontend
+    const shippingAddress = order.user.addresses && order.user.addresses.length > 0
+      ? {
+          firstName: order.user.firstName || '',
+          lastName: order.user.lastName || '',
+          street: order.user.addresses[0].street,
+          complement: '',
+          city: order.user.addresses[0].city,
+          state: order.user.addresses[0].state,
+          postalCode: order.user.addresses[0].zipCode,
+          country: order.user.addresses[0].country,
+          phone: order.user.phone || '',
+        }
+      : null;
+
+    return {
+      id: order.id,
+      userId: order.userId,
+      total: order.total,
+      status: order.status,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      user: {
+        id: order.user.id,
+        name: order.user.name || `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim(),
+        email: order.user.email,
+        firstName: order.user.firstName,
+        lastName: order.user.lastName,
+        phone: order.user.phone,
+      },
+      items: order.items.map(item => ({
+        id: item.id,
+        product: {
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          image: item.product.images && item.product.images.length > 0 
+            ? item.product.images[0].url 
+            : item.product.image || null,
+          supplier: item.product.supplier ? {
+            name: item.product.supplier.name,
+          } : null,
+        },
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      shippingAddress,
+    };
   }
 }
 

@@ -5,6 +5,7 @@ import { X, Package, User, Calendar, DollarSign, Truck, MapPin, Phone, Mail } fr
 import { apiClient } from '@/lib/api'
 // Formatage de date natif (pas besoin de date-fns)
 import { CJOrderDetailsModal } from './CJOrderDetailsModal'
+import { CJOrderBadge } from './CJOrderBadge'
 
 interface OrderDetails {
   id: string
@@ -66,6 +67,14 @@ export function OrderDetailsModal({ orderId, isOpen, onClose }: Props) {
       setLoading(true)
       setError(null)
       const response = await apiClient.getOrder(orderId)
+      
+      // Vérifier si la réponse contient une erreur
+      if (response?.error) {
+        setError(response.error)
+        return
+      }
+      
+      // Vérifier si les données sont présentes
       if (response?.data) {
         setOrder(response.data)
       } else {
@@ -73,7 +82,14 @@ export function OrderDetailsModal({ orderId, isOpen, onClose }: Props) {
       }
     } catch (err: any) {
       console.error('Erreur chargement détails commande:', err)
-      setError(err.message || 'Erreur lors du chargement des détails')
+      // Gérer les erreurs HTTP (404, 500, etc.)
+      if (err.response?.status === 404) {
+        setError('Commande introuvable')
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message)
+      } else {
+        setError(err.message || 'Erreur lors du chargement des détails de la commande')
+      }
     } finally {
       setLoading(false)
     }
