@@ -42,5 +42,47 @@ export interface CJOrderCreateResult {
   status: string;
   totalAmount: number;
   message: string;
+  productAmount?: number;
+  postageAmount?: number;
+  productOriginalAmount?: number;
+  postageOriginalAmount?: number;
+  totalDiscountAmount?: number;
+}
+
+export interface CJOrderDetails {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  productAmount: number;
+  postageAmount: number;
+  productOriginalAmount: number;
+  postageOriginalAmount: number;
+  totalDiscountAmount: number;
+  orderAmount: number;
+  actualPayment?: number;
+  trackNumber?: string;
+  productInfoList: Array<{
+    storeLineItemId?: string;
+    lineItemId: string;
+    variantId: string;
+    quantity: number;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CJOrderStats {
+  total: number;
+  byStatus: Record<string, number>;
+  totalAmount: number;
+  totalProductAmount: number;
+  totalPostageAmount: number;
+  successRate: number;
+  last30Days: {
+    created: number;
+    paid: number;
+    shipped: number;
+    delivered: number;
+  };
 }
 

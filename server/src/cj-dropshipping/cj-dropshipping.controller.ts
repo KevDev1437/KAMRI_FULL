@@ -326,7 +326,101 @@ export class CJDropshippingController {
   }
 
   /**
+   * Synchroniser les variants de tous les produits CJ
+   * ⚠️ IMPORTANT: Cette route doit être AVANT la route avec paramètre pour éviter les conflits
+   */
+  @Post('products/sync-all-variants')
+  @ApiOperation({ summary: 'Synchroniser les variants de tous les produits CJ' })
+  @ApiResponse({ status: 200, description: 'Variants synchronisés' })
+  async syncAllProductsVariants() {
+    this.logger.log(`📡 === REQUÊTE SYNC VARIANTS TOUS PRODUITS ===`);
+    
+    try {
+      // Récupérer tous les produits CJ
+      const products = await this.prisma.product.findMany({
+        where: {
+          source: 'cj-dropshipping',
+        },
+        select: {
+          id: true,
+          name: true,
+          cjProductId: true,
+        },
+      });
+
+      // Filtrer ceux qui ont un cjProductId
+      const cjProducts = products.filter(p => p.cjProductId !== null);
+
+      this.logger.log(`📦 ${cjProducts.length} produit(s) CJ à synchroniser`);
+
+      let totalSynced = 0;
+      let totalFailed = 0;
+      let totalVariants = 0;
+      const errors: Array<{ productId: string; name: string; error: string }> = [];
+
+      // Synchroniser chaque produit (avec pause pour rate limiting)
+      for (const product of cjProducts) {
+        try {
+          const result = await this.cjMainService.syncProductVariantsStock(product.id);
+          
+          if (result.success) {
+            totalSynced++;
+            totalVariants += result.updated || 0;
+            this.logger.log(`✅ ${product.name}: ${result.updated} variants`);
+          } else {
+            totalFailed++;
+            errors.push({
+              productId: product.id,
+              name: product.name || 'N/A',
+              error: result.message || 'Erreur inconnue'
+            });
+          }
+
+          // Pause de 600ms entre chaque produit (tier plus = 2 req/s)
+          await new Promise(resolve => setTimeout(resolve, 600));
+        } catch (error: any) {
+          totalFailed++;
+          errors.push({
+            productId: product.id,
+            name: product.name || 'N/A',
+            error: error.message || 'Erreur inconnue'
+          });
+          this.logger.error(`❌ Erreur pour ${product.name}:`, error.message);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Synchronisation terminée: ${totalSynced} produits, ${totalVariants} variants`,
+        data: {
+          totalProducts: cjProducts.length,
+          synced: totalSynced,
+          failed: totalFailed,
+          totalVariants: totalVariants,
+          errors: errors.length > 0 ? errors : undefined
+        }
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Erreur endpoint sync all variants:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur synchronisation';
+      return {
+        success: false,
+        message: errorMessage,
+        data: {
+          totalProducts: 0,
+          synced: 0,
+          failed: 0,
+          totalVariants: 0,
+          errors: []
+        }
+      };
+    }
+  }
+
+  /**
    * Synchroniser le stock des variants d'un produit manuellement
+   * ⚠️ IMPORTANT: Cette route doit être APRÈS la route sync-all-variants
    */
   @Post('products/:productId/sync-variants-stock')
   @ApiOperation({ summary: 'Synchroniser le stock des variants d\'un produit manuellement' })
@@ -346,18 +440,24 @@ export class CJDropshippingController {
         success: result.success,
         message: result.message,
         data: {
-          updated: result.updated,
-          failed: result.failed,
-          total: result.total
+          updated: result.updated || 0,
+          failed: result.failed || 0,
+          total: result.total || 0
         }
       };
       
     } catch (error) {
       this.logger.error('❌ Erreur endpoint sync stock variants:', error);
-      throw new HttpException(
-        error instanceof Error ? error.message : 'Erreur synchronisation stock',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Erreur synchronisation stock';
+      return {
+        success: false,
+        message: errorMessage,
+        data: {
+          updated: 0,
+          failed: 1,
+          total: 0
+        }
+      };
     }
   }
 

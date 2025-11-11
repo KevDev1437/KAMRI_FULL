@@ -54,13 +54,55 @@ export class CJOrderService {
   async createOrder(orderData: CJOrderCreateDto): Promise<CJOrderCreateResult> {
     try {
       const client = await this.initializeClient();
-      const cjOrder = await client.createOrderV3(orderData);
+      // S'assurer que shippingPhone a une valeur par défaut si manquant
+      const orderDataWithDefaults = {
+        ...orderData,
+        shippingPhone: orderData.shippingPhone || '',
+      };
+      
+      // 🔍 LOG COMPLET AVANT ENVOI (pour débogage)
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log('🚀 PAYLOAD FINAL ENVOYÉ À CJ createOrderV3:');
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log(JSON.stringify(orderDataWithDefaults, null, 2));
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log(`📦 ${orderDataWithDefaults.products.length} produit(s) dans la requête:`);
+      orderDataWithDefaults.products.forEach((p, idx) => {
+        this.logger.log(`  ${idx + 1}. vid="${p.vid}", quantity=${p.quantity}, storeLineItemId="${p.storeLineItemId || 'N/A'}"`);
+      });
+      this.logger.log('═══════════════════════════════════════════════════════\n');
+      
+      const cjOrder = await client.createOrderV3(orderDataWithDefaults);
+
+      if (!cjOrder) {
+        throw new Error('Réponse null de l\'API CJ lors de la création de commande');
+      }
+
+      if (!cjOrder.orderId) {
+        this.logger.error('❌ Réponse CJ sans orderId:', JSON.stringify(cjOrder, null, 2));
+        throw new Error(`Erreur création commande CJ: pas d'orderId dans la réponse`);
+      }
+
+      this.logger.log(`✅ Commande CJ créée: ${cjOrder.orderId}`);
+
+      // Extraire les montants détaillés de la réponse
+      const productAmount = (cjOrder as any).productAmount || 0;
+      const postageAmount = (cjOrder as any).postageAmount || 0;
+      const productOriginalAmount = (cjOrder as any).productOriginalAmount || productAmount;
+      const postageOriginalAmount = (cjOrder as any).postageOriginalAmount || postageAmount;
+      const totalDiscountAmount = (cjOrder as any).totalDiscountAmount || 0;
+      const orderAmount = productAmount + postageAmount;
 
       return {
         orderId: cjOrder.orderId,
-        orderNumber: cjOrder.orderNumber,
-        status: cjOrder.orderStatus,
-        totalAmount: cjOrder.totalAmount,
+        orderNumber: cjOrder.orderNumber || cjOrder.orderId,
+        status: cjOrder.orderStatus || 'CREATED',
+        totalAmount: orderAmount,
+        productAmount,
+        postageAmount,
+        productOriginalAmount,
+        postageOriginalAmount,
+        totalDiscountAmount,
         message: 'Commande CJ créée avec succès',
       };
     } catch (error) {

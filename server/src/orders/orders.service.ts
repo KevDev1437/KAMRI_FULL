@@ -1,17 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderCJIntegrationService } from './order-cj-integration.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OrdersService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private orderCJIntegration: OrderCJIntegrationService,
+  ) {}
 
   async createOrder(userId: string, items: any[]) {
-    return this.prisma.$transaction(async (tx) => {
+    this.logger.log(`📦 Création commande pour user ${userId}`);
+    
+    // Créer la commande KAMRI dans une transaction
+    const order = await this.prisma.$transaction(async (tx) => {
       // Calculate total
       const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
       // Create order
-      const order = await tx.order.create({
+      const createdOrder = await tx.order.create({
         data: {
           userId,
           total,
@@ -32,13 +41,37 @@ export class OrdersService {
         },
       });
 
+      this.logger.log(`✅ Commande KAMRI créée: ${createdOrder.id}`);
+
       // Clear cart
       await tx.cartItem.deleteMany({
         where: { userId },
       });
 
-      return order;
+      return createdOrder;
     });
+
+    // ✨ NOUVEAU : Créer automatiquement la commande CJ si nécessaire
+    // Note: On fait ça après la transaction pour éviter de bloquer la création KAMRI
+    // en cas d'erreur CJ
+    try {
+      const cjResult = await this.orderCJIntegration.createCJOrder(order.id);
+      
+      if (cjResult.success) {
+        this.logger.log(`✅ Commande CJ créée automatiquement: ${cjResult.cjOrderId}`);
+      } else if (cjResult.skipped) {
+        this.logger.log(`ℹ️ Commande sans produits CJ, skip`);
+      } else {
+        this.logger.warn(`⚠️ Échec création CJ: ${cjResult.message}`);
+        // Ne pas bloquer la commande KAMRI si échec CJ
+        // TODO: Ajouter à une queue de retry
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur création commande CJ:`, error.message);
+      // Ne pas bloquer la commande KAMRI
+    }
+
+    return order;
   }
 
   async getOrders(userId: string) {

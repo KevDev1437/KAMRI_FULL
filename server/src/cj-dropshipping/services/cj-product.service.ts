@@ -1294,28 +1294,52 @@ export class CJProductService {
 
   /**
    * Synchroniser le stock de tous les variants d'un produit
-   * @param productId ID du produit KAMRI (CJProductStore)
+   * @param productId ID du produit KAMRI (Product ou CJProductStore)
    */
   async syncProductVariantsStock(productId: string) {
     this.logger.log(`🔄 === SYNCHRONISATION STOCK VARIANTS (Product: ${productId}) ===`);
     
     try {
-      // Récupérer le produit avec son ID CJ
-      const product = await this.prisma.cJProductStore.findUnique({
+      // Essayer d'abord de trouver dans Product (table principale)
+      let product = await this.prisma.product.findUnique({
         where: { id: productId }
       });
       
-      if (!product || !product.cjProductId) {
-        throw new Error('Produit introuvable ou sans ID CJ');
+      let cjProductId: string | null = null;
+      let productName = '';
+      
+      if (product && product.cjProductId) {
+        // Produit trouvé dans Product
+        cjProductId = product.cjProductId;
+        productName = product.name;
+        this.logger.log(`📦 Produit trouvé dans Product: ${productName} (CJ PID: ${cjProductId})`);
+      } else {
+        // Essayer dans CJProductStore
+        const cjStoreProduct = await this.prisma.cJProductStore.findUnique({
+          where: { id: productId }
+        });
+        
+        if (cjStoreProduct && cjStoreProduct.cjProductId) {
+          cjProductId = cjStoreProduct.cjProductId;
+          productName = cjStoreProduct.name;
+          this.logger.log(`📦 Produit trouvé dans CJProductStore: ${productName} (CJ PID: ${cjProductId})`);
+          
+          // Trouver le produit KAMRI associé
+          product = await this.prisma.product.findFirst({
+            where: { cjProductId: cjProductId }
+          });
+        }
       }
       
-      this.logger.log(`📦 Produit trouvé: ${product.name} (CJ PID: ${product.cjProductId})`);
+      if (!cjProductId) {
+        throw new Error('Produit introuvable ou sans ID CJ');
+      }
       
       // Initialiser le client CJ
       const client = await this.initializeClient();
       
       // Récupérer les variants avec stock depuis CJ (méthode optimisée)
-      const variantsWithStock = await client.getProductVariantsWithStock(product.cjProductId);
+      const variantsWithStock = await client.getProductVariantsWithStock(cjProductId);
       
       if (!variantsWithStock || variantsWithStock.length === 0) {
         this.logger.warn('⚠️ Aucun variant trouvé sur CJ');
@@ -1333,10 +1357,17 @@ export class CJProductService {
       let updated = 0;
       let failed = 0;
       
-      // Récupérer le produit KAMRI associé (s'il existe)
-      const kamriProduct = await this.prisma.product.findFirst({
-        where: { cjProductId: product.cjProductId }
-      });
+      // Si pas de produit KAMRI, on ne peut pas créer les variants
+      if (!product) {
+        this.logger.warn('⚠️ Produit KAMRI non trouvé - les variants ne peuvent pas être créés dans Product');
+        return {
+          success: false,
+          message: 'Produit KAMRI non trouvé. Importez d\'abord le produit dans Product.',
+          updated: 0,
+          failed: 0,
+          total: variantsWithStock.length
+        };
+      }
       
       // Mettre à jour chaque variant
       for (const variant of variantsWithStock) {
@@ -1377,32 +1408,41 @@ export class CJProductService {
             lastSyncAt: new Date()
           };
           
-          if (kamriProduct) {
-            await this.prisma.productVariant.upsert({
-              where: {
-                cjVariantId: variant.vid
-              },
-              update: variantData,
-              create: {
-                ...variantData,
-                cjVariantId: variant.vid,
-                productId: kamriProduct.id
-              }
-            });
-          }
-          
-          // Mettre à jour le champ variants JSON dans CJProductStore
-          const currentVariants = product.variants ? JSON.parse(product.variants) : [];
-          const updatedVariants = currentVariants.map((v: any) => 
-            v.vid === variant.vid ? { ...v, stock: variant.stock, warehouseStock: variant.warehouseStock } : v
-          );
-          
-          await this.prisma.cJProductStore.update({
-            where: { id: productId },
-            data: {
-              variants: JSON.stringify(updatedVariants)
+          // Créer/mettre à jour le variant dans ProductVariant
+          await this.prisma.productVariant.upsert({
+            where: {
+              cjVariantId: variant.vid
+            },
+            update: variantData,
+            create: {
+              ...variantData,
+              cjVariantId: variant.vid,
+              productId: product.id
             }
           });
+          
+          // Mettre à jour le champ variants JSON dans Product (si présent)
+          if (product.variants) {
+            try {
+              const currentVariants = typeof product.variants === 'string' 
+                ? JSON.parse(product.variants) 
+                : product.variants;
+              const updatedVariants = Array.isArray(currentVariants) 
+                ? currentVariants.map((v: any) => 
+                    v.vid === variant.vid ? { ...v, stock: variant.stock, warehouseStock: variant.warehouseStock } : v
+                  )
+                : currentVariants;
+              
+              await this.prisma.product.update({
+                where: { id: product.id },
+                data: {
+                  variants: JSON.stringify(updatedVariants)
+                }
+              });
+            } catch (e) {
+              // Ignorer les erreurs de parsing
+            }
+          }
           
           updated++;
           this.logger.log(`  ✅ Variant ${variant.vid}: stock ${variant.stock}, prix ${variant.variantSellPrice}`);

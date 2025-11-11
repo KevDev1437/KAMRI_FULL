@@ -432,12 +432,14 @@ model CJOrderMapping {
   cjOrderNumber String   // orderNumber envoyé à CJ
   status        String   // CREATED, PAID, SHIPPED, etc.
   trackNumber   String?
+  metadata      String?  // JSON string avec montants détaillés et autres infos
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([cjOrderId])
+  @@index([status])
   @@map("cj_order_mappings")
 }
 

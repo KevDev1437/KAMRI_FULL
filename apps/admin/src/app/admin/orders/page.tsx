@@ -17,6 +17,7 @@ import {
   XCircle
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { CJOrderBadge } from '@/components/orders/CJOrderBadge'
 
 interface Order {
   id: string
@@ -44,6 +45,7 @@ export default function OrdersPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('Tous')
+  const [creatingCJ, setCreatingCJ] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
@@ -69,6 +71,29 @@ export default function OrdersPage() {
       console.error('Erreur lors du chargement des commandes:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleCreateCJ = async (orderId: string) => {
+    if (!confirm('Créer une commande CJ pour cette commande ?')) return;
+
+    setCreatingCJ(orderId);
+
+    try {
+      const response = await apiClient.createCJOrder?.(orderId);
+
+      if (response?.data?.success) {
+        alert('✅ Commande CJ créée avec succès !');
+        // Recharger la liste
+        await loadOrders();
+      } else {
+        alert(`❌ Erreur : ${response?.data?.message || response?.error || 'Erreur inconnue'}`);
+      }
+    } catch (error: any) {
+      console.error('Erreur création CJ:', error);
+      alert(`❌ Erreur lors de la création de la commande CJ: ${error?.message || 'Erreur inconnue'}`);
+    } finally {
+      setCreatingCJ(null);
     }
   }
 
@@ -165,9 +190,18 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Commandes</h1>
-        <p className="text-gray-600 mt-2">Gérez les commandes de vos clients</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Commandes</h1>
+          <p className="text-gray-600 mt-2">Gérez les commandes de vos clients</p>
+        </div>
+        <Button
+          onClick={() => window.location.href = '/admin/orders/create'}
+          className="bg-primary-600 hover:bg-primary-700"
+        >
+          <ShoppingCart className="w-4 h-4 mr-2" />
+          Créer une commande
+        </Button>
       </div>
 
       {/* Filters */}
@@ -234,6 +268,24 @@ export default function OrdersPage() {
                       {new Date(order.createdAt).toLocaleDateString()}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* CJ Status Badge */}
+              <div className="mb-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Statut CJ Dropshipping:</span>
+                  {creatingCJ === order.id ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span className="text-xs text-gray-500">Création...</span>
+                    </div>
+                  ) : (
+                    <CJOrderBadge
+                      orderId={order.id}
+                      onCreateCJ={() => handleCreateCJ(order.id)}
+                    />
+                  )}
                 </div>
               </div>
 

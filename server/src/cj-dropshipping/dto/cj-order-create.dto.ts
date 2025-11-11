@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEmail, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class CJOrderProductDto {
   @ApiProperty({ description: 'ID de la variante CJ' })
@@ -11,6 +11,17 @@ export class CJOrderProductDto {
   @IsNumber()
   @Min(1)
   quantity: number;
+
+  @ApiProperty({ description: 'ID de la ligne de commande dans le store', required: false })
+  @IsString()
+  @IsOptional()
+  storeLineItemId?: string;
+
+  @ApiProperty({ description: 'Liste des images de production du produit', required: false })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productionImgList?: string[];
 }
 
 export class CJOrderCreateDto {
@@ -26,10 +37,9 @@ export class CJOrderCreateDto {
   @IsString()
   shippingCountry: string;
 
-  @ApiProperty({ description: 'Province/État de livraison', required: false })
+  @ApiProperty({ description: 'Province/État de livraison' })
   @IsString()
-  @IsOptional()
-  shippingProvince?: string;
+  shippingProvince: string;
 
   @ApiProperty({ description: 'Ville de livraison' })
   @IsString()
@@ -39,13 +49,35 @@ export class CJOrderCreateDto {
   @IsString()
   shippingAddress: string;
 
+  @ApiProperty({ description: 'Adresse de livraison ligne 2', required: false })
+  @IsString()
+  @IsOptional()
+  shippingAddress2?: string;
+
+  @ApiProperty({ description: 'Code postal de livraison', required: false })
+  @IsString()
+  @IsOptional()
+  shippingZip?: string;
+
   @ApiProperty({ description: 'Nom du client' })
   @IsString()
   shippingCustomerName: string;
 
-  @ApiProperty({ description: 'Téléphone du client' })
+  @ApiProperty({ description: 'Téléphone du client', required: false })
   @IsString()
-  shippingPhone: string;
+  @IsOptional()
+  shippingPhone?: string;
+
+  @ApiProperty({ description: 'Email du client', required: false })
+  @IsString()
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @ApiProperty({ description: 'Montant total de la commande dans le store', required: false })
+  @IsString()
+  @IsOptional()
+  shopAmount?: string;
 
   @ApiProperty({ description: 'Nom de la méthode de livraison' })
   @IsString()

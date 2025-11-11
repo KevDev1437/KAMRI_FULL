@@ -1170,18 +1170,76 @@ export class CJAPIClient {
     shippingProvince?: string;
     shippingCity: string;
     shippingAddress: string;
+    shippingAddress2?: string;
+    shippingZip?: string;
     shippingCustomerName: string;
-    shippingPhone: string;
+    shippingPhone?: string;
+    email?: string;
+    shopAmount?: string;
     logisticName: string;
     fromCountryCode?: string;
     platform?: string;
     products: Array<{
       vid: string;
       quantity: number;
+      storeLineItemId?: string;
+      productionImgList?: string[];
     }>;
   }): Promise<CJOrder> {
-    const response = await this.makeRequest('POST', '/order/createOrderV3', orderData);
-    return response.data as any;
+    // Valider les produits avant envoi
+    if (!orderData.products || orderData.products.length === 0) {
+      throw new Error('Aucun produit à envoyer');
+    }
+
+    // Valider chaque produit
+    for (const product of orderData.products) {
+      if (!product.vid || product.vid.trim() === '') {
+        throw new Error(`Produit avec vid vide ou manquant: ${JSON.stringify(product)}`);
+      }
+      if (!product.quantity || product.quantity <= 0) {
+        throw new Error(`Produit avec quantité invalide: ${JSON.stringify(product)}`);
+      }
+    }
+
+    // 🔍 LOG DÉTAILLÉ AVANT ENVOI
+    this.logger.log('═══════════════════════════════════════════════════════');
+    this.logger.log('📤 ENVOI COMMANDE CJ - PAYLOAD COMPLET:');
+    this.logger.log('═══════════════════════════════════════════════════════');
+    this.logger.log(JSON.stringify(orderData, null, 2));
+    this.logger.log('═══════════════════════════════════════════════════════');
+    this.logger.log(`📦 Produits (${orderData.products.length}):`);
+    orderData.products.forEach((p, idx) => {
+      this.logger.log(`  ${idx + 1}. vid="${p.vid}" (type: ${typeof p.vid}, length: ${String(p.vid).length}), quantity=${p.quantity} (type: ${typeof p.quantity}), storeLineItemId="${p.storeLineItemId || 'N/A'}"`);
+    });
+    this.logger.log('═══════════════════════════════════════════════════════\n');
+    
+    const response = await this.makeRequest('POST', '/shopping/order/createOrderV3', orderData);
+    
+    this.logger.log('📦 Réponse createOrderV3:', JSON.stringify(response, null, 2));
+    
+    // L'API CJ retourne { code, result, message, data }
+    // response est déjà response.data de makeRequest, donc on doit extraire data
+    const responseAny = response as any;
+    
+    if (responseAny && responseAny.code === 200 && responseAny.data) {
+      this.logger.log('✅ Commande CJ créée avec succès (structure standard)');
+      return responseAny.data as any;
+    }
+    
+    // Si la structure est différente, essayer directement
+    if (responseAny && (responseAny.orderId || responseAny.orderNumber)) {
+      this.logger.log('✅ Commande CJ créée (structure directe)');
+      return responseAny as any;
+    }
+    
+    // Si code !== 200, c'est une erreur
+    if (responseAny && responseAny.code !== 200) {
+      this.logger.error(`❌ Erreur API CJ (code: ${responseAny.code}):`, responseAny.message);
+      throw new Error(`Erreur création commande CJ: ${responseAny.message || 'Code erreur ' + responseAny.code}`);
+    }
+    
+    this.logger.error('❌ Structure de réponse inattendue:', JSON.stringify(response, null, 2));
+    throw new Error(`Erreur création commande CJ: ${responseAny?.message || 'Réponse invalide'}`);
   }
 
   /**

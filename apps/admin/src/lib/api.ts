@@ -228,6 +228,10 @@ export class ApiClient {
     return this.fetchWithAuth('/products');
   }
 
+  async getAllProductsForAdmin() {
+    return this.fetchWithAuth('/products/admin/all');
+  }
+
   async getProduct(id: string) {
     return this.fetchWithAuth(`/products/${id}`);
   }
@@ -338,6 +342,55 @@ export class ApiClient {
 
   async getOrder(id: string) {
     return this.fetchWithAuth(`/orders/${id}`);
+  }
+
+  async createOrder(items: Array<{ productId: string; quantity: number; price: number }>) {
+    return this.fetchWithAuth('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
+  // CJ Order Status
+  async getCJStatus(orderId: string) {
+    return this.fetchWithAuth(`/orders/${orderId}/cj-status`);
+  }
+
+  async createCJOrder(orderId: string) {
+    return this.fetchWithAuth(`/orders/${orderId}/create-cj`, {
+      method: 'POST',
+    });
+  }
+
+  async hasCJProducts(orderId: string) {
+    return this.fetchWithAuth(`/orders/${orderId}/has-cj-products`);
+  }
+
+  async getCJDetails(orderId: string) {
+    return this.fetchWithAuth(`/orders/${orderId}/cj-details`);
+  }
+
+  async syncCJStatus(orderId: string) {
+    return this.fetchWithAuth(`/orders/${orderId}/sync-cj-status`, {
+      method: 'POST',
+    });
+  }
+
+  async getCJStats() {
+    return this.fetchWithAuth('/orders/cj/stats');
+  }
+
+  // CJ Dropshipping - Variants
+  async syncProductVariants(productId: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/products/${productId}/sync-variants-stock`, {
+      method: 'POST',
+    });
+  }
+
+  async syncAllProductsVariants() {
+    return this.fetchWithAuth('/cj-dropshipping/products/sync-all-variants', {
+      method: 'POST',
+    });
   }
 
   // Utilisateurs

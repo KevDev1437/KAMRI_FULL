@@ -72,6 +72,17 @@ export class ProductsService {
         category: true,
         supplier: true, // ✅ Ajouter la relation supplier
         images: true,
+        productVariants: {
+          select: {
+            id: true,
+            cjVariantId: true,
+            sku: true,
+            name: true,
+            price: true,
+            stock: true,
+            status: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -88,6 +99,17 @@ export class ProductsService {
         category: true,
         supplier: true, // ✅ Ajouter la relation supplier
         images: true,
+        productVariants: {
+          select: {
+            id: true,
+            cjVariantId: true,
+            sku: true,
+            name: true,
+            price: true,
+            stock: true,
+            status: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
