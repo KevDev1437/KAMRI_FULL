@@ -1349,8 +1349,15 @@ export class CJAPIClient {
   /**
    * Obtenir le statut d'une commande
    */
-  async getOrderStatus(orderId: string): Promise<CJOrder> {
+  async getOrderStatus(orderId: string): Promise<CJOrder | null> {
     const response = await this.makeRequest('GET', `/order/orderStatus/${orderId}`);
+    
+    // ✅ Vérifier si la réponse contient des données
+    if (!response.data) {
+      this.logger.warn(`⚠️ Commande ${orderId} introuvable ou données nulles dans la réponse CJ`);
+      return null;
+    }
+    
     return response.data as any;
   }
 

@@ -157,10 +157,17 @@ export class CJOrderService {
   /**
    * Obtenir le statut d'une commande
    */
-  async getOrderStatus(orderId: string): Promise<CJOrder> {
+  async getOrderStatus(orderId: string): Promise<CJOrder | null> {
     try {
       const client = await this.initializeClient();
-      return await client.getOrderStatus(orderId);
+      const status = await client.getOrderStatus(orderId);
+      
+      if (!status) {
+        this.logger.warn(`⚠️ Commande ${orderId} introuvable chez CJ Dropshipping`);
+        return null;
+      }
+      
+      return status;
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération du statut ${orderId}:`, error);
       throw error;
@@ -170,16 +177,24 @@ export class CJOrderService {
   /**
    * Synchroniser les statuts de commandes
    */
-  async syncOrderStatuses(): Promise<{ synced: number; errors: number }> {
+  async syncOrderStatuses(): Promise<{ synced: number; errors: number; notFound: number }> {
     try {
       const mappings = await this.prisma.cJOrderMapping.findMany();
       let synced = 0;
       let errors = 0;
+      let notFound = 0;
 
       for (const mapping of mappings) {
         try {
           const client = await this.initializeClient();
           const cjOrder = await client.getOrderStatus(mapping.cjOrderId);
+          
+          // ✅ Vérifier si la commande existe chez CJ
+          if (!cjOrder || !cjOrder.orderStatus) {
+            this.logger.warn(`⚠️ Commande ${mapping.cjOrderId} introuvable chez CJ ou en attente de propagation`);
+            notFound++;
+            continue; // Passer à la suivante
+          }
           
           // Mettre à jour le mapping
           await this.prisma.cJOrderMapping.update({
@@ -198,14 +213,16 @@ export class CJOrderService {
             },
           });
 
+          this.logger.log(`✅ Commande ${mapping.cjOrderId} synchronisée: ${cjOrder.orderStatus}`);
           synced++;
         } catch (error) {
-          this.logger.error(`Erreur sync commande ${mapping.cjOrderId}:`, error);
+          this.logger.error(`❌ Erreur sync commande ${mapping.cjOrderId}:`, error);
           errors++;
         }
       }
 
-      return { synced, errors };
+      this.logger.log(`📊 Synchronisation terminée: ${synced} réussies, ${notFound} non trouvées, ${errors} erreurs`);
+      return { synced, errors, notFound };
     } catch (error) {
       this.logger.error('Erreur lors de la synchronisation des commandes:', error);
       throw error;
