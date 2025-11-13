@@ -4,6 +4,7 @@ import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ProductDetailsModal } from '@/components/products/ProductDetailsModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
@@ -102,6 +103,7 @@ export default function ProductsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [showLogin, setShowLogin] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
   const toast = useToast()
 
@@ -658,6 +660,15 @@ export default function ProductsPage() {
 
                     {/* Actions */}
                     <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => setSelectedProductId(product.id)}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Voir détails
+                      </Button>
                       <Button variant="outline" size="sm" className="flex-1">
                         <Edit className="w-3 h-3 mr-1" />
                         Modifier
@@ -822,6 +833,13 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de détails produit */}
+      <ProductDetailsModal
+        productId={selectedProductId}
+        isOpen={selectedProductId !== null}
+        onClose={() => setSelectedProductId(null)}
+      />
     </div>
   )
 }

@@ -27,6 +27,7 @@ interface OrderItem {
   productName: string
   quantity: number
   price: number
+  variantId?: string | null // ✅ ID du variant sélectionné
 }
 
 export default function CreateOrderPage() {
@@ -94,34 +95,112 @@ export default function CreateOrderPage() {
   const loadProducts = async () => {
     try {
       setIsLoading(true)
-      // Utiliser getAllProductsForAdmin pour inclure les produits draft (où sont les produits CJ)
-      const response = await apiClient.getAllProductsForAdmin?.() || await apiClient.getProducts?.()
+      // ✅ Utiliser getProducts() pour récupérer uniquement les produits actifs (comme la page produits)
+      // Cela garantit que les produits utilisés pour créer des commandes sont les mêmes que ceux de la page produits
+      const response = await apiClient.getProducts()
+      
       if (response?.data) {
         const productsData = Array.isArray(response.data) ? response.data : response.data.data || []
         
-        // Filtrer uniquement les produits qui ont des variants
-        const productsWithVariants = productsData.filter((product: any) => {
-          // Vérifier si le produit a des variants
-          const hasVariants = product.productVariants && 
-                             Array.isArray(product.productVariants) && 
-                             product.productVariants.length > 0
+        console.log(`📦 [CREATE-ORDER] ${productsData.length} produit(s) actif(s) chargé(s)`)
+        
+        // Statistiques de débogage
+        let cjProductsCount = 0
+        let cjProductsWithoutVariants = 0
+        let nonCJProductsCount = 0
+        
+        // Filtrer uniquement les produits qui ont des variants ACTIFS (pour les produits CJ)
+        // Les produits non-CJ peuvent ne pas avoir de variants
+        const productsWithVariants = productsData.map((product: any) => {
+          // Filtrer les variants pour ne garder que les actifs
+          const originalVariantsCount = product.productVariants?.length || 0
+          if (product.productVariants && Array.isArray(product.productVariants)) {
+            product.productVariants = product.productVariants.filter((variant: any) => 
+              variant.isActive !== false && variant.status !== 'inactive'
+            )
+          }
+          let activeVariantsCount = product.productVariants?.length || 0
           
-          // Pour les produits CJ, on exige qu'ils aient des variants
+          // Détecter si c'est un produit CJ
+          const isCJ = product.source === 'cj-dropshipping' || product.cjProductId !== null
+          
+          // ✅ Fallback : Si produit CJ sans variants dans productVariants, essayer le champ JSON variants
+          if (isCJ && activeVariantsCount === 0 && product.variants) {
+            try {
+              const parsedVariants = typeof product.variants === 'string' 
+                ? JSON.parse(product.variants) 
+                : product.variants
+              
+              if (Array.isArray(parsedVariants) && parsedVariants.length > 0) {
+                // Transformer les variants JSON en format compatible
+                product.productVariants = parsedVariants.map((v: any, idx: number) => ({
+                  id: `variant-${idx}-${v.vid || v.variantId || idx}`,
+                  productId: product.id,
+                  cjVariantId: String(v.vid || v.variantId || ''),
+                  name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
+                  sku: v.variantSku || v.sku || '',
+                  price: parseFloat(v.variantPrice || v.price || 0),
+                  stock: parseInt(v.variantStock || v.stock || 0, 10),
+                  isActive: v.isActive !== false,
+                  status: v.status || 'active'
+                }))
+                activeVariantsCount = product.productVariants.length
+                console.log(`✅ [CREATE-ORDER] Produit CJ "${product.name}": ${activeVariantsCount} variant(s) récupéré(s) depuis JSON`)
+              }
+            } catch (error) {
+              console.error(`❌ [CREATE-ORDER] Erreur parsing variants JSON pour "${product.name}":`, error)
+            }
+          }
+          
+          if (isCJ) {
+            cjProductsCount++
+            if (activeVariantsCount === 0) {
+              cjProductsWithoutVariants++
+              console.warn(`⚠️ [CREATE-ORDER] Produit CJ "${product.name}" (${product.id}): ${originalVariantsCount} variant(s) total, ${activeVariantsCount} actif(s) - sera ignoré`)
+            } else {
+              console.log(`✅ [CREATE-ORDER] Produit CJ "${product.name}": ${activeVariantsCount}/${originalVariantsCount} variant(s) actif(s)`)
+            }
+          } else {
+            nonCJProductsCount++
+            console.log(`📦 [CREATE-ORDER] Produit non-CJ "${product.name}": ${activeVariantsCount} variant(s) actif(s)`)
+          }
+          
+          return product
+        }).filter((product: any) => {
+          // Vérifier si le produit a des variants actifs
+          const hasActiveVariants = product.productVariants && 
+                                   Array.isArray(product.productVariants) && 
+                                   product.productVariants.length > 0
+          
+          // Pour les produits CJ, on exige qu'ils aient des variants actifs (depuis productVariants ou JSON)
           const isCJ = product.source === 'cj-dropshipping' || product.cjProductId !== null
           
           if (isCJ) {
-            // Produits CJ : doivent avoir des variants
-            return hasVariants
+            // Produits CJ : doivent avoir des variants actifs pour créer une commande
+            return hasActiveVariants
           } else {
             // Produits non-CJ : on les garde aussi (ils peuvent ne pas avoir de variants)
             return true
           }
         })
         
+        console.log(`📊 [CREATE-ORDER] Statistiques:`)
+        console.log(`  - Total produits chargés: ${productsData.length}`)
+        console.log(`  - Produits CJ: ${cjProductsCount} (${cjProductsWithoutVariants} sans variants actifs - exclus)`)
+        console.log(`  - Produits non-CJ: ${nonCJProductsCount}`)
+        console.log(`✅ [CREATE-ORDER] ${productsWithVariants.length} produit(s) disponibles pour commande`)
+        
+        // Log des variants pour chaque produit final
+        productsWithVariants.forEach((product: any) => {
+          const variantsCount = product.productVariants?.length || 0
+          const isCJ = product.source === 'cj-dropshipping' || product.cjProductId !== null
+          console.log(`📦 [CREATE-ORDER] "${product.name}" (${isCJ ? 'CJ' : 'non-CJ'}): ${variantsCount} variant(s) actif(s)`)
+        })
+        
         setProducts(productsWithVariants)
       }
     } catch (error) {
-      console.error('Erreur chargement produits:', error)
+      console.error('❌ [CREATE-ORDER] Erreur chargement produits:', error)
     } finally {
       setIsLoading(false)
     }
@@ -209,36 +288,64 @@ export default function CreateOrderPage() {
     product.id.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const addProductToOrder = (product: Product) => {
-    const existingItem = orderItems.find(item => item.productId === product.id)
+  const addProductToOrder = (product: Product, variantId?: string | null) => {
+    const existingItem = orderItems.find(item => 
+      item.productId === product.id && item.variantId === variantId
+    )
     
     if (existingItem) {
       setOrderItems(orderItems.map(item =>
-        item.productId === product.id
+        item.productId === product.id && item.variantId === variantId
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ))
     } else {
+      // Pour les produits CJ, sélectionner le premier variant actif par défaut
+      let selectedVariantId: string | null = variantId || null
+      
+      // ✅ Vérifier que le variantId fourni existe dans les variants du produit
+      if (selectedVariantId && product.productVariants) {
+        const variantExists = product.productVariants.some(v => v.id === selectedVariantId)
+        if (!variantExists) {
+          console.warn(`⚠️ Variant ${selectedVariantId} non trouvé dans les variants du produit ${product.id}, sera ignoré`)
+          selectedVariantId = null
+        }
+      }
+      
+      // Si pas de variantId valide et produit CJ, sélectionner le premier variant actif
+      if (!selectedVariantId && product.productVariants && product.productVariants.length > 0) {
+        const activeVariant = product.productVariants.find(v => v.cjVariantId && v.cjVariantId.trim() !== '' && v.id)
+        if (activeVariant && activeVariant.id) {
+          selectedVariantId = activeVariant.id // ✅ Utiliser l'ID KAMRI du variant
+          console.log(`✅ Variant auto-sélectionné pour produit ${product.id}: ${selectedVariantId}`)
+        } else {
+          console.warn(`⚠️ Aucun variant actif avec ID valide trouvé pour produit CJ ${product.id}`)
+        }
+      }
+      
       setOrderItems([...orderItems, {
         productId: product.id,
         productName: product.name,
         quantity: 1,
-        price: product.price
+        price: product.price,
+        variantId: selectedVariantId // Peut être null si aucun variant valide
       }])
     }
   }
 
-  const removeItem = (productId: string) => {
-    setOrderItems(orderItems.filter(item => item.productId !== productId))
+  const removeItem = (productId: string, variantId?: string | null) => {
+    setOrderItems(orderItems.filter(item => 
+      !(item.productId === productId && item.variantId === variantId)
+    ))
   }
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number, variantId?: string | null) => {
     if (quantity <= 0) {
-      removeItem(productId)
+      removeItem(productId, variantId)
       return
     }
     setOrderItems(orderItems.map(item =>
-      item.productId === productId
+      item.productId === productId && item.variantId === variantId
         ? { ...item, quantity }
         : item
     ))
@@ -260,12 +367,43 @@ export default function CreateOrderPage() {
     try {
       setIsCreating(true)
       
-      // Préparer les items pour l'API
-      const items = orderItems.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price
-      }))
+      // Préparer les items pour l'API avec validation des variantId
+      const items = orderItems.map(item => {
+        const product = products.find(p => p.id === item.productId)
+        
+        // ✅ Vérifier que le variantId existe dans les variants du produit
+        let validVariantId: string | null = null
+        if (item.variantId && product?.productVariants) {
+          const variantExists = product.productVariants.some(v => v.id === item.variantId)
+          if (variantExists) {
+            validVariantId = item.variantId
+            console.log(`✅ Variant ${item.variantId} validé pour produit ${item.productId}`)
+          } else {
+            console.warn(`⚠️ Variant ${item.variantId} non trouvé pour produit ${item.productId}, sera ignoré`)
+          }
+        }
+        
+        const itemData: {
+          productId: string
+          quantity: number
+          price: number
+          variantId?: string | null
+        } = {
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+        }
+        
+        // Inclure variantId SEULEMENT s'il est valide
+        if (validVariantId) {
+          itemData.variantId = validVariantId
+        }
+        // Ne pas inclure la propriété variantId du tout si elle est invalide
+        
+        return itemData
+      })
+
+      console.log('📦 Items à envoyer:', JSON.stringify(items, null, 2))
 
       // Créer la commande
       const response = await apiClient.createOrder(items)
@@ -437,16 +575,23 @@ export default function CreateOrderPage() {
               ) : (
                 <>
                   <div className="space-y-3 mb-4">
-                    {orderItems.map((item) => {
+                    {orderItems.map((item, idx) => {
                       const product = products.find(p => p.id === item.productId)
                       const isCJ = product?.source === 'cj-dropshipping' || product?.cjProductId !== null
+                      const selectedVariant = product?.productVariants?.find(v => v.id === item.variantId)
                       
                       return (
-                        <div key={item.productId} className="flex items-center justify-between p-2 border rounded">
+                        <div key={`${item.productId}-${item.variantId || idx}`} className="flex items-center justify-between p-2 border rounded">
                           <div className="flex-1">
                             <div className="text-sm font-medium">{item.productName}</div>
                             <div className="text-xs text-gray-500">
                               {item.price}€ {isCJ && <span className="text-purple-600">• CJ</span>}
+                              {selectedVariant && selectedVariant.cjVariantId && (
+                                <span className="text-blue-600 ml-1">• VID: {selectedVariant.cjVariantId.substring(0, 8)}...</span>
+                              )}
+                              {isCJ && !selectedVariant && (
+                                <span className="text-yellow-600 ml-1">• ⚠️ Variant auto</span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -454,13 +599,13 @@ export default function CreateOrderPage() {
                               type="number"
                               min="1"
                               value={item.quantity}
-                              onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value) || 1)}
+                              onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value) || 1, item.variantId)}
                               className="w-16 text-center"
                             />
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => removeItem(item.productId)}
+                              onClick={() => removeItem(item.productId, item.variantId)}
                             >
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>

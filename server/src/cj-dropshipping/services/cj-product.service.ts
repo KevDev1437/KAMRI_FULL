@@ -102,58 +102,100 @@ export class CJProductService {
 
   /**
    * Obtenir les produits par défaut (sans filtre)
+   * Retourne maintenant les informations de pagination
+   * ⚠️ IMPORTANT : Utilise toujours l'API CJ pour avoir les produits à jour, pas la BD locale
    */
-  async getDefaultProducts(query: { pageNum?: number; pageSize?: number; countryCode?: string }): Promise<CJProduct[]> {
+  async getDefaultProducts(query: { pageNum?: number; pageSize?: number; countryCode?: string; useCache?: boolean }): Promise<{
+    products: CJProduct[];
+    total: number;
+    pageNumber: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
     this.logger.log('🔍 === DÉBUT getDefaultProducts ===');
     this.logger.log('📝 Paramètres:', JSON.stringify(query, null, 2));
     
-    // 🚨 PROTECTION : Si le token est valide, utiliser la base de données locale
-    const hasToken = this.cjApiClient['accessToken'];
-    const tokenExpiry = this.cjApiClient['tokenExpiry'];
-    const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
+    // ⚠️ Par défaut, utiliser l'API CJ pour avoir les produits à jour
+    // La BD locale (cJProductStore) est utilisée uniquement si useCache=true explicitement
+    const useCache = query.useCache === true;
     
-    if (isTokenValid) {
-      this.logger.log('✅ Token CJ valide - Utilisation de la base de données locale');
-      const existingProducts = await this.prisma.cJProductStore.count();
+    if (useCache) {
+      // 🚨 OPTION : Utiliser la base de données locale si demandé explicitement
+      const hasToken = this.cjApiClient['accessToken'];
+      const tokenExpiry = this.cjApiClient['tokenExpiry'];
+      const isTokenValid = hasToken && tokenExpiry && new Date() < tokenExpiry;
       
-      if (existingProducts > 0) {
-        this.logger.log(`📦 ${existingProducts} produits en base - Utilisation du cache local`);
-        const cachedProducts = await this.prisma.cJProductStore.findMany({
-          take: Number(query.pageSize) || 100,
-          orderBy: { createdAt: 'desc' }
-        });
+      if (isTokenValid) {
+        this.logger.log('✅ Token CJ valide - Utilisation de la base de données locale (useCache=true)');
+        const existingProducts = await this.prisma.cJProductStore.count();
         
-        // Transformer en format CJProduct
-        return cachedProducts.map(product => ({
-          pid: product.cjProductId,
-          productName: product.name,
-          productNameEn: product.name,
-          productSku: (product as any).productSku || product.cjProductId,
-          sellPrice: Number(product.price) || Number(product.originalPrice) || 0,
-          productImage: product.image,
-          categoryName: product.category,
-          description: product.description,
-          variants: [],
-          rating: 0,
-          totalReviews: 0,
-          weight: 0,
-          dimensions: '',
-          brand: '',
-          tags: [],
-          reviews: []
-        }));
+        if (existingProducts > 0) {
+          this.logger.log(`📦 ${existingProducts} produits en base - Utilisation du cache local`);
+          const pageSize = Number(query.pageSize) || 100;
+          const pageNum = Number(query.pageNum) || 1;
+          const skip = (pageNum - 1) * pageSize;
+          
+          const [cachedProducts, total] = await Promise.all([
+            this.prisma.cJProductStore.findMany({
+              skip,
+              take: pageSize,
+              orderBy: { createdAt: 'desc' }
+            }),
+            this.prisma.cJProductStore.count()
+          ]);
+          
+          // Transformer en format CJProduct
+          const products = cachedProducts.map(product => ({
+            pid: product.cjProductId,
+            productName: product.name,
+            productNameEn: product.name,
+            productSku: (product as any).productSku || product.cjProductId,
+            sellPrice: Number(product.price) || Number(product.originalPrice) || 0,
+            productImage: product.image,
+            categoryName: product.category,
+            description: product.description,
+            variants: [],
+            rating: 0,
+            totalReviews: 0,
+            weight: 0,
+            dimensions: '',
+            brand: '',
+            tags: [],
+            reviews: []
+          }));
+          
+          return {
+            products,
+            total,
+            pageNumber: pageNum,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize)
+          };
+        } else {
+          this.logger.log('📦 Aucun produit en base - Appel API CJ nécessaire');
+        }
       } else {
-        this.logger.log('📦 Aucun produit en base - Appel API CJ nécessaire');
+        this.logger.log('🔑 Token CJ invalide ou expiré - Appel API CJ nécessaire');
       }
     } else {
-      this.logger.log('🔑 Token CJ invalide ou expiré - Appel API CJ nécessaire');
+      this.logger.log('🌐 Utilisation de l\'API CJ pour obtenir les produits à jour (useCache=false par défaut)');
     }
     
-    // Vérifier le cache pour la première page
+    // Vérifier le cache pour la première page uniquement
     if (query.pageNum === 1 && this.defaultProductsCache && 
         (Date.now() - this.defaultProductsCache.timestamp) < this.CACHE_DURATION) {
       this.logger.log('📦 Utilisation du cache pour les produits par défaut');
-      return this.defaultProductsCache.data;
+      // Pour le cache, on doit faire un appel API pour obtenir le total réel
+      // Mais pour éviter un appel supplémentaire, on utilise une estimation basée sur la taille de la page
+      const pageSize = query.pageSize || 100;
+      const estimatedTotal = this.defaultProductsCache.data.length >= pageSize ? pageSize * 10 : this.defaultProductsCache.data.length;
+      return {
+        products: this.defaultProductsCache.data,
+        total: estimatedTotal, // Estimation - sera remplacé par la vraie valeur au prochain appel
+        pageNumber: 1,
+        pageSize,
+        totalPages: Math.ceil(estimatedTotal / pageSize)
+      };
     }
     
     try {
@@ -188,10 +230,36 @@ export class CJProductService {
         this.logger.log('📦 Produits mis en cache pour 5 minutes');
       }
       
-      this.logger.log(`🎉 getDefaultProducts terminé avec succès: ${products.length} produits`);
+      // Calculer totalPages si non fourni par l'API
+      const pageSize = result.pageSize || query.pageSize || 100;
+      const total = result.total || 0;
+      let totalPages = result.totalPages;
+      
+      // Si totalPages n'est pas fourni, le calculer
+      if (!totalPages || totalPages === 0) {
+        if (total > 0) {
+          totalPages = Math.ceil(total / pageSize);
+        } else {
+          // Si total est 0 mais qu'on a des produits, estimer à partir du nombre de produits
+          totalPages = products.length >= pageSize ? 2 : 1;
+        }
+      }
+      
+      this.logger.log(`🎉 getDefaultProducts terminé avec succès:`);
+      this.logger.log(`   - Produits: ${products.length}`);
+      this.logger.log(`   - Total: ${total}`);
+      this.logger.log(`   - PageSize: ${pageSize}`);
+      this.logger.log(`   - TotalPages: ${totalPages}`);
+      this.logger.log(`   - PageNumber: ${result.pageNumber || query.pageNum || 1}`);
       this.logger.log('🔍 === FIN getDefaultProducts ===');
       
-      return products;
+      return {
+        products,
+        total: total || products.length, // Utiliser le nombre de produits si total est 0
+        pageNumber: result.pageNumber || query.pageNum || 1,
+        pageSize,
+        totalPages: totalPages || 1 // Au minimum 1 page
+      };
     } catch (error) {
       this.logger.error('❌ === ERREUR getDefaultProducts ===');
       this.logger.error('💥 Erreur détaillée:', error);

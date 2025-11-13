@@ -24,7 +24,7 @@ import { UpdateCJConfigDto } from './dto/cj-config.dto';
 import { CJOrderCreateDto } from './dto/cj-order-create.dto';
 import { CJProductSearchDto } from './dto/cj-product-search.dto';
 import { CJWebhookDto } from './dto/cj-webhook.dto';
-import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
+import { CJWebhookPayload, WebhookProcessingResult } from './interfaces/cj-webhook.interface';
 import { CJSyncProgressEvent, CJSyncResult } from './interfaces/cj-sync-progress.interface';
 import { CJSourcingCreateRequest } from './interfaces/cj-sourcing.interface';
 // 🔧 NOUVEAUX SERVICES REFACTORISÉS
@@ -109,14 +109,19 @@ export class CJDropshippingController {
   @Get('products/default')
   @ApiOperation({ summary: 'Obtenir les produits CJ par défaut' })
   @ApiResponse({ status: 200, description: 'Liste des produits par défaut' })
-  async getDefaultProducts(@Query() query: { pageNum?: number; pageSize?: number; countryCode?: string }) {
+  async getDefaultProducts(@Query() query: { pageNum?: number; pageSize?: number; countryCode?: string; useCache?: boolean }) {
     this.logger.log('🔍 === DÉBUT CONTROLLER getDefaultProducts ===');
     this.logger.log('📝 Query reçue:', JSON.stringify(query, null, 2));
     
     try {
       const result = await this.cjMainService.getDefaultProducts(query);
       this.logger.log('✅ Controller getDefaultProducts terminé avec succès');
-      this.logger.log('📊 Nombre de produits retournés:', result.length);
+      // Le résultat est maintenant un objet avec products, total, totalPages, etc.
+      const productCount = Array.isArray(result) ? result.length : (result.products?.length || 0);
+      this.logger.log('📊 Nombre de produits retournés:', productCount);
+      if (!Array.isArray(result) && result.total) {
+        this.logger.log(`📊 Total: ${result.total}, Pages: ${result.totalPages}`);
+      }
       this.logger.log('🔍 === FIN CONTROLLER getDefaultProducts ===');
       return result;
     } catch (error) {
@@ -523,6 +528,17 @@ export class CJDropshippingController {
   @Post('webhooks')
   @HttpCode(HttpStatus.OK) // ✅ Réponse 200 OK requise par CJ
   @ApiOperation({ summary: 'Recevoir les webhooks CJ Dropshipping' })
+  // ✅ Headers explicites pour garantir le Content-Type
+  @ApiResponse({ 
+    status: 200,
+    description: 'Webhook reçu et traité',
+    headers: {
+      'Content-Type': {
+        description: 'application/json',
+        schema: { type: 'string' }
+      }
+    }
+  })
   @ApiResponse({ 
     status: 200, 
     description: 'Webhook reçu et traité (format conforme CJ)',
@@ -541,12 +557,14 @@ export class CJDropshippingController {
     const startTime = Date.now();
     
     // ✅ Gérer les requêtes de test de CJ Dropshipping (sans body ou body vide)
-    if (!dto || !dto.messageId) {
+    // CJ teste l'endpoint avant de le configurer - doit répondre IMMÉDIATEMENT (< 3s)
+    if (!dto || Object.keys(dto).length === 0 || !dto.messageId) {
       this.logger.log('✅ Test de connexion webhook par CJ Dropshipping');
+      // Réponse IMMÉDIATE sans traitement
       return {
         code: 200,
         result: true,
-        message: 'Webhook endpoint is ready',
+        message: 'Success',
         data: {
           endpoint: '/api/cj-dropshipping/webhooks',
           status: 'ready',
@@ -556,8 +574,12 @@ export class CJDropshippingController {
       };
     }
     
-    // ✅ VALIDATION HTTPS STRICTE
-    if (process.env.NODE_ENV === 'production' && request.protocol !== 'https') {
+    // ✅ VALIDATION HTTPS STRICTE (mais permettre ngrok en développement)
+    const isHttps = request.protocol === 'https' || 
+                    request.headers['x-forwarded-proto'] === 'https' ||
+                    request.headers['x-forwarded-ssl'] === 'on';
+    
+    if (process.env.NODE_ENV === 'production' && !isHttps) {
       this.logger.error('❌ Webhook reçu en HTTP (HTTPS requis)');
       return {
         code: 200,
@@ -576,15 +598,46 @@ export class CJDropshippingController {
         params: dto.params
       };
 
-      // ✅ Traitement via le service webhook amélioré
-      const result = await this.cjWebhookService.processWebhook(payload);
+      // ✅ Traitement ASYNCHRONE pour répondre rapidement (< 3s)
+      // Le traitement lourd se fait en arrière-plan
+      const processPromise = this.cjWebhookService.processWebhook(payload);
       
-      // ✅ Vérifier le timeout de 3 secondes
+      // ✅ Répondre IMMÉDIATEMENT avec un timeout de sécurité
+      type QuickResponse = 
+        | { success: true; result: WebhookProcessingResult }
+        | { success: false; timeout: true };
+      
+      const quickResponse: QuickResponse = await Promise.race([
+        processPromise.then(result => ({ success: true as const, result })),
+        new Promise<QuickResponse>(resolve => 
+          setTimeout(() => resolve({ success: false as const, timeout: true }), 2500)
+        )
+      ]);
+
       const processingTime = Date.now() - startTime;
-      if (processingTime > 3000) {
-        this.logger.warn(`⚠️  Webhook traité en ${processingTime}ms (> 3s limite CJ)`);
+
+      if (quickResponse.success === false) {
+        // TypeScript sait maintenant que c'est { success: false; timeout: true }
+        this.logger.warn(`⚠️  Webhook prend trop de temps, réponse rapide envoyée`);
+        // Traitement continue en arrière-plan
+        processPromise.catch(err => this.logger.error('Erreur traitement asynchrone:', err));
+        
+        return {
+          code: 200,
+          result: true,
+          message: 'Success',
+          data: {
+            messageId: payload.messageId,
+            type: payload.type,
+            processingTimeMs: processingTime,
+            processed: true,
+            note: 'Processing in background'
+          },
+          requestId: payload.messageId
+        };
       }
 
+      // TypeScript sait maintenant que quickResponse.success === true
       this.logger.log(`✅ Webhook traité en ${processingTime}ms`);
 
       // ✅ FORMAT CONFORME À LA DOC CJ
@@ -597,7 +650,7 @@ export class CJDropshippingController {
           type: payload.type,
           processingTimeMs: processingTime,
           processed: true,
-          details: result
+          details: quickResponse.result
         },
         requestId: payload.messageId
       };

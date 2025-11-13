@@ -61,6 +61,31 @@ interface DraftProduct {
   editedBy?: string
   createdAt: string
   updatedAt: string
+  // ✅ Toutes les données CJ
+  source?: string
+  cjProductId?: string
+  productSku?: string
+  productWeight?: string
+  packingWeight?: string
+  productType?: string
+  productUnit?: string
+  productKeyEn?: string
+  materialNameEn?: string
+  packingNameEn?: string
+  suggestSellPrice?: string
+  listedNum?: number
+  supplierName?: string
+  createrTime?: string
+  variants?: string // JSON des variants CJ
+  cjReviews?: string // JSON des avis CJ
+  dimensions?: string
+  brand?: string
+  tags?: string // JSON des tags
+  externalCategory?: string
+  cjMapping?: {
+    cjProductId: string
+    cjSku: string
+  }
 }
 
 interface Category {
@@ -133,6 +158,23 @@ export default function DraftProductsPage() {
       
       console.log('📝 [DRAFT-PRODUCTS] Produits draft chargés:', draftsList.length)
       console.log('📝 [DRAFT-PRODUCTS] Produits:', draftsList)
+      
+      // ✅ Log des variants pour chaque produit
+      draftsList.forEach((product, idx) => {
+        console.log(`📦 [DRAFT-PRODUCTS] Produit ${idx + 1} (${product.id}):`, {
+          name: product.name,
+          variantsCount: product.productVariants?.length || 0,
+          variants: product.productVariants?.map(v => ({
+            id: v.id,
+            name: v.name,
+            sku: v.sku,
+            cjVariantId: v.cjVariantId,
+            stock: v.stock,
+            price: v.price
+          })) || []
+        })
+      })
+      
       setDrafts(draftsList)
 
       // Charger les catégories
@@ -194,9 +236,45 @@ export default function DraftProductsPage() {
     setCurrentImageIndex(prev => ({ ...prev, [product.id]: 0 }))
     
     // ✅ Initialiser les variants en cours d'édition
+    // Priorité : productVariants (relation Prisma) > variants (JSON)
+    let variantsToUse: ProductVariant[] = []
+    
+    if (product.productVariants && product.productVariants.length > 0) {
+      // Utiliser productVariants si disponible
+      variantsToUse = product.productVariants
+    } else if (product.variants) {
+      // Fallback : parser le champ JSON variants
+      try {
+        const parsedVariants = typeof product.variants === 'string' 
+          ? JSON.parse(product.variants) 
+          : product.variants
+        
+        if (Array.isArray(parsedVariants)) {
+          // Transformer les variants JSON en format ProductVariant
+          variantsToUse = parsedVariants.map((v: any, idx: number) => ({
+            id: `variant-${idx}-${v.vid || v.variantId || idx}`,
+            cjVariantId: String(v.vid || v.variantId || ''),
+            name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
+            sku: v.variantSku || v.sku || '',
+            price: parseFloat(v.variantPrice || v.price || 0),
+            stock: parseInt(v.variantStock || v.stock || 0, 10),
+            weight: parseFloat(v.variantWeight || v.weight || 0),
+            dimensions: typeof v.variantDimensions === 'string' ? v.variantDimensions : JSON.stringify(v.variantDimensions || {}),
+            image: v.variantImage || v.image || '',
+            status: v.status || 'active',
+            properties: typeof v.variantProperties === 'string' ? v.variantProperties : JSON.stringify(v.variantProperties || {}),
+            isActive: v.isActive !== false
+          }))
+          console.log(`✅ [DRAFT-EDIT] Variants parsés depuis JSON: ${variantsToUse.length} variants`)
+        }
+      } catch (error) {
+        console.error('❌ [DRAFT-EDIT] Erreur parsing variants JSON:', error)
+      }
+    }
+    
     setEditingVariants(prev => ({
       ...prev,
-      [product.id]: product.productVariants || []
+      [product.id]: variantsToUse
     }))
     
     setFormData({
@@ -1952,11 +2030,72 @@ export default function DraftProductsPage() {
                         })()}
                         
                         {/* ✅ Gestion des variants */}
-                        {editingVariants[product.id] && editingVariants[product.id].length > 0 && (
-                          <div className="mt-4">
-                            <Label>Variants du produit ({editingVariants[product.id].length} variant{editingVariants[product.id].length > 1 ? 's' : ''})</Label>
-                            <div className="mt-2 space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3 bg-gray-50">
-                              {editingVariants[product.id].map((variant, idx) => {
+                        {(() => {
+                          // Priorité : editingVariants > productVariants > variants JSON
+                          let variants: ProductVariant[] = editingVariants[product.id] || product.productVariants || []
+                          
+                          // Si toujours vide, essayer de parser le champ JSON variants
+                          if (variants.length === 0 && product.variants) {
+                            try {
+                              const parsedVariants = typeof product.variants === 'string' 
+                                ? JSON.parse(product.variants) 
+                                : product.variants
+                              
+                              if (Array.isArray(parsedVariants)) {
+                                variants = parsedVariants.map((v: any, idx: number) => ({
+                                  id: `variant-${idx}-${v.vid || v.variantId || idx}`,
+                                  cjVariantId: String(v.vid || v.variantId || ''),
+                                  name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
+                                  sku: v.variantSku || v.sku || '',
+                                  price: parseFloat(v.variantPrice || v.price || 0),
+                                  stock: parseInt(v.variantStock || v.stock || 0, 10),
+                                  weight: parseFloat(v.variantWeight || v.weight || 0),
+                                  dimensions: typeof v.variantDimensions === 'string' ? v.variantDimensions : JSON.stringify(v.variantDimensions || {}),
+                                  image: v.variantImage || v.image || '',
+                                  status: v.status || 'active',
+                                  properties: typeof v.variantProperties === 'string' ? v.variantProperties : JSON.stringify(v.variantProperties || {}),
+                                  isActive: v.isActive !== false
+                                }))
+                                console.log(`✅ [DRAFT-EDIT] Variants parsés depuis JSON (fallback): ${variants.length} variants`)
+                              }
+                            } catch (error) {
+                              console.error('❌ [DRAFT-EDIT] Erreur parsing variants JSON:', error)
+                            }
+                          }
+                          
+                          console.log(`🔍 [DRAFT-EDIT] Produit ${product.id} - Variants disponibles:`, {
+                            editingVariants: editingVariants[product.id]?.length || 0,
+                            productVariants: product.productVariants?.length || 0,
+                            variantsJson: product.variants ? (typeof product.variants === 'string' ? JSON.parse(product.variants).length : product.variants.length) : 0,
+                            variants: variants.length,
+                            variantDetails: variants.map(v => ({
+                              id: v.id,
+                              name: v.name,
+                              sku: v.sku,
+                              cjVariantId: v.cjVariantId,
+                              stock: v.stock,
+                              price: v.price
+                            }))
+                          })
+                          
+                          if (variants.length === 0) {
+                            return (
+                              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-800">
+                                  ⚠️ Aucun variant trouvé pour ce produit. 
+                                  {product.cjProductId && (
+                                    <span> Synchronisez les variants depuis la page produits.</span>
+                                  )}
+                                </p>
+                              </div>
+                            )
+                          }
+                          
+                          return (
+                            <div className="mt-4">
+                              <Label>Variants du produit ({variants.length} variant{variants.length > 1 ? 's' : ''})</Label>
+                              <div className="mt-2 space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                                {variants.map((variant, idx) => {
                                 // Parser les propriétés JSON
                                 let properties: any = {}
                                 try {
@@ -2073,10 +2212,118 @@ export default function DraftProductsPage() {
                                   </div>
                                 )
                               })}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2">
+                                ℹ️ Les variants sont en lecture seule. Pour modifier un variant, utilisez la page de gestion des variants.
+                              </p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                              ℹ️ Les variants sont en lecture seule. Pour modifier un variant, utilisez la page de gestion des variants.
-                            </p>
+                          )
+                        })()}
+
+                        {/* ✅ Informations CJ Dropshipping supplémentaires */}
+                        {(product.source === 'cj-dropshipping' || product.cjProductId) && (
+                          <div className="mt-4 border-t pt-4">
+                            <Label className="mb-3 block text-sm font-semibold text-gray-700">
+                              📦 Informations CJ Dropshipping
+                            </Label>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              {product.cjProductId && (
+                                <div>
+                                  <span className="text-gray-500">ID CJ:</span>
+                                  <p className="font-mono text-xs mt-1">{product.cjProductId}</p>
+                                </div>
+                              )}
+                              {product.productSku && (
+                                <div>
+                                  <span className="text-gray-500">SKU:</span>
+                                  <p className="font-mono text-xs mt-1">{product.productSku}</p>
+                                </div>
+                              )}
+                              {product.brand && (
+                                <div>
+                                  <span className="text-gray-500">Marque:</span>
+                                  <p className="font-semibold mt-1">{product.brand}</p>
+                                </div>
+                              )}
+                              {product.productWeight && (
+                                <div>
+                                  <span className="text-gray-500">Poids produit:</span>
+                                  <p className="font-semibold mt-1">{product.productWeight}</p>
+                                </div>
+                              )}
+                              {product.packingWeight && (
+                                <div>
+                                  <span className="text-gray-500">Poids emballage:</span>
+                                  <p className="font-semibold mt-1">{product.packingWeight}</p>
+                                </div>
+                              )}
+                              {product.productType && (
+                                <div>
+                                  <span className="text-gray-500">Type:</span>
+                                  <p className="font-semibold mt-1">{product.productType}</p>
+                                </div>
+                              )}
+                              {product.materialNameEn && (
+                                <div>
+                                  <span className="text-gray-500">Matériau:</span>
+                                  <p className="font-semibold mt-1">{product.materialNameEn}</p>
+                                </div>
+                              )}
+                              {product.packingNameEn && (
+                                <div>
+                                  <span className="text-gray-500">Emballage:</span>
+                                  <p className="font-semibold mt-1">{product.packingNameEn}</p>
+                                </div>
+                              )}
+                              {product.dimensions && (
+                                <div className="col-span-2">
+                                  <span className="text-gray-500">Dimensions:</span>
+                                  <p className="font-semibold mt-1">{product.dimensions}</p>
+                                </div>
+                              )}
+                              {product.supplierName && (
+                                <div>
+                                  <span className="text-gray-500">Fournisseur CJ:</span>
+                                  <p className="font-semibold mt-1">{product.supplierName}</p>
+                                </div>
+                              )}
+                              {product.externalCategory && (
+                                <div>
+                                  <span className="text-gray-500">Catégorie externe:</span>
+                                  <p className="font-semibold mt-1">{product.externalCategory}</p>
+                                </div>
+                              )}
+                              {product.tags && (
+                                <div className="col-span-2">
+                                  <span className="text-gray-500">Tags:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {(() => {
+                                      try {
+                                        const tags = typeof product.tags === 'string' ? JSON.parse(product.tags) : product.tags
+                                        if (Array.isArray(tags)) {
+                                          return tags.map((tag: string, idx: number) => (
+                                            <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                                              {tag}
+                                            </span>
+                                          ))
+                                        }
+                                        return null
+                                      } catch {
+                                        return <span className="text-xs text-gray-500">{product.tags}</span>
+                                      }
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+                              {product.cjMapping && (
+                                <div className="col-span-2">
+                                  <span className="text-gray-500">Mapping CJ:</span>
+                                  <p className="font-mono text-xs mt-1">
+                                    PID: {product.cjMapping.cjProductId} | SKU: {product.cjMapping.cjSku}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

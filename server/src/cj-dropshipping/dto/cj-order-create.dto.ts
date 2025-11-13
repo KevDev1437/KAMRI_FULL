@@ -16,12 +16,6 @@ export class CJOrderProductDto {
   @IsString()
   @IsOptional()
   storeLineItemId?: string;
-
-  @ApiProperty({ description: 'Liste des images de production du produit', required: false })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  productionImgList?: string[];
 }
 
 export class CJOrderCreateDto {

@@ -815,8 +815,52 @@ export class CJAPIClient {
    * Obtenir les variantes d'un produit
    */
   async getProductVariants(pid: string): Promise<CJVariant[]> {
+    this.logger.log(`🔍 Récupération variants pour produit ${pid}`);
     const response = await this.makeRequest('GET', `/product/variant/query`, { params: { pid } });
-    return response.data as any;
+    
+    // makeRequest retourne response.data directement, qui peut être :
+    // - La structure CJ complète : { code, result, message, data }
+    // - Directement les données si déjà parsées
+    
+    let variants: CJVariant[] = [];
+    
+    // Vérifier si c'est la structure CJ complète
+    if (response && typeof response === 'object' && 'code' in response) {
+      // Structure CJ : { code, result, message, data }
+      const cjResponse = response as CJResponse<any>;
+      if (cjResponse.code === 200 && cjResponse.data) {
+        const data = cjResponse.data as any;
+        if (Array.isArray(data)) {
+          variants = data as CJVariant[];
+        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+          variants = data.list as CJVariant[];
+        } else if (data && typeof data === 'object' && 'data' in data && Array.isArray(data.data)) {
+          variants = data.data as CJVariant[];
+        } else if (data && typeof data === 'object' && 'vid' in data) {
+          // Si c'est un seul variant, le mettre dans un tableau
+          variants = [data as CJVariant];
+        }
+      }
+    } else if (Array.isArray(response)) {
+      // Si la réponse est directement un tableau
+      variants = response as CJVariant[];
+    } else if (response && typeof response === 'object') {
+      const responseObj = response as any;
+      if (Array.isArray(responseObj.list)) {
+        // Si la réponse a une propriété list
+        variants = responseObj.list as CJVariant[];
+      } else if (Array.isArray(responseObj.data)) {
+        // Si la réponse a une propriété data qui est un tableau
+        variants = responseObj.data as CJVariant[];
+      }
+    }
+    
+    this.logger.log(`✅ ${variants.length} variant(s) récupéré(s) pour produit ${pid}`);
+    if (variants.length > 0) {
+      this.logger.log(`📋 VIDs trouvés: ${variants.slice(0, 5).map((v: any) => v.vid || v.variantId).join(', ')}${variants.length > 5 ? '...' : ''}`);
+    }
+    
+    return variants;
   }
 
   /**
@@ -1183,7 +1227,6 @@ export class CJAPIClient {
       vid: string;
       quantity: number;
       storeLineItemId?: string;
-      productionImgList?: string[];
     }>;
   }): Promise<CJOrder> {
     // Valider les produits avant envoi
@@ -1240,6 +1283,67 @@ export class CJAPIClient {
     
     this.logger.error('❌ Structure de réponse inattendue:', JSON.stringify(response, null, 2));
     throw new Error(`Erreur création commande CJ: ${responseAny?.message || 'Réponse invalide'}`);
+  }
+
+  /**
+   * Ajouter une commande au panier CJ
+   */
+  async addCart(cjOrderIdList: string[]): Promise<{
+    successCount: number;
+    addSuccessOrders: string[];
+    unInterceptAddressCount: number;
+    interceptOrders: any[];
+  }> {
+    this.logger.log(`🛒 Ajout de ${cjOrderIdList.length} commande(s) au panier CJ`);
+    const response = await this.makeRequest('POST', '/shopping/order/addCart', {
+      cjOrderIdList,
+    });
+    
+    // L'API CJ retourne { code, result, message, data }
+    const responseAny = response as any;
+    
+    if (responseAny && responseAny.code === 200 && responseAny.data) {
+      this.logger.log(`✅ ${responseAny.data.successCount || 0} commande(s) ajoutée(s) au panier`);
+      return responseAny.data;
+    }
+    
+    if (responseAny && responseAny.code !== 200) {
+      this.logger.error(`❌ Erreur API CJ (code: ${responseAny.code}):`, responseAny.message);
+      throw new Error(`Erreur ajout au panier CJ: ${responseAny.message || 'Code erreur ' + responseAny.code}`);
+    }
+    
+    throw new Error(`Erreur ajout au panier CJ: Réponse invalide`);
+  }
+
+  /**
+   * Confirmer le panier CJ
+   */
+  async addCartConfirm(cjOrderIdList: string[]): Promise<{
+    successCount: number;
+    submitSuccess: boolean;
+    shipmentsId: string;
+    result: number;
+    interceptOrders: any[];
+  }> {
+    this.logger.log(`✅ Confirmation de ${cjOrderIdList.length} commande(s) dans le panier CJ`);
+    const response = await this.makeRequest('POST', '/shopping/order/addCartConfirm', {
+      cjOrderIdList,
+    });
+    
+    // L'API CJ retourne { code, result, message, data }
+    const responseAny = response as any;
+    
+    if (responseAny && responseAny.code === 200 && responseAny.data) {
+      this.logger.log(`✅ Panier confirmé: ${responseAny.data.submitSuccess ? 'Succès' : 'Échec'}`);
+      return responseAny.data;
+    }
+    
+    if (responseAny && responseAny.code !== 200) {
+      this.logger.error(`❌ Erreur API CJ (code: ${responseAny.code}):`, responseAny.message);
+      throw new Error(`Erreur confirmation panier CJ: ${responseAny.message || 'Code erreur ' + responseAny.code}`);
+    }
+    
+    throw new Error(`Erreur confirmation panier CJ: Réponse invalide`);
   }
 
   /**

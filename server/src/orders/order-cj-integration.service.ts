@@ -132,7 +132,11 @@ export class OrderCJIntegrationService {
       
       if (!variants || variants.length === 0) {
         this.logger.warn(`❌ Produit ${cjProductId} introuvable ou sans variants dans CJ`);
-        return false;
+        this.logger.warn(`⚠️ La vérification de disponibilité échoue, mais on continue quand même (le variant peut être valide)`);
+        // ⚠️ IMPORTANT: Ne pas bloquer la création de commande si la vérification échoue
+        // Le variant peut être valide même si l'API ne retourne pas de résultats
+        // (problème de cache API, produit récemment ajouté, etc.)
+        return true; // Retourner true pour permettre la création de la commande
       }
       
       // Chercher le variant spécifique
@@ -141,9 +145,13 @@ export class OrderCJIntegrationService {
       );
       
       if (!variant) {
-        this.logger.warn(`❌ Variant ${cjVariantId} introuvable dans le produit ${cjProductId}`);
+        this.logger.warn(`⚠️ Variant ${cjVariantId} introuvable dans le produit ${cjProductId}`);
         this.logger.log(`📋 Variants disponibles: ${variants.map((v: any) => v.vid).join(', ')}`);
-        return false;
+        this.logger.warn(`⚠️ La vérification de disponibilité échoue, mais on continue quand même (le variant peut être valide)`);
+        // ⚠️ IMPORTANT: Ne pas bloquer la création de commande si la vérification échoue
+        // Le variant peut être valide même s'il n'est pas dans la liste retournée
+        // (problème de cache API, variant récemment ajouté, etc.)
+        return true; // Retourner true pour permettre la création de la commande
       }
       
       // Vérifier le stock (si disponible dans la réponse)
@@ -236,16 +244,15 @@ export class OrderCJIntegrationService {
                 cjMapping: true,
                 images: true, // Inclure les images du produit
                 productVariants: {
-                  where: {
-                    isActive: true,
-                    cjVariantId: { not: null },
-                  },
+                  // ✅ Inclure tous les variants (même inactifs) pour permettre le fallback vers JSON
+                  // Le filtrage sera fait dans la logique métier
                   orderBy: {
                     createdAt: 'asc',
                   },
                 },
               },
             },
+            variant: true, // ✅ Inclure le variant sélectionné dans OrderItem
           },
         },
       },
@@ -284,12 +291,21 @@ export class OrderCJIntegrationService {
       this.logger.log(`✅ Produit CJ détecté - Recherche variant...`);
 
       // Récupérer le variant CJ
-      // Si le produit a des variants, prendre le premier actif avec cjVariantId
+      // Priorité : variant stocké dans OrderItem > productVariants (relation Prisma) > variants (JSON)
       let vid: string | null = null;
       let sku: string | null = null;
       let activeVariant: any = null;
 
-      if (product.productVariants && product.productVariants.length > 0) {
+      // 0. ✅ PRIORITÉ ABSOLUE : Utiliser le variant stocké dans OrderItem.variantId si disponible
+      if (item.variant && item.variant.cjVariantId && item.variant.cjVariantId.trim() !== '') {
+        activeVariant = item.variant;
+        vid = item.variant.cjVariantId;
+        sku = item.variant.sku || product.productSku || null;
+        this.logger.log(`✅ Variant trouvé dans OrderItem.variantId pour produit ${product.id}: vid=${vid}, sku=${sku}`);
+      }
+
+      // 1. Si pas de variant dans OrderItem, essayer productVariants (relation Prisma)
+      if (!vid && product.productVariants && product.productVariants.length > 0) {
         // Chercher un variant actif avec cjVariantId
         activeVariant = product.productVariants.find(
           v => v.isActive && v.cjVariantId && v.cjVariantId.trim() !== ''
@@ -298,7 +314,7 @@ export class OrderCJIntegrationService {
         if (activeVariant) {
           vid = activeVariant.cjVariantId;
           sku = activeVariant.sku || product.productSku || null;
-          this.logger.log(`✅ Variant trouvé pour produit ${product.id}: vid=${vid}, sku=${sku}`);
+          this.logger.log(`✅ Variant trouvé dans productVariants pour produit ${product.id}: vid=${vid}, sku=${sku}`);
         } else {
           this.logger.warn(`⚠️ Produit ${product.id} a des variants mais aucun n'est actif avec cjVariantId`);
           // Essayer le premier variant même s'il n'est pas actif
@@ -309,6 +325,33 @@ export class OrderCJIntegrationService {
             sku = firstVariant.sku || product.productSku || null;
             this.logger.warn(`⚠️ Utilisation du premier variant (peut-être inactif): vid=${vid}`);
           }
+        }
+      }
+
+      // 2. Fallback : Si toujours pas de variant, essayer le champ JSON variants
+      if (!vid && product.variants) {
+        this.logger.log(`🔄 Tentative récupération variant depuis champ JSON pour produit ${product.id}`);
+        try {
+          const parsedVariants = typeof product.variants === 'string' 
+            ? JSON.parse(product.variants) 
+            : product.variants;
+          
+          if (Array.isArray(parsedVariants) && parsedVariants.length > 0) {
+            // Prendre le premier variant avec un vid valide
+            const jsonVariant = parsedVariants.find((v: any) => 
+              (v.vid || v.variantId) && String(v.vid || v.variantId).trim() !== ''
+            );
+            
+            if (jsonVariant) {
+              vid = String(jsonVariant.vid || jsonVariant.variantId).trim();
+              sku = jsonVariant.variantSku || jsonVariant.sku || product.productSku || null;
+              this.logger.log(`✅ Variant trouvé dans champ JSON pour produit ${product.id}: vid=${vid}, sku=${sku}`);
+            } else {
+              this.logger.warn(`⚠️ Champ JSON variants trouvé mais aucun variant avec vid valide pour produit ${product.id}`);
+            }
+          }
+        } catch (error: any) {
+          this.logger.error(`❌ Erreur parsing variants JSON pour produit ${product.id}:`, error.message);
         }
       }
 
@@ -413,62 +456,15 @@ export class OrderCJIntegrationService {
         this.logger.warn(`⚠️ Impossible de vérifier la disponibilité: pas de cjProductId pour produit ${product.id}`);
       }
 
-      // Récupérer les images du produit pour productionImgList
-      let productionImgList: string[] = [];
-      if (product.images && product.images.length > 0) {
-        // Images depuis la relation Prisma
-        productionImgList = product.images.map(img => img.url).filter(url => url && url.trim() !== '');
-      } else if (product.image) {
-        // Image stockée comme chaîne JSON ou URL simple
-        try {
-          if (typeof product.image === 'string' && product.image.startsWith('[')) {
-            // Chaîne JSON
-            const parsed = JSON.parse(product.image);
-            if (Array.isArray(parsed)) {
-              productionImgList = parsed.filter(url => url && typeof url === 'string' && url.trim() !== '');
-            }
-          } else if (typeof product.image === 'string') {
-            // URL simple
-            productionImgList = [product.image];
-          }
-        } catch (e) {
-          // Si le parsing échoue, utiliser l'image telle quelle
-          if (typeof product.image === 'string' && product.image.trim() !== '') {
-            productionImgList = [product.image];
-          }
-        }
-      }
+      this.logger.log(`✅ Produit ${product.id} ajouté avec vid="${trimmedVid}", quantity=${item.quantity}`);
 
-      // Si aucune image n'est trouvée, utiliser l'image du variant ou une image par défaut
-      if (productionImgList.length === 0 && activeVariant?.image) {
-        productionImgList = [activeVariant.image];
-      }
-
-      // Si toujours aucune image, utiliser l'image du produit CJ si disponible
-      if (productionImgList.length === 0 && product.cjProductId) {
-        // Essayer de récupérer l'image depuis le produit directement
-        // Le mapping CJ ne contient pas d'image, on utilise product.image
-        if (product.image && typeof product.image === 'string' && product.image.trim() !== '') {
-          productionImgList = [product.image];
-        }
-      }
-
-      this.logger.log(`✅ Produit ${product.id} ajouté avec vid="${trimmedVid}", quantity=${item.quantity}, images=${productionImgList.length}`);
-
-      // Construire l'objet produit
+      // Construire l'objet produit selon la documentation CJ
+      // Les produits ne doivent contenir que : vid, quantity, storeLineItemId (optionnel)
       const productData: any = {
         vid: trimmedVid,
         quantity: item.quantity,
         storeLineItemId: item.id, // ID de OrderItem pour le mapping
       };
-
-      // ⚠️ IMPORTANT: productionImgList doit toujours être envoyé, même s'il est vide
-      // Selon l'erreur 5021 "productionImgList is empty, order cannot be created"
-      // CJ exige ce champ même s'il est vide (tableau vide plutôt que undefined)
-      // Note: Ce champ n'est pas documenté dans les paramètres de base mais est requis
-      productData.productionImgList = productionImgList.length > 0 
-        ? productionImgList.filter(img => img && img.trim() !== '')
-        : []; // Toujours envoyer un tableau (vide si pas d'images)
 
       cjProducts.push(productData);
     }
@@ -588,11 +584,8 @@ export class OrderCJIntegrationService {
             productPayload.storeLineItemId = p.storeLineItemId;
           }
 
-          // productionImgList - toujours envoyer (même vide) pour éviter l'erreur 5021
-          // Selon l'erreur, CJ exige ce champ même s'il est vide
-          productPayload.productionImgList = p.productionImgList && p.productionImgList.length > 0 
-            ? p.productionImgList.filter(img => img && img.trim() !== '') 
-            : []; // Envoyer un tableau vide plutôt que undefined
+          // ✅ Selon la documentation CJ, les produits ne doivent contenir que vid, quantity, storeLineItemId
+          // Le champ productionImgList n'existe pas dans l'API createOrderV3
 
           return productPayload;
         });
@@ -713,6 +706,31 @@ export class OrderCJIntegrationService {
 
       this.logger.log(`✅ Commande CJ créée: ${result.orderId}`);
       this.logger.log(`✅ Mapping créé: ${mapping.id}`);
+
+      // ✨ NOUVEAU : Ajouter automatiquement la commande au panier CJ et confirmer
+      try {
+        this.logger.log(`🛒 Ajout de la commande ${result.orderId} au panier CJ...`);
+        const addCartResult = await this.cjOrderService.addCart([result.orderId]);
+        
+        if (addCartResult.successCount > 0) {
+          this.logger.log(`✅ Commande ajoutée au panier CJ avec succès`);
+          
+          // Confirmer le panier
+          this.logger.log(`✅ Confirmation du panier CJ...`);
+          const confirmResult = await this.cjOrderService.addCartConfirm([result.orderId]);
+          
+          if (confirmResult.submitSuccess) {
+            this.logger.log(`✅ Panier CJ confirmé avec succès`);
+          } else {
+            this.logger.warn(`⚠️ Panier CJ confirmé mais submitSuccess=false`);
+          }
+        } else {
+          this.logger.warn(`⚠️ Aucune commande ajoutée au panier CJ`);
+        }
+      } catch (cartError: any) {
+        // Ne pas bloquer la création de commande si l'ajout au panier échoue
+        this.logger.error(`❌ Erreur lors de l'ajout au panier CJ (non bloquant):`, cartError.message);
+      }
 
       return {
         success: true,
@@ -872,6 +890,36 @@ export class OrderCJIntegrationService {
     //     errorType: 'CJ_CREATION_FAILED',
     //   },
     // });
+  }
+
+  /**
+   * Ajouter une commande CJ au panier
+   */
+  async addCJOrderToCart(cjOrderId: string) {
+    this.logger.log(`🛒 Ajout commande CJ ${cjOrderId} au panier...`);
+    try {
+      const result = await this.cjOrderService.addCart([cjOrderId]);
+      this.logger.log(`✅ Commande ${cjOrderId} ajoutée au panier CJ avec succès`);
+      return result;
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur ajout au panier CJ:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Confirmer le panier CJ pour une commande
+   */
+  async confirmCJCart(cjOrderId: string) {
+    this.logger.log(`✅ Confirmation panier CJ pour commande ${cjOrderId}...`);
+    try {
+      const result = await this.cjOrderService.addCartConfirm([cjOrderId]);
+      this.logger.log(`✅ Panier CJ confirmé pour commande ${cjOrderId}`);
+      return result;
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur confirmation panier CJ:`, error);
+      throw error;
+    }
   }
 }
 

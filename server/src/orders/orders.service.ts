@@ -13,42 +13,185 @@ export class OrdersService {
 
   async createOrder(userId: string, items: any[]) {
     this.logger.log(`📦 Création commande pour user ${userId}`);
+    this.logger.log(`📋 ${items.length} item(s) reçu(s):`, JSON.stringify(items.map(i => ({
+      productId: i.productId,
+      variantId: i.variantId || '(aucun)',
+      quantity: i.quantity,
+      price: i.price
+    })), null, 2));
+    
+    // ✅ Vérifier que l'utilisateur existe AVANT la transaction
+    const userExists = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    
+    if (!userExists) {
+      throw new Error(`Utilisateur ${userId} introuvable`);
+    }
+    
+    // ✅ Vérifier que tous les produits existent AVANT la transaction
+    for (const item of items) {
+      const productExists = await this.prisma.product.findUnique({
+        where: { id: item.productId },
+        select: { id: true },
+      });
+      
+      if (!productExists) {
+        throw new Error(`Produit ${item.productId} introuvable`);
+      }
+      
+      // ✅ Vérifier que le variantId existe s'il est fourni
+      if (item.variantId) {
+        const variantIdStr = String(item.variantId).trim();
+        
+        // Ignorer les valeurs invalides
+        if (variantIdStr === '' || variantIdStr === 'null' || variantIdStr === 'undefined') {
+          this.logger.warn(`⚠️ VariantId invalide pour produit ${item.productId}: "${variantIdStr}", sera ignoré`);
+          item.variantId = null;
+        } else {
+          try {
+            const variantExists = await this.prisma.productVariant.findUnique({
+              where: { id: variantIdStr },
+              select: { id: true, productId: true },
+            });
+            
+            if (!variantExists) {
+              this.logger.warn(`⚠️ Variant ${variantIdStr} introuvable dans la base de données pour produit ${item.productId}, sera ignoré`);
+              item.variantId = null; // Supprimer le variantId invalide
+            } else if (variantExists.productId !== item.productId) {
+              this.logger.warn(`⚠️ Variant ${variantIdStr} appartient au produit ${variantExists.productId}, pas à ${item.productId}, sera ignoré`);
+              item.variantId = null; // Supprimer le variantId invalide
+            } else {
+              this.logger.log(`✅ Variant ${variantIdStr} validé pour produit ${item.productId}`);
+            }
+          } catch (error: any) {
+            this.logger.error(`❌ Erreur lors de la vérification du variant ${variantIdStr} pour produit ${item.productId}:`, error.message);
+            item.variantId = null; // Supprimer le variantId en cas d'erreur
+          }
+        }
+      }
+    }
+    
+    // ✅ Préparer les items AVANT la transaction (les validations sont déjà faites)
+    const orderItemsData = items.map((item) => {
+      // Base de données pour l'item (sans variantId par défaut)
+      const orderItemData: {
+        productId: string;
+        quantity: number;
+        price: number;
+        variantId?: string; // Optionnel, seulement si valide
+      } = {
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+      };
+      
+      // Inclure variantId SEULEMENT s'il existe, est valide, et a été vérifié
+      // Ne pas inclure si null, undefined, ou chaîne vide
+      // IMPORTANT: Ne pas inclure la propriété variantId du tout si elle est null/undefined
+      const variantIdValue = item.variantId;
+      if (variantIdValue && 
+          variantIdValue !== null && 
+          variantIdValue !== undefined &&
+          variantIdValue !== 'null' && 
+          variantIdValue !== 'undefined' &&
+          String(variantIdValue).trim() !== '') {
+        // Si item.variantId n'a pas été mis à null lors de la validation précédente,
+        // c'est qu'il est valide, donc on peut l'inclure
+        const trimmedVariantId = String(variantIdValue).trim();
+        orderItemData.variantId = trimmedVariantId;
+        this.logger.log(`✅ Item ${item.productId}: variantId=${trimmedVariantId} inclus`);
+      } else {
+        // Ne pas inclure variantId du tout si invalide (ne pas mettre à null explicitement)
+        this.logger.log(`ℹ️ Item ${item.productId}: pas de variantId valide, création sans variant`);
+      }
+      
+      return orderItemData;
+    });
+    
+    this.logger.log(`📦 ${orderItemsData.length} item(s) préparé(s) pour création`);
+    orderItemsData.forEach((item, idx) => {
+      this.logger.log(`  Item ${idx + 1}: productId=${item.productId}, variantId=${item.variantId || '(aucun)'}, quantity=${item.quantity}, price=${item.price}`);
+    });
     
     // Créer la commande KAMRI dans une transaction
     const order = await this.prisma.$transaction(async (tx) => {
       // Calculate total
       const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+      // Les validations sont déjà faites avant la transaction
       // Create order
-      const createdOrder = await tx.order.create({
-        data: {
+      try {
+        this.logger.log(`🚀 Tentative création commande avec ${orderItemsData.length} item(s)...`);
+        this.logger.log(`📋 Données à créer:`, JSON.stringify({
           userId,
           total,
-          items: {
-            create: items.map(item => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.price,
-            })),
-          },
-        },
-        include: {
-          items: {
-            include: {
-              product: true,
+          itemsCount: orderItemsData.length,
+          items: orderItemsData.map(item => ({
+            productId: item.productId,
+            variantId: item.variantId || '(aucun)',
+            quantity: item.quantity,
+            price: item.price
+          }))
+        }, null, 2));
+        
+        const createdOrder = await tx.order.create({
+          data: {
+            userId,
+            total,
+            items: {
+              create: orderItemsData,
             },
           },
-        },
-      });
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+        
+        this.logger.log(`✅ Commande créée avec succès: ${createdOrder.id}`);
 
-      this.logger.log(`✅ Commande KAMRI créée: ${createdOrder.id}`);
+        // Clear cart
+        await tx.cartItem.deleteMany({
+          where: { userId },
+        });
 
-      // Clear cart
-      await tx.cartItem.deleteMany({
-        where: { userId },
-      });
-
-      return createdOrder;
+        return createdOrder;
+      } catch (error: any) {
+        this.logger.error(`❌ Erreur lors de la création de la commande:`, error);
+        this.logger.error(`❌ Détails de l'erreur:`, {
+          message: error.message,
+          code: error.code,
+          meta: error.meta,
+          userId,
+          items: orderItemsData,
+          itemsCount: orderItemsData.length,
+        });
+        
+        // Si c'est une erreur de contrainte de clé étrangère, donner plus de détails
+        if (error.code === 'P2003') {
+          const fieldName = error.meta?.field_name || 'unknown';
+          const targetModel = error.meta?.model_name || 'unknown';
+          this.logger.error(`❌ Contrainte FK violée: champ "${fieldName}" dans modèle "${targetModel}"`);
+          
+          // Vérifier quel champ cause le problème
+          if (fieldName.includes('variantId') || fieldName.includes('variant')) {
+            const problematicItems = orderItemsData.filter(item => item.variantId);
+            this.logger.error(`❌ Items avec variantId problématique:`, problematicItems);
+          } else if (fieldName.includes('productId') || fieldName.includes('product')) {
+            const problematicItems = orderItemsData.filter(item => item.productId);
+            this.logger.error(`❌ Items avec productId problématique:`, problematicItems);
+          } else if (fieldName.includes('userId') || fieldName.includes('user')) {
+            this.logger.error(`❌ userId problématique: ${userId}`);
+          }
+        }
+        
+        throw error;
+      }
     });
 
     // ✨ NOUVEAU : Créer automatiquement la commande CJ si nécessaire
@@ -150,13 +293,6 @@ export class OrdersService {
                 },
               },
             },
-            productVariant: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-              },
-            },
           },
         },
       },
@@ -166,18 +302,29 @@ export class OrdersService {
       return null;
     }
 
+    // Type guard pour vérifier que user et items sont bien présents
+    if (!order.user || !order.items) {
+      return null;
+    }
+
+    // Type assertion pour indiquer à TypeScript que user et items sont présents
+    const orderWithIncludes = order as typeof order & {
+      user: NonNullable<typeof order.user>;
+      items: NonNullable<typeof order.items>;
+    };
+
     // Transformer les données pour correspondre à l'interface frontend
-    const shippingAddress = order.user.addresses && order.user.addresses.length > 0
+    const shippingAddress = orderWithIncludes.user.addresses && orderWithIncludes.user.addresses.length > 0
       ? {
-          firstName: order.user.firstName || '',
-          lastName: order.user.lastName || '',
-          street: order.user.addresses[0].street,
+          firstName: orderWithIncludes.user.firstName || '',
+          lastName: orderWithIncludes.user.lastName || '',
+          street: orderWithIncludes.user.addresses[0].street,
           complement: '',
-          city: order.user.addresses[0].city,
-          state: order.user.addresses[0].state,
-          postalCode: order.user.addresses[0].zipCode,
-          country: order.user.addresses[0].country,
-          phone: order.user.phone || '',
+          city: orderWithIncludes.user.addresses[0].city,
+          state: orderWithIncludes.user.addresses[0].state,
+          postalCode: orderWithIncludes.user.addresses[0].zipCode,
+          country: orderWithIncludes.user.addresses[0].country,
+          phone: orderWithIncludes.user.phone || '',
         }
       : null;
 
@@ -189,14 +336,14 @@ export class OrdersService {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       user: {
-        id: order.user.id,
-        name: order.user.name || `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim(),
-        email: order.user.email,
-        firstName: order.user.firstName,
-        lastName: order.user.lastName,
-        phone: order.user.phone,
+        id: orderWithIncludes.user.id,
+        name: orderWithIncludes.user.name || `${orderWithIncludes.user.firstName || ''} ${orderWithIncludes.user.lastName || ''}`.trim(),
+        email: orderWithIncludes.user.email,
+        firstName: orderWithIncludes.user.firstName,
+        lastName: orderWithIncludes.user.lastName,
+        phone: orderWithIncludes.user.phone,
       },
-      items: order.items.map(item => ({
+      items: orderWithIncludes.items.map(item => ({
         id: item.id,
         product: {
           id: item.product.id,

@@ -30,7 +30,29 @@ export function ProductDetailsModal({
   const [reviewSort, setReviewSort] = useState<'recent' | 'helpful' | 'rating'>('recent');
   
   // Parser les variants avec useMemo pour éviter les re-calculs
+  // ✅ Priorité : productVariants (relation Prisma) > variants (JSON)
   const parsedVariants = useMemo(() => {
+    // 1. Essayer d'abord productVariants (relation Prisma) - priorité haute
+    if (product?.productVariants && Array.isArray(product.productVariants) && product.productVariants.length > 0) {
+      // Transformer les ProductVariant en format compatible avec le modal
+      return product.productVariants.map((pv: any) => ({
+        vid: pv.cjVariantId || pv.id,
+        variantName: pv.name || '',
+        variantNameEn: pv.name || '',
+        variantSku: pv.sku || '',
+        variantImage: pv.image || '',
+        variantPrice: pv.price || 0,
+        variantStock: pv.stock || 0,
+        variantWeight: pv.weight || 0,
+        variantDimensions: typeof pv.dimensions === 'string' ? pv.dimensions : JSON.stringify(pv.dimensions || {}),
+        variantProperties: typeof pv.properties === 'string' ? pv.properties : JSON.stringify(pv.properties || {}),
+        isActive: pv.isActive !== false,
+        // Conserver les données originales pour référence
+        _original: pv
+      }));
+    }
+    
+    // 2. Fallback : utiliser variants (champ JSON)
     if (!product?.variants) return [];
     
     // Si c'est déjà un tableau, le retourner
@@ -48,7 +70,7 @@ export function ProductDetailsModal({
     }
     
     return [];
-  }, [product?.variants]);
+  }, [product?.variants, product?.productVariants]);
 
   // Parser les tags de la même manière
 

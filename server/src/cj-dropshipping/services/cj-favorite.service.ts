@@ -50,6 +50,65 @@ export class CJFavoriteService {
   }
 
   /**
+   * Suivre les catégories non mappées
+   */
+  private async trackUnmappedCategory(category: string): Promise<void> {
+    try {
+      // Trouver le fournisseur CJ
+      const supplier = await this.prisma.supplier.findFirst({
+        where: { name: 'CJ Dropshipping' }
+      });
+      
+      if (!supplier) {
+        this.logger.warn('⚠️ Fournisseur CJ Dropshipping introuvable');
+        return;
+      }
+      
+      // Vérifier si la catégorie est déjà mappée
+      const mapping = await this.prisma.categoryMapping.findFirst({
+        where: {
+          supplierId: supplier.id,
+          externalCategory: category
+        }
+      });
+      
+      if (mapping) {
+        // Catégorie déjà mappée, ne rien faire
+        return;
+      }
+      
+      // Compter les produits avec cette catégorie
+      const productCount = await this.prisma.cJProductStore.count({
+        where: { category }
+      });
+      
+      // Créer ou mettre à jour l'enregistrement unmappedExternalCategory
+      await this.prisma.unmappedExternalCategory.upsert({
+        where: {
+          supplierId_externalCategory: {
+            supplierId: supplier.id,
+            externalCategory: category
+          }
+        },
+        create: {
+          supplierId: supplier.id,
+          externalCategory: category,
+          productCount
+        },
+        update: {
+          productCount,
+          updatedAt: new Date()
+        }
+      });
+      
+      this.logger.log(`📊 Catégorie non mappée enregistrée: ${category} (${productCount} produits)`);
+    } catch (error) {
+      this.logger.error(`❌ Erreur tracking catégorie non mappée:`, error);
+      // Ne pas bloquer l'import si cette opération échoue
+    }
+  }
+
+  /**
    * Récupère la liste de mes produits (favoris CJ) avec pagination complète
    */
   async getMyProducts(params: {
@@ -556,6 +615,11 @@ export class CJFavoriteService {
         status: storeProductData.status,
         action: storeResult.isNew ? 'NOUVEAU' : 'MISE_À_JOUR'
       });
+
+      // ✅ Enregistrer la catégorie non mappée si nécessaire
+      if (storeProductData.category) {
+        await this.trackUnmappedCategory(storeProductData.category);
+      }
 
       // ===================================================================
       // ✅ ENRICHIR LES VARIANTS AVEC LEUR STOCK (MÉTHODE OPTIMISÉE)

@@ -21,8 +21,29 @@ export class OrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new order' })
-  createOrder(@GetUser() user: any, @Body() body: { items: any[] }) {
-    return this.ordersService.createOrder(user.userId, body.items);
+  async createOrder(@GetUser() user: any, @Body() body: { items: any[] }) {
+    try {
+      this.logger.log(`📦 Création commande demandée pour user ${user.userId} avec ${body.items?.length || 0} item(s)`);
+      const order = await this.ordersService.createOrder(user.userId, body.items);
+      return order;
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur création commande:`, error);
+      this.logger.error(`❌ Stack trace:`, error.stack);
+      
+      // Retourner un message d'erreur plus clair
+      const errorMessage = error.message || 'Erreur lors de la création de la commande';
+      const statusCode = error.code === 'P2003' ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR;
+      
+      throw new HttpException(
+        {
+          statusCode,
+          message: errorMessage,
+          error: error.code || 'INTERNAL_SERVER_ERROR',
+          details: error.meta || null,
+        },
+        statusCode
+      );
+    }
   }
 
   @Get()
@@ -49,6 +70,74 @@ export class OrdersController {
     } catch (error: any) {
       throw new HttpException(
         error.message || 'Erreur création commande CJ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Ajouter une commande CJ au panier
+   * POST /api/orders/:id/cj-add-cart
+   */
+  @Post(':id/cj-add-cart')
+  @ApiOperation({ summary: 'Ajouter une commande CJ au panier' })
+  async addCJOrderToCart(@Param('id') id: string) {
+    try {
+      const mapping = await this.prisma.cJOrderMapping.findUnique({
+        where: { orderId: id },
+      });
+
+      if (!mapping) {
+        throw new HttpException(
+          'Commande CJ non trouvée',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const result = await this.orderCJIntegration.addCJOrderToCart(mapping.cjOrderId);
+      
+      return {
+        success: true,
+        message: 'Commande ajoutée au panier CJ avec succès',
+        data: result,
+      };
+    } catch (error: any) {
+      throw new HttpException(
+        error.message || 'Erreur lors de l\'ajout au panier CJ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Confirmer le panier CJ pour une commande
+   * POST /api/orders/:id/cj-confirm-cart
+   */
+  @Post(':id/cj-confirm-cart')
+  @ApiOperation({ summary: 'Confirmer le panier CJ pour une commande' })
+  async confirmCJCart(@Param('id') id: string) {
+    try {
+      const mapping = await this.prisma.cJOrderMapping.findUnique({
+        where: { orderId: id },
+      });
+
+      if (!mapping) {
+        throw new HttpException(
+          'Commande CJ non trouvée',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const result = await this.orderCJIntegration.confirmCJCart(mapping.cjOrderId);
+      
+      return {
+        success: true,
+        message: 'Panier CJ confirmé avec succès',
+        data: result,
+      };
+    } catch (error: any) {
+      throw new HttpException(
+        error.message || 'Erreur lors de la confirmation du panier CJ',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -112,6 +112,49 @@ export class CJOrderService {
   }
 
   /**
+   * Ajouter une commande au panier CJ
+   */
+  async addCart(cjOrderIdList: string[]): Promise<{
+    successCount: number;
+    addSuccessOrders: string[];
+    unInterceptAddressCount: number;
+    interceptOrders: any[];
+  }> {
+    try {
+      const client = await this.initializeClient();
+      this.logger.log(`🛒 Ajout de ${cjOrderIdList.length} commande(s) au panier CJ`);
+      const result = await client.addCart(cjOrderIdList);
+      this.logger.log(`✅ ${result.successCount} commande(s) ajoutée(s) au panier avec succès`);
+      return result;
+    } catch (error) {
+      this.logger.error('Erreur lors de l\'ajout au panier CJ:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Confirmer le panier CJ
+   */
+  async addCartConfirm(cjOrderIdList: string[]): Promise<{
+    successCount: number;
+    submitSuccess: boolean;
+    shipmentsId: string;
+    result: number;
+    interceptOrders: any[];
+  }> {
+    try {
+      const client = await this.initializeClient();
+      this.logger.log(`✅ Confirmation de ${cjOrderIdList.length} commande(s) dans le panier CJ`);
+      const result = await client.addCartConfirm(cjOrderIdList);
+      this.logger.log(`✅ Panier confirmé: ${result.submitSuccess ? 'Succès' : 'Échec'}`);
+      return result;
+    } catch (error) {
+      this.logger.error('Erreur lors de la confirmation du panier CJ:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Obtenir le statut d'une commande
    */
   async getOrderStatus(orderId: string): Promise<CJOrder> {

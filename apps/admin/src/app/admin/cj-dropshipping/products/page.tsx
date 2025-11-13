@@ -4,6 +4,7 @@ import { ProductDetailsModal } from '@/components/cj/ProductDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { useToast } from '@/contexts/ToastContext';
 import { useCJDropshipping } from '@/hooks/useCJDropshipping';
 import { CJProduct, CJProductSearchFilters } from '@/types/cj.types';
@@ -45,7 +46,8 @@ export default function CJProductsPage() {
   const [syncing, setSyncing] = useState(false);
   const [loadingDefault, setLoadingDefault] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [loadingCategories, setLoadingCategories] = useState(false);
   
   // États pour la sélection multiple
@@ -85,28 +87,38 @@ export default function CJProductsPage() {
         const connectionResult = await testConnection();
         
         if (connectionResult.success) {
-          // Utiliser les catégories et produits de la connexion
+          // Utiliser les catégories de la connexion
           if (connectionResult.categories) {
             setCategories(Array.isArray(connectionResult.categories) ? connectionResult.categories : []);
             console.log('Catégories chargées via connexion:', connectionResult.categoriesCount);
           }
           
-          if (connectionResult.products) {
-            setProducts(Array.isArray(connectionResult.products) ? connectionResult.products : []);
-            console.log('Produits chargés via connexion:', connectionResult.productsCount);
-          }
+          // Charger les produits avec pagination via getDefaultProducts pour obtenir les vraies infos
+          const result = await getDefaultProducts({
+            pageNum: 1,
+            pageSize: 100,
+            countryCode: undefined
+          });
+          setProducts(result.products || []);
+          setTotalPages(result.totalPages || 1);
+          setTotalProducts(result.total || 0);
+          setCurrentPage(result.pageNumber || 1);
+          console.log(`✅ Produits chargés: ${result.products.length} sur ${result.total} total (${result.totalPages} pages)`);
         } else {
           // En cas d'échec, charger séparément (fallback)
           console.log('Connexion échouée, chargement séparé...');
           const categoriesData = await getCategories();
           setCategories(Array.isArray(categoriesData) ? categoriesData : []);
           
-          const defaultProducts = await getDefaultProducts({
+          const result = await getDefaultProducts({
             pageNum: 1,
-            pageSize: 50,
+            pageSize: 100,
             countryCode: undefined // ✅ Tous les pays par défaut
           });
-          setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
+          setProducts(result.products || []);
+          setTotalPages(result.totalPages || 1);
+          setTotalProducts(result.total || 0);
+          setCurrentPage(result.pageNumber || 1);
         }
       } catch (error) {
         console.error('Erreur lors du chargement initial:', error);
@@ -119,52 +131,38 @@ export default function CJProductsPage() {
     loadInitialData();
   }, []);
 
-  // L'ancien useEffect pour charger les produits par défaut est maintenant intégré dans loadInitialData
-
-  const loadMoreProducts = async () => {
-    if (loadingDefault || !hasMoreProducts) return;
+  // Fonction pour charger une page spécifique (remplace loadMoreProducts)
+  const loadPage = async (page: number) => {
+    if (loadingDefault || page < 1 || page > totalPages) return;
     
     setLoadingDefault(true);
     try {
-      const nextPage = currentPage + 1;
-      console.log(`🔄 Chargement page ${nextPage} (page courante: ${currentPage})`);
+      console.log(`🔄 Chargement page ${page}`);
       
-      const moreProducts = await getDefaultProducts({
-        pageNum: nextPage,
-        pageSize: 50,
+      const result = await getDefaultProducts({
+        pageNum: page,
+        pageSize: 100,
         countryCode: undefined // ✅ Tous les pays par défaut
       });
       
-      console.log(`📦 ${moreProducts.length} nouveaux produits reçus pour la page ${nextPage}`);
+      console.log(`📦 ${result.products.length} produits reçus pour la page ${page} sur ${result.total} total (${result.totalPages} pages)`);
       
-      if (moreProducts.length === 0) {
-        console.log('❌ Aucun nouveau produit, fin de pagination');
-        setHasMoreProducts(false);
-      } else {
-        // 🔧 CORRECTION : Éviter les doublons en filtrant les PIDs existants
-        const existingPids = new Set(products.map(p => p.pid));
-        const newProducts = moreProducts.filter(p => !existingPids.has(p.pid));
-        
-        console.log(`📦 ${moreProducts.length} produits reçus, ${newProducts.length} nouveaux (${moreProducts.length - newProducts.length} doublons filtrés)`);
-        
-        if (newProducts.length > 0) {
-          setProducts(prev => [...prev, ...newProducts]);
-          setCurrentPage(nextPage);
-        } else {
-          console.log('⚠️ Tous les produits sont des doublons, fin de pagination');
-          setHasMoreProducts(false);
-        }
-        
-        // Si on a moins de 50 produits, on a probablement atteint la fin
-        if (moreProducts.length < 50) {
-          console.log('⚠️ Moins de 50 produits reçus, probablement la fin');
-          setHasMoreProducts(false);
-        }
-      }
+      // Remplacer les produits au lieu de les ajouter
+      setProducts(result.products || []);
+      setTotalPages(result.totalPages || 1);
+      setTotalProducts(result.total || 0);
+      setCurrentPage(result.pageNumber || page);
     } catch (err) {
-      console.error('Erreur lors du chargement de plus de produits:', err);
+      console.error('Erreur lors du chargement de la page:', err);
     } finally {
       setLoadingDefault(false);
+    }
+  };
+
+  // Gestion du changement de page
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      loadPage(page);
     }
   };
 
@@ -901,10 +899,11 @@ export default function CJProductsPage() {
                         pageNum: 1,
                         pageSize: 100,
                         countryCode: undefined
-                      }).then((defaultProducts) => {
-                        setProducts(Array.isArray(defaultProducts) ? defaultProducts : []);
-                        setCurrentPage(1);
-                        setHasMoreProducts(true);
+                      }).then((result) => {
+                        setProducts(result.products || []);
+                        setTotalPages(result.totalPages || 1);
+                        setTotalProducts(result.total || 0);
+                        setCurrentPage(result.pageNumber || 1);
                         window.dispatchEvent(new Event('refreshStoreNotifications'));
                       });
                     }
@@ -1335,17 +1334,21 @@ export default function CJProductsPage() {
             ))}
           </div>
           
-          {/* Bouton Charger plus */}
-          {hasMoreProducts && (
-            <div className="flex justify-center mt-8">
-              <Button
-                onClick={loadMoreProducts}
-                disabled={loadingDefault}
-                variant="outline"
-                className="px-8 py-2"
-              >
-                {loadingDefault ? 'Chargement...' : 'Charger plus de produits'}
-              </Button>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              totalItems={totalProducts}
+              itemsPerPage={100}
+            />
+          )}
+          
+          {/* Debug info (à retirer en production) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
+              Debug: Page {currentPage}/{totalPages} | Total: {totalProducts} produits
             </div>
           )}
         </div>

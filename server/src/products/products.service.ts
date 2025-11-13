@@ -1,12 +1,20 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { PrepareProductDto } from './dto/prepare-product.dto';
 import { EditProductDto } from './dto/edit-product.dto';
+import { CJAPIClient } from '../cj-dropshipping/cj-api-client';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ProductsService.name);
+  private cjClient: CJAPIClient | null = null;
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService
+  ) {}
 
   // ✅ Fonction utilitaire pour traiter les images et formater la description
   private processProductImages(product: any) {
@@ -73,14 +81,21 @@ export class ProductsService {
         supplier: true, // ✅ Ajouter la relation supplier
         images: true,
         productVariants: {
+          // ✅ Inclure TOUS les champs nécessaires des variants pour la création de commandes
           select: {
             id: true,
+            productId: true,
             cjVariantId: true,
             sku: true,
             name: true,
             price: true,
             stock: true,
             status: true,
+            isActive: true, // ✅ Important pour filtrer les variants actifs
+            weight: true,
+            dimensions: true,
+            image: true,
+            properties: true,
           },
         },
       },
@@ -127,6 +142,27 @@ export class ProductsService {
         category: true,
         supplier: true, // ✅ Ajouter la relation supplier
         images: true,
+        productVariants: {
+          // ✅ Inclure TOUS les champs des variants
+          select: {
+            id: true,
+            productId: true,
+            cjVariantId: true,
+            name: true,
+            sku: true,
+            price: true,
+            weight: true,
+            dimensions: true,
+            image: true,
+            status: true,
+            properties: true,
+            stock: true,
+            isActive: true,
+            lastSyncAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         reviews: {
           include: {
             user: {
@@ -195,6 +231,28 @@ export class ProductsService {
           }
         },
         cjMapping: true, // ✅ Inclure le mapping CJ
+        productVariants: {
+          // ✅ Inclure TOUS les champs des variants pour la page validation
+          select: {
+            id: true,
+            productId: true,
+            cjVariantId: true,
+            name: true,
+            sku: true,
+            price: true,
+            weight: true,
+            dimensions: true,
+            image: true,
+            status: true,
+            properties: true,
+            stock: true,
+            isActive: true,
+            lastSyncAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        images: true, // ✅ Inclure aussi les images
       },
       orderBy: {
         createdAt: 'desc',
@@ -394,21 +452,64 @@ export class ProductsService {
     }
   }
 
+  /**
+   * Initialiser le client CJ API si nécessaire
+   */
+  private async initializeCJClient(): Promise<CJAPIClient> {
+    if (this.cjClient) {
+      return this.cjClient;
+    }
+
+    this.logger.log('🚀 Initialisation du client CJ pour import produit...');
+    
+    // Créer le client CJ avec la configuration
+    this.cjClient = new CJAPIClient(this.configService, this.prisma);
+    
+    // Charger la configuration depuis la base de données
+    const config = await this.prisma.cJConfig.findFirst();
+    if (!config?.enabled) {
+      throw new Error('L\'intégration CJ Dropshipping est désactivée');
+    }
+
+    // Initialiser la configuration du client
+    this.cjClient.setConfig({
+      email: config.email,
+      apiKey: config.apiKey,
+      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
+      platformToken: config.platformToken,
+      debug: process.env.CJ_DEBUG === 'true',
+    });
+
+    // ✅ Essayer de charger le token depuis la base de données
+    const tokenLoaded = await this.cjClient.loadTokenFromDatabase();
+    
+    if (!tokenLoaded) {
+      // Si le token n'est pas en base ou est expiré, faire un login
+      this.logger.log('🔑 Token non trouvé en base ou expiré - Login CJ requis');
+      await this.cjClient.login();
+      this.logger.log('✅ Login CJ réussi');
+    } else {
+      this.logger.log('✅ Token CJ chargé depuis la base de données');
+    }
+    
+    return this.cjClient;
+  }
+
   async importCJProduct(importData: any) {
     try {
       const { pid, variantSku, categoryId, supplierId } = importData;
 
+      this.logger.log(`🔄 === IMPORT PRODUIT CJ (PID: ${pid}, Variant: ${variantSku}) ===`);
+
       // Vérifier si le produit existe déjà
       const existingProduct = await this.prisma.product.findFirst({
         where: {
-          cjMapping: {
-            cjProductId: pid,
-            cjSku: variantSku
-          }
+          cjProductId: pid
         }
       });
 
       if (existingProduct) {
+        this.logger.log(`⚠️ Produit déjà importé: ${existingProduct.id}`);
         return {
           success: false,
           error: 'Ce produit CJ est déjà importé',
@@ -423,26 +524,53 @@ export class ProductsService {
       }
 
       const cjProduct = cjDetails.data;
-      const variant = cjProduct.variants?.find(v => v.variantSku === variantSku);
+      const selectedVariant = cjProduct.variants?.find(v => v.variantSku === variantSku);
 
-      if (!variant) {
+      if (!selectedVariant) {
         throw new Error('Variante non trouvée');
       }
 
-      // Créer le produit dans la base locale avec statut 'draft'
+      // ✅ Récupérer TOUTES les données CJ détaillées
+      const productImage = Array.isArray(cjProduct.productImage) 
+        ? JSON.stringify(cjProduct.productImage) 
+        : (cjProduct.productImage || '[]');
+
+      // ✅ Créer le produit avec TOUTES les données CJ
       const product = await this.prisma.product.create({
         data: {
           name: cjProduct.productNameEn || cjProduct.productName,
-          description: cjProduct.productDescriptionEn || cjProduct.productDescription,
-          price: parseFloat(variant.sellPrice) || 0,
-          originalPrice: parseFloat(variant.originalPrice) || 0,
-          image: JSON.stringify(cjProduct.productImage || []),
+          description: cjProduct.productDescriptionEn || cjProduct.productDescription || '',
+          price: parseFloat(selectedVariant.variantSellPrice || selectedVariant.sellPrice || '0'),
+          originalPrice: parseFloat(selectedVariant.originalPrice || selectedVariant.variantOriginalPrice || '0'),
+          image: productImage,
           categoryId,
           supplierId,
           externalCategory: cjProduct.categoryName,
           source: 'cj-dropshipping',
           status: 'draft',
-          stock: variant.stock || 0,
+          stock: selectedVariant.stock || 0,
+          
+          // ✅ TOUTES les données CJ détaillées
+          cjProductId: pid,
+          productSku: cjProduct.productSku || '',
+          productWeight: cjProduct.productWeight || null,
+          packingWeight: cjProduct.packingWeight || null,
+          productType: cjProduct.productType || null,
+          productUnit: cjProduct.productUnit || null,
+          productKeyEn: cjProduct.productKeyEn || null,
+          materialNameEn: cjProduct.materialNameEn || null,
+          packingNameEn: cjProduct.packingNameEn || null,
+          suggestSellPrice: cjProduct.suggestSellPrice || null,
+          listedNum: cjProduct.listedNum || null,
+          supplierName: cjProduct.supplierName || null,
+          createrTime: cjProduct.createrTime || null,
+          variants: JSON.stringify(cjProduct.variants || []), // ✅ Sauvegarder tous les variants en JSON
+          cjReviews: JSON.stringify(cjProduct.reviews || cjProduct.cjReviews || []),
+          dimensions: cjProduct.dimensions || null,
+          brand: cjProduct.brand || null,
+          tags: JSON.stringify(cjProduct.tags || []),
+          
+          // ✅ Créer le mapping CJ
           cjMapping: {
             create: {
               cjProductId: pid,
@@ -457,12 +585,133 @@ export class ProductsService {
         }
       });
 
+      this.logger.log(`✅ Produit créé: ${product.id} - ${product.name}`);
+
+      // ✅ Créer les ProductVariant pour TOUS les variants
+      try {
+        const client = await this.initializeCJClient();
+        const variantsWithStock = await client.getProductVariantsWithStock(pid);
+
+        if (variantsWithStock && variantsWithStock.length > 0) {
+          this.logger.log(`📦 Création de ${variantsWithStock.length} variants dans ProductVariant...`);
+
+          let createdCount = 0;
+          let updatedCount = 0;
+
+          for (const variant of variantsWithStock) {
+            try {
+              // Parser variantKey
+              let parsedKey = variant.variantKey || '';
+              try {
+                if (parsedKey && parsedKey.startsWith('[')) {
+                  const parsed = JSON.parse(parsedKey);
+                  parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+                }
+              } catch {
+                // Garder la valeur originale
+              }
+
+              const variantData = {
+                name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
+                sku: variant.variantSku,
+                price: variant.variantSellPrice || 0,
+                weight: variant.variantWeight || null,
+                dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+                  ? JSON.stringify({
+                      length: variant.variantLength,
+                      width: variant.variantWidth,
+                      height: variant.variantHeight,
+                      volume: variant.variantVolume
+                    })
+                  : null,
+                image: variant.variantImage || null,
+                stock: variant.stock || 0,
+                properties: JSON.stringify({
+                  key: parsedKey,
+                  property: variant.variantProperty || '',
+                  standard: variant.variantStandard || '',
+                  unit: variant.variantUnit || ''
+                }),
+                status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
+                lastSyncAt: new Date()
+              };
+
+              // Créer/mettre à jour le variant dans ProductVariant
+              const result = await this.prisma.productVariant.upsert({
+                where: {
+                  cjVariantId: variant.vid
+                },
+                update: variantData,
+                create: {
+                  ...variantData,
+                  cjVariantId: variant.vid,
+                  productId: product.id
+                }
+              });
+
+              if (result) {
+                createdCount++;
+              } else {
+                updatedCount++;
+              }
+            } catch (variantError: any) {
+              this.logger.warn(`⚠️ Erreur création variant ${variant.vid}: ${variantError.message}`);
+            }
+          }
+
+          this.logger.log(`✅ Variants créés: ${createdCount}, mis à jour: ${updatedCount}`);
+        } else {
+          this.logger.warn('⚠️ Aucun variant avec stock trouvé, création depuis les variants du produit...');
+          
+          // Fallback : créer les variants depuis cjProduct.variants si disponibles
+          if (cjProduct.variants && Array.isArray(cjProduct.variants)) {
+            for (const variant of cjProduct.variants) {
+              try {
+                await this.prisma.productVariant.create({
+                  data: {
+                    productId: product.id,
+                    cjVariantId: variant.vid || variant.variantId || '',
+                    name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
+                    sku: variant.variantSku || '',
+                    price: parseFloat(variant.variantSellPrice || variant.sellPrice || '0'),
+                    stock: variant.stock || 0,
+                    status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
+                    isActive: true
+                  }
+                });
+              } catch (variantError: any) {
+                // Ignorer les erreurs de doublons
+                if (!variantError.message?.includes('Unique constraint')) {
+                  this.logger.warn(`⚠️ Erreur création variant fallback: ${variantError.message}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (variantsError: any) {
+        this.logger.error(`❌ Erreur lors de la création des variants: ${variantsError.message}`);
+        // Ne pas faire échouer l'import si les variants échouent
+      }
+
+      // ✅ Retourner le produit avec les variants
+      const productWithVariants = await this.prisma.product.findUnique({
+        where: { id: product.id },
+        include: {
+          category: true,
+          supplier: true,
+          cjMapping: true,
+          productVariants: true
+        }
+      });
+
+      this.logger.log(`✅ Import terminé: ${productWithVariants?.productVariants?.length || 0} variants créés`);
+
       return {
         success: true,
-        data: product
+        data: productWithVariants
       };
     } catch (error) {
-      console.error('Erreur import produit CJ:', error);
+      this.logger.error('❌ Erreur import produit CJ:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erreur inconnue',
@@ -1117,7 +1366,27 @@ export class ProductsService {
         category: true,
         supplier: true,
         images: true,
-        productVariants: true, // ✅ Inclure les variants
+        productVariants: {
+          // ✅ Inclure TOUS les champs des variants
+          select: {
+            id: true,
+            productId: true,
+            cjVariantId: true,
+            name: true,
+            sku: true,
+            price: true,
+            weight: true,
+            dimensions: true,
+            image: true,
+            status: true,
+            properties: true,
+            stock: true,
+            isActive: true,
+            lastSyncAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         cjMapping: true
       },
       orderBy: {
@@ -1127,10 +1396,30 @@ export class ProductsService {
     
     console.log(`📋 [GET-DRAFT] ${products.length} produit(s) draft trouvé(s)`);
     if (products.length > 0) {
-      console.log('📋 [GET-DRAFT] Produits:', products.map(p => ({ id: p.id, name: p.name, status: p.status })));
+      console.log('📋 [GET-DRAFT] Produits:', products.map(p => ({ 
+        id: p.id, 
+        name: p.name, 
+        status: p.status,
+        variantsCount: p.productVariants?.length || 0,
+        hasVariantsJson: !!p.variants,
+        variantsJsonLength: (() => {
+          if (!p.variants) return 0;
+          try {
+            // p.variants est toujours une string selon Prisma, on doit la parser
+            const variantsValue = p.variants as string | null | undefined;
+            if (!variantsValue || typeof variantsValue !== 'string') return 0;
+            
+            const parsed = JSON.parse(variantsValue);
+            return Array.isArray(parsed) ? parsed.length : 0;
+          } catch {
+            return 0;
+          }
+        })()
+      })));
     }
     
-    return products;
+    // ✅ Traiter les images pour chaque produit
+    return products.map(product => this.processProductImages(product));
   }
 
   /**
@@ -1143,7 +1432,27 @@ export class ProductsService {
         category: true,
         supplier: true,
         images: true,
-        productVariants: true, // ✅ Inclure les variants
+        productVariants: {
+          // ✅ Inclure TOUS les champs des variants
+          select: {
+            id: true,
+            productId: true,
+            cjVariantId: true,
+            name: true,
+            sku: true,
+            price: true,
+            weight: true,
+            dimensions: true,
+            image: true,
+            status: true,
+            properties: true,
+            stock: true,
+            isActive: true,
+            lastSyncAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         cjMapping: true
       }
     });
@@ -1152,7 +1461,8 @@ export class ProductsService {
       throw new NotFoundException('Produit draft non trouvé');
     }
 
-    return product;
+    // ✅ Traiter les images pour le produit
+    return this.processProductImages(product);
   }
 
   /**
