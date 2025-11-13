@@ -256,7 +256,7 @@ export default function DraftProductsPage() {
             cjVariantId: String(v.vid || v.variantId || ''),
             name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
             sku: v.variantSku || v.sku || '',
-            price: parseFloat(v.variantPrice || v.price || 0),
+            price: parseFloat(v.variantSellPrice || v.variantPrice || v.price || v.sellPrice || 0),
             stock: parseInt(v.variantStock || v.stock || 0, 10),
             weight: parseFloat(v.variantWeight || v.weight || 0),
             dimensions: typeof v.variantDimensions === 'string' ? v.variantDimensions : JSON.stringify(v.variantDimensions || {}),
@@ -635,6 +635,66 @@ export default function DraftProductsPage() {
               return cleanColor
             })
             .filter((c): c is string => c !== null && c !== undefined && c.length > 0 && c.length < 50) // Augmenter la limite à 50 pour les couleurs complexes
+        }
+        
+        // ✅ PRIORITÉ 0 : Extraire depuis le champ variants JSON (pour les produits CJ sans ProductVariant)
+        // Ex: variantKey "Black Zone2-S", "Blue Zone4-M", "Red Zone8-XL"
+        if (product?.variants && typeof product.variants === 'string' && product.variants.length > 0) {
+          try {
+            const variantsArray = JSON.parse(product.variants)
+            if (Array.isArray(variantsArray) && variantsArray.length > 0) {
+              console.log('🔍 [DEBUG] Parsing variants JSON:', variantsArray.length)
+              
+              // Map pour éviter les doublons
+              const colorImageMap = new Map<string, string>()
+              
+              variantsArray.forEach((v: any) => {
+                if (!v.variantKey || !v.variantImage) return
+                
+                let extractedColor = ''
+                
+                // Pattern : "Black Zone2-S", "Blue Zone4-M", "Red Zone8-XL"
+                // Extraction : UNIQUEMENT le mot avant "Zone"
+                const zoneMatch = v.variantKey.match(/^([A-Za-z]+)\s*Zone\d+/i)
+                if (zoneMatch && zoneMatch[1]) {
+                  extractedColor = zoneMatch[1].trim()
+                  console.log(`✅ [DEBUG] Zone pattern: "${v.variantKey}" → "${extractedColor}"`)
+                } else {
+                  // Pattern standard : "Brown-35", "Black Single Liner-35"
+                  const firstWord = v.variantKey.split(/[-\s]/)[0]
+                  if (firstWord && /^[A-Za-z]+$/.test(firstWord)) {
+                    extractedColor = firstWord.trim()
+                    console.log(`✅ [DEBUG] Standard pattern: "${v.variantKey}" → "${extractedColor}"`)
+                  }
+                }
+                
+                // Vérifier que c'est une couleur connue
+                if (extractedColor) {
+                  const knownColors = ['black', 'white', 'brown', 'gray', 'grey', 'blue', 'red', 'green', 'yellow', 'pink', 'purple', 'orange', 'khaki', 'beige', 'navy', 'tan', 'burgundy', 'wine', 'ivory', 'cream', 'gold', 'silver', 'platinum']
+                  const colorLower = extractedColor.toLowerCase()
+                  
+                  if (knownColors.includes(colorLower) && !colorImageMap.has(colorLower)) {
+                    colorImageMap.set(colorLower, v.variantImage)
+                    console.log(`✅ [DEBUG] Color added from JSON: "${extractedColor}" → image`)
+                  }
+                }
+              })
+              
+              // Ajouter les couleurs trouvées
+              colorImageMap.forEach((image, colorLower) => {
+                const colorName = colorLower.charAt(0).toUpperCase() + colorLower.slice(1)
+                info.colors.push({ name: colorName, image })
+              })
+              
+              // Si on a trouvé des couleurs dans le JSON, on peut retourner ici
+              if (info.colors.length > 0) {
+                console.log(`✅ [DEBUG] ${info.colors.length} couleurs extraites du JSON`)
+                return info
+              }
+            }
+          } catch (e) {
+            console.error('❌ [DEBUG] Erreur parsing variants JSON:', e)
+          }
         }
         
         // Essayer d'associer avec les images des variants si disponibles
@@ -2047,7 +2107,7 @@ export default function DraftProductsPage() {
                                   cjVariantId: String(v.vid || v.variantId || ''),
                                   name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
                                   sku: v.variantSku || v.sku || '',
-                                  price: parseFloat(v.variantPrice || v.price || 0),
+                                  price: parseFloat(v.variantSellPrice || v.variantPrice || v.price || v.sellPrice || 0),
                                   stock: parseInt(v.variantStock || v.stock || 0, 10),
                                   weight: parseFloat(v.variantWeight || v.weight || 0),
                                   dimensions: typeof v.variantDimensions === 'string' ? v.variantDimensions : JSON.stringify(v.variantDimensions || {}),

@@ -384,6 +384,10 @@ export class DuplicatePreventionService {
    */
   async upsertCJStoreProduct(productData: any): Promise<{ isNew: boolean; productId: string }> {
     try {
+      const existing = await this.prisma.cJProductStore.findUnique({
+        where: { cjProductId: productData.cjProductId }
+      });
+      
       const result = await this.prisma.cJProductStore.upsert({
         where: { cjProductId: productData.cjProductId },
         update: {
@@ -398,9 +402,17 @@ export class DuplicatePreventionService {
           productWeight: productData.productWeight,
           suggestSellPrice: productData.suggestSellPrice,
           variants: productData.variants,
+          // ✅ Préserver le statut d'import s'il existe
+          importStatus: existing?.importStatus || 'not_imported',
+          importedProductId: existing?.importedProductId || null,
           updatedAt: new Date()
         },
-        create: productData
+        create: {
+          ...productData,
+          // ✅ Initialiser le statut d'import pour les nouveaux produits
+          importStatus: 'not_imported',
+          importedProductId: null
+        }
       });
 
       const isNew = result.createdAt.getTime() === result.updatedAt.getTime();

@@ -385,6 +385,10 @@ model CJProductStore {
   category      String?
   status        String  @default("available") // available, selected, imported
   isFavorite    Boolean @default(false) // Marquer comme favori CJ
+  
+  // ✅ NOUVEAU : Statut d'importation pour la solution hybride
+  importStatus  String  @default("not_imported") // not_imported, imported_draft, imported_published
+  importedProductId String? // ID du produit dans la table Product (si importé)
 
   // 🔧 AJOUTER TOUS LES CHAMPS DÉTAILLÉS
   productSku       String?
