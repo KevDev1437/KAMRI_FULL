@@ -793,6 +793,7 @@ export default function SuppliersPage() {
                                           <th className="text-left p-3 font-medium text-gray-700">VID</th>
                                           <th className="text-left p-3 font-medium text-gray-700">SKU</th>
                                           <th className="text-left p-3 font-medium text-gray-700">Prix</th>
+                                          <th className="text-left p-3 font-medium text-gray-700">Stock</th>
                                           <th className="text-left p-3 font-medium text-gray-700">Poids</th>
                                           <th className="text-left p-3 font-medium text-gray-700">Dimensions</th>
                                         </tr>
@@ -834,6 +835,23 @@ export default function SuppliersPage() {
                                               {variant.variantSellPrice ? (
                                                 <span className="font-semibold text-green-600">
                                                   ${typeof variant.variantSellPrice === 'string' ? variant.variantSellPrice : variant.variantSellPrice.toFixed(2)}
+                                                </span>
+                                              ) : (
+                                                <span className="text-gray-400">N/A</span>
+                                              )}
+                                            </td>
+                                            <td className="p-3">
+                                              {variant.variantStock !== undefined && variant.variantStock !== null ? (
+                                                <span className={`font-semibold ${
+                                                  variant.variantStock > 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  {variant.variantStock}
+                                                </span>
+                                              ) : variant.stock !== undefined && variant.stock !== null ? (
+                                                <span className={`font-semibold ${
+                                                  variant.stock > 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  {variant.stock}
                                                 </span>
                                               ) : (
                                                 <span className="text-gray-400">N/A</span>

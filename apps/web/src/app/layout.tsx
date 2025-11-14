@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import ConnectedProviders from '../components/ConnectedProviders'
 import { AppProvider } from '../contexts/AppContext'
 import { AuthProvider } from '../contexts/AuthContext'
+import { ToastProvider } from '../contexts/ToastContext'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -23,11 +24,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <AppProvider>
-            <ConnectedProviders>
-              <div className="min-h-screen bg-[#F5F5F5]">
-                <main>{children}</main>
-              </div>
-            </ConnectedProviders>
+            <ToastProvider>
+              <ConnectedProviders>
+                <div className="min-h-screen bg-[#F5F5F5]">
+                  <main>{children}</main>
+                </div>
+              </ConnectedProviders>
+            </ToastProvider>
           </AppProvider>
         </AuthProvider>
       </body>

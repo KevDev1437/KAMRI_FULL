@@ -312,7 +312,8 @@ export class CJWebhookService {
                         height: v.variantHeight
                       }) : null,
                     image: v.variantImage || null,
-                    status: variantStatus,
+                    stock: parseInt(v.stock || v.variantStock || '0', 10), // ✅ AJOUT DU STOCK
+                    status: variantStatus || ((parseInt(v.stock || '0', 10) > 0) ? 'available' : 'out_of_stock'),
                     properties: JSON.stringify({
                       key: v.variantKey || '',
                       value1: v.variantValue1 || '',

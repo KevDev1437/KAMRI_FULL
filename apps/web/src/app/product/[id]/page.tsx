@@ -10,13 +10,32 @@ import SimilarProducts from '../../../components/SimilarProducts';
 import { apiClient } from '../../../lib/api';
 
 
+interface ProductVariant {
+  id: string;
+  productId: string;
+  cjVariantId: string | null;
+  name: string | null;
+  sku: string | null;
+  price: number | null;
+  weight: number | null;
+  dimensions: string | null;
+  image: string | null;
+  status: string | null;
+  properties: string | null;
+  stock: number | null;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Product {
   id: string;
   name: string;
   price: number;
   originalPrice?: number;
   image?: string;
-  images?: Array<{ url: string; alt?: string }>; // ✅ Structure correcte pour les images
+  images?: string[]; // Array de strings pour les URLs d'images
   category?: {
     id: string;
     name: string;
@@ -37,6 +56,9 @@ interface Product {
   stockCount?: number;
   stock: number;
   status: string;
+  // ✅ AJOUT : Support des variants CJ
+  productVariants?: ProductVariant[];
+  variants?: string; // JSON string des variants CJ
 }
 
 // Fonction pour récupérer des produits similaires
@@ -54,6 +76,7 @@ export default function ProductDetailsPage() {
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [variantImage, setVariantImage] = useState<string | null>(null); // ✅ Image du variant sélectionné
 
   useEffect(() => {
     const loadProductData = async () => {
@@ -67,15 +90,15 @@ export default function ProductDetailsPage() {
         if (productResponse.data) {
           // L'API backend retourne { data: product, message: '...' }
           // Notre API client retourne { data: { data: product, message: '...' } }
-          const backendData = productResponse.data.data || productResponse.data;
+          const backendData = (productResponse.data as any)?.data || productResponse.data;
           console.log('📦 [ProductDetail] Product data:', backendData);
           setProduct(backendData);
           
           // Charger tous les produits pour les produits similaires
           const productsResponse = await apiClient.getProducts();
           if (productsResponse.data) {
-            // Même logique pour les produits
-            const backendProductsData = productsResponse.data.data || productsResponse.data;
+            // Même logique pour les produits - gérer les deux formats de réponse
+            const backendProductsData = (productsResponse.data as any)?.data || productsResponse.data;
             const products = Array.isArray(backendProductsData) ? backendProductsData : [];
             setAllProducts(products);
             
@@ -147,10 +170,16 @@ export default function ProductDetailsPage() {
             images={product.images || [product.image || '/images/modelo.png']}
             mainImage={product.image || '/images/modelo.png'}
             productName={product.name}
+            variantImage={variantImage} // ✅ Passer l'image du variant
           />
           
           {/* Informations produit */}
-          <ProductInfo product={product} />
+          <ProductInfo 
+            product={product}
+            onVariantChange={(variant, image) => {
+              setVariantImage(image); // ✅ Mettre à jour l'image
+            }}
+          />
         </div>
         
         {/* Produits similaires */}

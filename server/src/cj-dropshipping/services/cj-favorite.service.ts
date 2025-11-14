@@ -96,8 +96,8 @@ export class CJFavoriteService {
           productCount
         },
         update: {
-          productCount,
-          updatedAt: new Date()
+          productCount
+          // updatedAt est géré automatiquement par Prisma (@updatedAt)
         }
       });
       

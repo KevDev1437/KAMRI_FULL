@@ -669,7 +669,12 @@ export default function ProductsPage() {
                         <Eye className="w-3 h-3 mr-1" />
                         Voir détails
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => window.location.href = `/admin/products/${product.id}/edit`}
+                      >
                         <Edit className="w-3 h-3 mr-1" />
                         Modifier
                       </Button>

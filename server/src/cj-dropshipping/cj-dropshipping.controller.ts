@@ -275,6 +275,41 @@ export class CJDropshippingController {
     }
   }
 
+  @Get('products/:pid/stock')
+  @ApiOperation({ summary: 'Obtenir le stock en masse de TOUS les variants d\'un produit (optimisé)' })
+  @ApiResponse({ status: 200, description: 'Stock de tous les variants en 1 requête' })
+  async getProductStockBulk(@Param('pid') pid: string) {
+    this.logger.log(`⚡ === RÉCUPÉRATION STOCK BULK POUR PID: ${pid} ===`);
+    
+    try {
+      // Obtenir le client CJ initialisé via le service produit
+      const productService = this.cjMainService['cjProductService'];
+      const client = await productService['initializeClient']();
+      const stockMap = await client.getProductInventoryBulk(pid);
+      
+      // Convertir la Map en objet pour JSON
+      const stockData: Record<string, any> = {};
+      stockMap.forEach((data, vid) => {
+        stockData[vid] = data;
+      });
+      
+      this.logger.log(`✅ Stock de ${stockMap.size} variants récupéré`);
+      
+      return {
+        success: true,
+        data: stockData,
+        message: `Stock de ${stockMap.size} variants récupéré`
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération stock bulk:', error);
+      return {
+        success: false,
+        data: {},
+        message: 'Erreur lors de la récupération des stocks'
+      };
+    }
+  }
+
   // ===== GESTION DU CACHE =====
 
   @Get('cache/stats')

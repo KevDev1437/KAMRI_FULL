@@ -1,7 +1,28 @@
 'use client';
 
 import { calculateDiscountPercentage, formatDiscountPercentage, getBadgeConfig } from '@kamri/lib';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useCart } from '../contexts/CartContext';
+import { useToast } from '../contexts/ToastContext';
+
+interface ProductVariant {
+  id: string;
+  productId: string;
+  cjVariantId: string | null;
+  name: string | null;
+  sku: string | null;
+  price: number | null;
+  weight: number | null;
+  dimensions: string | null;
+  image: string | null;
+  status: string | null;
+  properties: string | null;
+  stock: number | null;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface Product {
   id: string;
@@ -30,26 +51,378 @@ interface Product {
   stockCount?: number;
   stock: number;
   status: string;
+  // ✅ AJOUT : Support des variants CJ
+  productVariants?: ProductVariant[];
+  variants?: string; // JSON string des variants CJ
 }
 
 interface ProductInfoProps {
   product: Product;
+  onVariantChange?: (variant: ProductVariant | null, image: string | null) => void;
 }
 
-export default function ProductInfo({ product }: ProductInfoProps) {
+export default function ProductInfo({ product, onVariantChange }: ProductInfoProps) {
+  const { addToCart } = useCart();
+  const toast = useToast();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(
-    product.colors && product.colors.length > 0 ? product.colors[0] : null
-  );
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+
+  // ✅ Extraire les variants disponibles (productVariants ou variants JSON)
+  const availableVariants = useMemo(() => {
+    if (product.productVariants && product.productVariants.length > 0) {
+      return product.productVariants.filter(v => v.isActive !== false);
+    }
+    
+    // Fallback : parser le champ JSON variants
+    if (product.variants && typeof product.variants === 'string') {
+      try {
+        const parsed = JSON.parse(product.variants);
+        if (Array.isArray(parsed)) {
+          return parsed.map((v: any, idx: number) => ({
+            id: `variant-${idx}-${v.vid || idx}`,
+            productId: product.id,
+            cjVariantId: String(v.vid || v.variantId || ''),
+            name: v.variantNameEn || v.variantName || v.name || `Variant ${idx + 1}`,
+            sku: v.variantSku || v.sku || '',
+            price: parseFloat(v.variantSellPrice || v.variantPrice || v.price || v.sellPrice || 0),
+            stock: parseInt(v.variantStock || v.stock || 0, 10),
+            weight: parseFloat(v.variantWeight || v.weight || 0),
+            dimensions: typeof v.variantDimensions === 'string' ? v.variantDimensions : JSON.stringify(v.variantDimensions || {}),
+            image: v.variantImage || v.image || '',
+            status: v.status || 'active',
+            properties: typeof v.variantProperties === 'string' ? v.variantProperties : (v.variantKey || JSON.stringify(v.variantProperties || {})),
+            isActive: v.isActive !== false,
+            lastSyncAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }));
+        }
+      } catch (e) {
+        console.error('Erreur parsing variants JSON:', e);
+      }
+    }
+    
+    return [];
+  }, [product]);
+
+  // ✅ Extraire les couleurs uniques depuis les variants
+  const availableColors = useMemo(() => {
+    console.log('🔍 DEBUG: Total variants disponibles:', availableVariants.length);
+    console.log('🔍 DEBUG: Premiers variants:', availableVariants.slice(0, 3));
+    
+    const colorsMap = new Map<string, { name: string; image: string; count: number }>();
+    
+    availableVariants.forEach((variant, idx) => {
+      let color = '';
+      
+      if (idx < 2) {
+        console.log(`🔍 DEBUG Variant ${idx}:`, {
+          name: variant.name,
+          properties: variant.properties,
+          sku: variant.sku
+        });
+      }
+      
+      // Extraire depuis properties (JSON ou string)
+      if (variant.properties) {
+        try {
+          // Si c'est déjà une string simple comme "Purple-S" ou "Black-M"
+          if (typeof variant.properties === 'string') {
+            // Essayer de parser comme JSON d'abord
+            try {
+              const props = JSON.parse(variant.properties);
+              
+              if (typeof props === 'string') {
+                // C'était une string JSON comme '"Purple-S"'
+                const zoneMatch = props.match(/^([A-Za-z\s]+?)(?:\s*Zone\d+)?[-\s]/i);
+                color = zoneMatch ? zoneMatch[1].trim() : props.split(/[-\s]/)[0];
+              } else if (props.value1) {
+                color = props.value1;
+              } else if (props.key) {
+                color = String(props.key).split(/[-\s]/)[0];
+              }
+            } catch {
+              // Ce n'est pas du JSON, c'est une string directe
+              // Format: "Purple-S", "Black-M", "Black Zone2-S"
+              const zoneMatch = variant.properties.match(/^([A-Za-z\s]+?)(?:\s*Zone\d+)?[-\s]/i);
+              if (zoneMatch) {
+                color = zoneMatch[1].trim();
+              } else {
+                // Fallback simple
+                color = variant.properties.split(/[-\s]/)[0];
+              }
+            }
+          } else {
+            // C'est un objet
+            const props = variant.properties;
+            if (props.value1) {
+              color = props.value1;
+            } else if (props.key) {
+              color = String(props.key).split(/[-\s]/)[0];
+            }
+          }
+        } catch (e) {
+          console.warn('Erreur parsing properties:', e);
+        }
+      }
+      
+      // Fallback : extraire du nom
+      if (!color && variant.name) {
+        const nameMatch = variant.name.match(/^([A-Za-z]+)/);
+        if (nameMatch) {
+          color = nameMatch[1];
+        }
+      }
+      
+      if (color) {
+        const colorLower = color.toLowerCase();
+        const knownColors = ['black', 'white', 'brown', 'gray', 'grey', 'blue', 'red', 'green', 'yellow', 'pink', 'purple', 'orange', 'khaki', 'beige', 'navy', 'tan', 'burgundy', 'wine', 'ivory', 'cream', 'gold', 'silver', 'platinum'];
+        
+        if (knownColors.includes(colorLower)) {
+          const existing = colorsMap.get(colorLower);
+          if (existing) {
+            existing.count++;
+          } else {
+            colorsMap.set(colorLower, {
+              name: color.charAt(0).toUpperCase() + color.slice(1).toLowerCase(),
+              image: variant.image || '',
+              count: 1
+            });
+          }
+        }
+      }
+    });
+    
+    return Array.from(colorsMap.values());
+  }, [availableVariants]);
+
+  // ✅ Extraire les tailles uniques depuis les variants
+  const availableSizes = useMemo(() => {
+    const sizesSet = new Set<string>();
+    
+    availableVariants.forEach(variant => {
+      let size = '';
+      
+      // Extraire depuis properties
+      if (variant.properties) {
+        try {
+          // Si c'est une string simple comme "Purple-S" ou "Black-M"
+          if (typeof variant.properties === 'string') {
+            // Essayer de parser comme JSON d'abord
+            try {
+              const props = JSON.parse(variant.properties);
+              
+              if (typeof props === 'string') {
+                // Pattern : "Purple-S", "Black Zone2-S" → taille = "S"
+                const sizeMatch = props.match(/[-\s]([A-Z0-9]+)$/i);
+                if (sizeMatch) {
+                  size = sizeMatch[1];
+                }
+              } else if (props.value2) {
+                size = props.value2;
+              } else if (props.key) {
+                const sizeMatch = String(props.key).match(/[-\s]([A-Z0-9]+)$/i);
+                if (sizeMatch) {
+                  size = sizeMatch[1];
+                }
+              }
+            } catch {
+              // Ce n'est pas du JSON, c'est une string directe
+              // Format: "Purple-S", "Black-M", "Black Zone2-S"
+              const sizeMatch = variant.properties.match(/[-\s]([A-Z0-9]+)$/i);
+              if (sizeMatch) {
+                size = sizeMatch[1];
+              }
+            }
+          } else {
+            // C'est un objet
+            const props = variant.properties;
+            if (props.value2) {
+              size = props.value2;
+            } else if (props.key) {
+              const sizeMatch = String(props.key).match(/[-\s]([A-Z0-9]+)$/i);
+              if (sizeMatch) {
+                size = sizeMatch[1];
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Erreur parsing size:', e);
+        }
+      }
+      
+      if (size) {
+        sizesSet.add(size.toUpperCase());
+      }
+    });
+    
+    // Trier les tailles dans un ordre logique
+    const sizesArray = Array.from(sizesSet);
+    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', '4XL', '5XL', '6XL'];
+    
+    return sizesArray.sort((a, b) => {
+      const indexA = sizeOrder.indexOf(a);
+      const indexB = sizeOrder.indexOf(b);
+      
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      
+      // Tri numérique pour les tailles comme "35", "36", etc.
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      
+      return a.localeCompare(b);
+    });
+  }, [availableVariants]);
+
+  // ✅ Sélectionner automatiquement la première couleur et taille disponibles
+  useEffect(() => {
+    if (availableColors.length > 0 && !selectedColor) {
+      console.log('🎨 Auto-sélection de la première couleur:', availableColors[0].name);
+      setSelectedColor(availableColors[0].name);
+    }
+  }, [availableColors]);
+
+  useEffect(() => {
+    if (availableSizes.length > 0 && !selectedSize) {
+      console.log('📏 Auto-sélection de la première taille:', availableSizes[0]);
+      setSelectedSize(availableSizes[0]);
+    }
+  }, [availableSizes]);
+
+  // ✅ Trouver le variant correspondant à la sélection couleur + taille
+  useEffect(() => {
+    console.log('🔍 Recherche variant pour:', { selectedColor, selectedSize, totalVariants: availableVariants.length });
+    
+    if (!selectedColor && !selectedSize) {
+      setSelectedVariant(null);
+      onVariantChange?.(null, null);
+      return;
+    }
+    
+    const matchingVariant = availableVariants.find(variant => {
+      let variantColor = '';
+      let variantSize = '';
+      
+      // Utiliser la MÊME logique d'extraction que pour availableColors et availableSizes
+      if (variant.properties) {
+        try {
+          if (typeof variant.properties === 'string') {
+            // Essayer de parser comme JSON d'abord
+            try {
+              const props = JSON.parse(variant.properties);
+              
+              if (typeof props === 'string') {
+                // Pattern : "Purple-S", "Black Zone2-S"
+                const colorMatch = props.match(/^([A-Za-z\s]+?)(?:\s*Zone\d+)?[-\s]/i);
+                variantColor = colorMatch ? colorMatch[1].trim() : props.split(/[-\s]/)[0];
+                const sizeMatch = props.match(/[-\s]([A-Z0-9]+)$/i);
+                variantSize = sizeMatch ? sizeMatch[1] : '';
+              } else if (props.value1 || props.value2) {
+                variantColor = props.value1 || '';
+                variantSize = props.value2 || '';
+              } else if (props.key) {
+                variantColor = String(props.key).split(/[-\s]/)[0];
+                const sizeMatch = String(props.key).match(/[-\s]([A-Z0-9]+)$/i);
+                variantSize = sizeMatch ? sizeMatch[1] : '';
+              }
+            } catch {
+              // Ce n'est pas du JSON, c'est une string directe
+              const colorMatch = variant.properties.match(/^([A-Za-z\s]+?)(?:\s*Zone\d+)?[-\s]/i);
+              variantColor = colorMatch ? colorMatch[1].trim() : variant.properties.split(/[-\s]/)[0];
+              const sizeMatch = variant.properties.match(/[-\s]([A-Z0-9]+)$/i);
+              variantSize = sizeMatch ? sizeMatch[1] : '';
+            }
+          } else {
+            // C'est un objet
+            const props = variant.properties;
+            variantColor = props.value1 || '';
+            variantSize = props.value2 || '';
+            if (props.key) {
+              variantColor = variantColor || String(props.key).split(/[-\s]/)[0];
+              const sizeMatch = String(props.key).match(/[-\s]([A-Z0-9]+)$/i);
+              variantSize = variantSize || (sizeMatch ? sizeMatch[1] : '');
+            }
+          }
+        } catch (e) {
+          console.warn('Erreur matching variant:', e);
+        }
+      }
+      
+      const colorMatch = !selectedColor || variantColor.toLowerCase() === selectedColor.toLowerCase();
+      const sizeMatch = !selectedSize || variantSize.toUpperCase() === selectedSize.toUpperCase();
+      
+      console.log(`🔍 Variant "${variant.name}": color="${variantColor}" (match: ${colorMatch}), size="${variantSize}" (match: ${sizeMatch})`);
+      
+      return colorMatch && sizeMatch;
+    });
+    
+    if (matchingVariant) {
+      console.log('✅ Variant trouvé:', { 
+        id: matchingVariant.id, 
+        color: selectedColor, 
+        size: selectedSize, 
+        price: matchingVariant.price, 
+        stock: matchingVariant.stock 
+      });
+    } else {
+      console.warn('⚠️ Aucun variant trouvé pour:', { selectedColor, selectedSize });
+    }
+    
+    setSelectedVariant(matchingVariant || null);
+    onVariantChange?.(matchingVariant || null, matchingVariant?.image || null);
+  }, [selectedColor, selectedSize, availableVariants, onVariantChange]);
+
+  // ✅ Calculer le prix et le stock à afficher
+  const displayPrice = selectedVariant?.price || product.price;
+  const displayStock = selectedVariant?.stock ?? product.stock;
+  const displayImage = selectedVariant?.image || product.image;
 
   // Utilisation des couleurs d'étiquettes cohérentes
   const badgeConfig = getBadgeConfig(product.badge as any);
   
   // Calcul du pourcentage de réduction pour les promos
   const discountPercentage = product.originalPrice 
-    ? calculateDiscountPercentage(product.originalPrice, product.price)
+    ? calculateDiscountPercentage(product.originalPrice, displayPrice)
     : 0;
+
+  // ✅ Fonction pour ajouter au panier avec le variant sélectionné
+  const handleAddToCart = async () => {
+    if (isAddingToCart) return;
+    
+    // Vérifier qu'un variant est sélectionné si des variants existent
+    if (availableVariants.length > 0 && !selectedVariant) {
+      toast?.error?.('Veuillez sélectionner une couleur et une taille');
+      return;
+    }
+    
+    // Vérifier le stock
+    if (displayStock <= 0) {
+      toast?.error?.('Ce produit est en rupture de stock');
+      return;
+    }
+    
+    setIsAddingToCart(true);
+    try {
+      // ✅ Envoyer le variantId si disponible
+      await addToCart(product.id, quantity, selectedVariant?.id);
+      toast?.success?.(`${quantity} article${quantity > 1 ? 's' : ''} ajouté${quantity > 1 ? 's' : ''} au panier`);
+    } catch (error) {
+      console.error('Erreur ajout au panier:', error);
+      toast?.error?.('Erreur lors de l\'ajout au panier');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -93,57 +466,112 @@ export default function ProductInfo({ product }: ProductInfoProps) {
           </div>
         )}
 
-        {/* Prix */}
+        {/* Prix - utilise displayPrice du variant sélectionné */}
         <div className="flex items-center gap-3 mb-6">
-          <span className="text-3xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}€</span>
+          <span className="text-3xl font-bold text-[#4CAF50]">{displayPrice.toFixed(2)}€</span>
           {product.originalPrice && (
             <span className="text-xl text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</span>
+          )}
+          {selectedVariant && selectedVariant.sku && (
+            <span className="text-xs text-gray-500 ml-2">SKU: {selectedVariant.sku}</span>
           )}
         </div>
 
         {/* Description */}
-        {product.description && (
-          <div className="text-[#424242] leading-relaxed mb-6">
-            <h3 className="text-lg font-semibold text-[#424242] mb-3">Description</h3>
-            <div className="whitespace-pre-line text-sm">
-              {product.description}
+        {product.description && (() => {
+          // Nettoyer la description en enlevant tous les codes techniques CJ et metadata
+          const cleanDescription = product.description
+            .split('\n')
+            .filter(line => {
+              const trimmed = line.trim();
+              
+              // Lignes vides ou juste des étoiles
+              if (!trimmed || trimmed === '**' || trimmed === '-') return false;
+              
+              // Headers markdown (###, ##, etc.)
+              if (trimmed.match(/^#{1,6}\s+/)) return false;
+              
+              // Codes techniques CJ (ex: "- 82016 purple", "82016 Black")
+              if (trimmed.match(/^\d{5}/)) return false;
+              if (trimmed.match(/^[-\s]*\d{5}\s+/)) return false;
+              
+              // Notes CJ (Note 1, Note 2, etc.)
+              if (trimmed.match(/^\*\*Note/i)) return false;
+              
+              // Emojis suivis de headers (🎨, 🎯, ⚠️)
+              if (trimmed.match(/^[🎨🎯⚠️📋📏💡]/)) return false;
+              
+              // Métadonnées techniques CJ
+              const technicalKeys = [
+                'Pants length:', 'Applicable occasions:', 'Nom du tissu:', 
+                'Sleeve type:', 'Composition principale:', 'Length:', 
+                'Genre applicable:', 'Fonctionnalités:', 'Suitable season:',
+                'Sleeve length:', 'Contenu de l\'emballage:', 'work clothes',
+                'please contact our customer service'
+              ];
+              if (technicalKeys.some(key => trimmed.toLowerCase().includes(key.toLowerCase()))) return false;
+              
+              // Lignes qui ne contiennent que des astérisques et espaces
+              if (trimmed.match(/^[\s*-]+$/)) return false;
+              
+              // Messages génériques CJ sur les tailles
+              if (trimmed.toLowerCase().includes('asian size') || 
+                  trimmed.toLowerCase().includes('européenne et américaine') ||
+                  trimmed.toLowerCase().includes('computers display colors differently') ||
+                  trimmed.toLowerCase().includes('may vary slightly')) return false;
+              
+              return true;
+            })
+            .join('\n')
+            .trim()
+            // Nettoyer les doubles astérisques restants
+            .replace(/\*\*/g, '')
+            // Nettoyer les espaces multiples
+            .replace(/\n{3,}/g, '\n\n');
+
+          return cleanDescription ? (
+            <div className="text-[#424242] leading-relaxed mb-6">
+              <h3 className="text-lg font-semibold text-[#424242] mb-3">Description</h3>
+              <div className="whitespace-pre-line text-sm">
+                {cleanDescription}
+              </div>
             </div>
-          </div>
-        )}
+          ) : null;
+        })()}
       </div>
 
-      {/* Couleurs */}
-      {product.colors && product.colors.length > 0 && (
+      {/* Couleurs - extraites des variants CJ */}
+      {availableColors.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-[#424242] mb-3">Couleur</h3>
-          <div className="flex gap-3">
-            {product.colors.map((color) => (
+          <div className="flex flex-wrap gap-3">
+            {availableColors.map((colorData) => (
               <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
+                key={colorData.name}
+                onClick={() => setSelectedColor(colorData.name)}
                 className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                  selectedColor === color
+                  selectedColor === colorData.name
                     ? 'border-[#4CAF50] bg-[#4CAF50] text-white'
                     : 'border-gray-300 bg-white text-[#424242] hover:border-[#81C784]'
                 }`}
               >
-                {color}
+                {colorData.name}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Tailles (mode) */}
-      {product.type === 'mode' && product.sizes && (
+      {/* Tailles - extraites des variants CJ */}
+      {availableSizes.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-[#424242] mb-3">Taille</h3>
-          <div className="flex gap-3">
-            {product.sizes.map((size) => (
+          <div className="flex flex-wrap gap-3">
+            {availableSizes.map((size) => (
               <button
                 key={size}
                 onClick={() => setSelectedSize(size)}
-                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                className={`min-w-[3rem] h-12 px-3 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                   selectedSize === size
                     ? 'border-[#4CAF50] bg-[#4CAF50] text-white'
                     : 'border-gray-300 bg-white text-[#424242] hover:border-[#81C784]'
@@ -153,6 +581,19 @@ export default function ProductInfo({ product }: ProductInfoProps) {
               </button>
             ))}
           </div>
+        </div>
+      )}
+      
+      {/* Alerte si variant non disponible */}
+      {availableVariants.length > 0 && !selectedVariant && selectedColor && selectedSize && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+          <svg className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+          </svg>
+          <p className="text-sm text-yellow-800">
+            La combinaison <strong>{selectedColor}</strong> + <strong>{selectedSize}</strong> n'est pas disponible. 
+            Veuillez choisir une autre combinaison.
+          </p>
         </div>
       )}
 
@@ -197,26 +638,66 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
       {/* Boutons d'action */}
       <div className="flex gap-4">
-        <button className="flex-1 bg-[#4CAF50] text-white py-4 px-6 rounded-lg font-bold hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          Ajouter au panier
+        <button 
+          onClick={handleAddToCart}
+          disabled={isAddingToCart || displayStock <= 0 || (availableVariants.length > 0 && !selectedVariant)}
+          className={`flex-1 py-4 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${
+            isAddingToCart || displayStock <= 0 || (availableVariants.length > 0 && !selectedVariant)
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-[#4CAF50] text-white hover:bg-[#2E7D32] hover:shadow-lg transform hover:scale-105'
+          }`}
+        >
+          {isAddingToCart ? (
+            <>
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Ajout en cours...
+            </>
+          ) : (
+            <>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              {displayStock <= 0 ? 'Rupture de stock' : 'Ajouter au panier'}
+            </>
+          )}
         </button>
-        <button className="flex-1 bg-white text-[#4CAF50] py-4 px-6 rounded-lg font-bold border-2 border-[#4CAF50] hover:bg-[#4CAF50] hover:text-white transform hover:scale-105 transition-all duration-200">
+        <button 
+          onClick={handleAddToCart}
+          disabled={isAddingToCart || displayStock <= 0 || (availableVariants.length > 0 && !selectedVariant)}
+          className={`flex-1 py-4 px-6 rounded-lg font-bold border-2 transition-all duration-200 ${
+            isAddingToCart || displayStock <= 0 || (availableVariants.length > 0 && !selectedVariant)
+              ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+              : 'bg-white text-[#4CAF50] border-[#4CAF50] hover:bg-[#4CAF50] hover:text-white transform hover:scale-105'
+          }`}
+        >
           Acheter maintenant
         </button>
       </div>
 
-      {/* Stock */}
-      <div className="flex items-center gap-2 text-[#4CAF50]">
+      {/* Stock - utilise displayStock du variant sélectionné */}
+      <div className={`flex items-center gap-2 ${displayStock > 0 ? 'text-[#4CAF50]' : 'text-red-600'}`}>
         <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          {displayStock > 0 ? (
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          ) : (
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          )}
         </svg>
         <span className="font-medium">
-          {product.stock > 0 ? `${product.stock} en stock` : 'Rupture de stock'}
+          {displayStock > 0 ? `${displayStock} en stock` : 'Rupture de stock'}
         </span>
       </div>
+      
+      {/* Info variant sélectionné */}
+      {selectedVariant && (
+        <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+          <p><span className="font-semibold">Variant sélectionné:</span> {selectedVariant.name || `${selectedColor} - ${selectedSize}`}</p>
+          {selectedVariant.sku && <p><span className="font-semibold">SKU:</span> {selectedVariant.sku}</p>}
+        </div>
+      )}
     </div>
   );
 }

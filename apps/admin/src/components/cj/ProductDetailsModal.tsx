@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { CJProduct } from '@/types/cj.types';
 import { DollarSign, Star, Tag } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 interface ProductDetailsModalProps {
   isOpen: boolean;
@@ -29,13 +29,92 @@ export function ProductDetailsModal({
   const [showOnlyWithPhotos, setShowOnlyWithPhotos] = useState(false);
   const [reviewSort, setReviewSort] = useState<'recent' | 'helpful' | 'rating'>('recent');
   
+  // 🆕 États pour les stocks
+  const [variantStocks, setVariantStocks] = useState<Map<string, number>>(new Map());
+  const [loadingStocks, setLoadingStocks] = useState(false);
+  const [stocksLoaded, setStocksLoaded] = useState(false);
+  
+  // 🆕 Charger les stocks quand le modal s'ouvre
+  useEffect(() => {
+    // Reset quand on ferme le modal
+    if (!isOpen) {
+      setVariantStocks(new Map());
+      setStocksLoaded(false);
+      setLoadingStocks(false);
+      return;
+    }
+    
+    // Si pas de produit, ne rien faire
+    if (!product) {
+      return;
+    }
+    
+    // Si déjà chargé ou en cours de chargement, ne PAS recharger (évite la boucle)
+    if (stocksLoaded || loadingStocks) {
+      return;
+    }
+    
+    // Récupérer le PID (CJ Product ID)
+    const pid = product.cjProductId || product.pid;
+    if (!pid) {
+      console.log('⚠️ Pas de PID CJ disponible pour charger les stocks');
+      setStocksLoaded(true); // Marquer comme "chargé" pour éviter la boucle
+      return;
+    }
+    
+    console.log(`🔄 Chargement des stocks pour PID: ${pid}`);
+    
+    // Charger les stocks depuis l'API backend
+    const loadStocks = async () => {
+      setLoadingStocks(true);
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+        const url = `${API_URL}/cj-dropshipping/products/${pid}/stock`;
+        console.log(`📡 Appel API: ${url}`);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`📦 Réponse API:`, data);
+        
+        if (data.success && data.data) {
+          // Créer une Map VID -> Stock
+          const stockMap = new Map<string, number>();
+          Object.entries(data.data).forEach(([vid, stockInfo]: [string, any]) => {
+            stockMap.set(vid, stockInfo.stock || 0);
+          });
+          
+          setVariantStocks(stockMap);
+          console.log(`✅ Stocks chargés pour ${stockMap.size} variants`);
+        } else {
+          console.log(`⚠️ Aucun stock retourné par l'API`);
+        }
+      } catch (error) {
+        console.error('❌ Erreur chargement stocks:', error);
+        // Marquer comme chargé même en cas d'erreur pour éviter la boucle infinie
+      } finally {
+        setLoadingStocks(false);
+        setStocksLoaded(true); // ✅ IMPORTANT : Toujours marquer comme chargé pour éviter la boucle
+      }
+    };
+    
+    loadStocks();
+  }, [isOpen, product?.cjProductId, product?.pid]); // ✅ Dépendances fixes pour éviter la boucle
+  
   // Parser les variants avec useMemo pour éviter les re-calculs
   // ✅ Priorité : productVariants (relation Prisma) > variants (JSON)
+  // ✅ Enrichir avec les stocks chargés dynamiquement
   const parsedVariants = useMemo(() => {
+    let variants: any[] = [];
+    
     // 1. Essayer d'abord productVariants (relation Prisma) - priorité haute
     if (product?.productVariants && Array.isArray(product.productVariants) && product.productVariants.length > 0) {
       // Transformer les ProductVariant en format compatible avec le modal
-      return product.productVariants.map((pv: any) => ({
+      variants = product.productVariants.map((pv: any) => ({
         vid: pv.cjVariantId || pv.id,
         variantName: pv.name || '',
         variantNameEn: pv.name || '',
@@ -50,27 +129,45 @@ export function ProductDetailsModal({
         // Conserver les données originales pour référence
         _original: pv
       }));
-    }
-    
+    } 
     // 2. Fallback : utiliser variants (champ JSON)
-    if (!product?.variants) return [];
-    
-    // Si c'est déjà un tableau, le retourner
-    if (Array.isArray(product.variants)) return product.variants;
-    
-    // Si c'est une chaîne JSON, la parser
-    if (typeof product.variants === 'string') {
-      try {
-        const parsed = JSON.parse(product.variants);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (error) {
-        console.error('Erreur de parsing des variants:', error);
-        return [];
+    else if (product?.variants) {
+      // Si c'est déjà un tableau, le retourner
+      if (Array.isArray(product.variants)) {
+        variants = product.variants;
+      }
+      // Si c'est une chaîne JSON, la parser
+      else if (typeof product.variants === 'string') {
+        try {
+          const parsed = JSON.parse(product.variants);
+          variants = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+          console.error('Erreur de parsing des variants:', error);
+          variants = [];
+        }
       }
     }
     
-    return [];
-  }, [product?.variants, product?.productVariants]);
+    // 🆕 Enrichir avec les stocks chargés dynamiquement
+    if (variantStocks.size > 0) {
+      variants = variants.map(v => {
+        const vid = v.vid;
+        const stock = variantStocks.get(vid);
+        
+        // Si on a un stock chargé, l'injecter
+        if (stock !== undefined) {
+          return {
+            ...v,
+            variantStock: stock,
+            stock: stock
+          };
+        }
+        return v;
+      });
+    }
+    
+    return variants;
+  }, [product?.variants, product?.productVariants, variantStocks]);
 
   // Parser les tags de la même manière
 
@@ -670,6 +767,7 @@ export function ProductDetailsModal({
                       <th className="text-left p-3 font-medium text-gray-700">VID</th>
                       <th className="text-left p-3 font-medium text-gray-700">SKU</th>
                       <th className="text-left p-3 font-medium text-gray-700">Price</th>
+                      <th className="text-left p-3 font-medium text-gray-700">Stock</th>
                       <th className="text-left p-3 font-medium text-gray-700">Weight</th>
                       <th className="text-left p-3 font-medium text-gray-700">Dimensions</th>
                     </tr>
@@ -711,6 +809,23 @@ export function ProductDetailsModal({
                           {variant.variantSellPrice ? (
                             <span className="font-semibold text-green-600">
                               ${formatPrice(variant.variantSellPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {variant.variantStock !== undefined && variant.variantStock !== null ? (
+                            <span className={`font-semibold ${
+                              variant.variantStock > 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {variant.variantStock}
+                            </span>
+                          ) : variant.stock !== undefined && variant.stock !== null ? (
+                            <span className={`font-semibold ${
+                              variant.stock > 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {variant.stock}
                             </span>
                           ) : (
                             <span className="text-gray-400">N/A</span>

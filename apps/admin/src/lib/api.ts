@@ -235,6 +235,13 @@ export class ApiClient {
     });
   }
 
+  async updateProduct(id: string, productData: any) {
+    return this.fetchWithAuth(`/products/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(productData),
+    });
+  }
+
   async deleteProduct(id: string) {
     return this.fetchWithAuth(`/products/${id}`, {
       method: 'DELETE',

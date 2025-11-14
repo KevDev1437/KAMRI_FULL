@@ -32,7 +32,7 @@ export default function CategoryPage() {
         if (categoriesResponse.data) {
           // L'API backend retourne { data: categories, message: '...' }
           // Notre API client retourne { data: { data: categories, message: '...' } }
-          const backendData = categoriesResponse.data.data || categoriesResponse.data;
+          const backendData = (categoriesResponse.data as any)?.data || categoriesResponse.data;
           const categories = Array.isArray(backendData) ? backendData : [];
           console.log('📂 [CATEGORY-SLUG] Categories list:', categories);
           
@@ -58,7 +58,7 @@ export default function CategoryPage() {
             const productsResponse = await apiClient.getProducts();
             if (productsResponse.data) {
               // Même logique pour les produits
-              const backendProductsData = productsResponse.data.data || productsResponse.data;
+              const backendProductsData = (productsResponse.data as any)?.data || productsResponse.data;
               const products = Array.isArray(backendProductsData) ? backendProductsData : [];
               const categoryProducts = products.filter((product) => 
                 product.category?.name === foundCategory.name

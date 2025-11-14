@@ -13,7 +13,8 @@ export class ProductsService {
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private cjApiClient: CJAPIClient
   ) {}
 
   // ✅ Fonction utilitaire pour traiter les images et formater la description
@@ -661,12 +662,19 @@ export class ProductsService {
 
           this.logger.log(`✅ Variants créés: ${createdCount}, mis à jour: ${updatedCount}`);
         } else {
-          this.logger.warn('⚠️ Aucun variant avec stock trouvé, création depuis les variants du produit...');
+          this.logger.warn('⚠️ Aucun variant avec stock trouvé depuis l\'API CJ');
+          this.logger.log('🔄 Tentative de création depuis cjProduct.variants (JSON)...');
           
           // Fallback : créer les variants depuis cjProduct.variants si disponibles
           if (cjProduct.variants && Array.isArray(cjProduct.variants)) {
+            this.logger.log(`📦 ${cjProduct.variants.length} variants trouvés dans le JSON`);
+            let fallbackCreated = 0;
+            
             for (const variant of cjProduct.variants) {
               try {
+                // ✅ Parser le stock même depuis JSON
+                const stockValue = parseInt(variant.stock || variant.variantStock || '0', 10);
+                
                 await this.prisma.productVariant.create({
                   data: {
                     productId: product.id,
@@ -674,11 +682,12 @@ export class ProductsService {
                     name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
                     sku: variant.variantSku || '',
                     price: parseFloat(variant.variantSellPrice || variant.sellPrice || '0'),
-                    stock: variant.stock || 0,
-                    status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
+                    stock: stockValue,
+                    status: stockValue > 0 ? 'available' : 'out_of_stock',
                     isActive: true
                   }
                 });
+                fallbackCreated++;
               } catch (variantError: any) {
                 // Ignorer les erreurs de doublons
                 if (!variantError.message?.includes('Unique constraint')) {
@@ -686,6 +695,13 @@ export class ProductsService {
                 }
               }
             }
+            
+            this.logger.log(`✅ ${fallbackCreated} variants créés depuis JSON fallback`);
+            if (fallbackCreated === 0) {
+              this.logger.error('❌ AUCUN variant n\'a pu être créé - Vérifiez les données CJ');
+            }
+          } else {
+            this.logger.error('❌ cjProduct.variants est vide ou invalide - Impossible de créer des variants');
           }
         }
       } catch (variantsError: any) {
@@ -1190,7 +1206,109 @@ export class ProductsService {
         categoryId: product.categoryId
       });
 
-      // 6. Marquer comme importé dans CJProductStore
+      // 6. 🆕 CRÉER LES PRODUCTVARIANTS AVEC LEURS STOCKS
+      console.log('📦 [PREPARE] Création des ProductVariants avec stocks...');
+      
+      try {
+        // 🆕 Récupérer les stocks en temps réel depuis l'API CJ
+        let variantsWithStock: any[] = [];
+        
+        if (cjProduct.cjProductId) {
+          try {
+            console.log(`📡 [PREPARE] Récupération des stocks pour PID: ${cjProduct.cjProductId}`);
+            
+            // Charger le token CJ depuis la base de données
+            await this.cjApiClient.loadTokenFromDatabase();
+            
+            // Récupérer les variants avec leurs stocks
+            variantsWithStock = await this.cjApiClient.getProductVariantsWithStock(cjProduct.cjProductId);
+            console.log(`✅ [PREPARE] ${variantsWithStock.length} variants avec stocks récupérés`);
+          } catch (stockError) {
+            console.warn('⚠️ [PREPARE] Impossible de récupérer les stocks en temps réel:', stockError);
+            // Fallback : utiliser les variants depuis CJProductStore (sans stock)
+            variantsWithStock = [];
+          }
+        }
+        
+        // Si pas de stocks récupérés, utiliser les variants depuis CJProductStore
+        let variants: any[] = variantsWithStock.length > 0 ? variantsWithStock : [];
+        
+        if (variants.length === 0 && cjProduct.variants) {
+          try {
+            variants = typeof cjProduct.variants === 'string' 
+              ? JSON.parse(cjProduct.variants)
+              : cjProduct.variants;
+            console.log(`📦 [PREPARE] Utilisation de ${variants.length} variants depuis CJProductStore (sans stocks en temps réel)`);
+          } catch (e) {
+            console.warn('⚠️ [PREPARE] Erreur parsing variants:', e);
+          }
+        }
+
+        if (variants && variants.length > 0) {
+          console.log(`📊 [PREPARE] ${variants.length} variants à créer`);
+          
+          let createdCount = 0;
+          for (const variant of variants) {
+            try {
+              // Parser variantKey si c'est un JSON string
+              let parsedKey = variant.variantKey;
+              try {
+                if (parsedKey && parsedKey.startsWith('[')) {
+                  const parsed = JSON.parse(parsedKey);
+                  parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+                }
+              } catch {}
+
+              // Récupérer le stock depuis le variant CJ (peut être dans stock ou variantStock)
+              const stockValue = parseInt(variant.stock || variant.variantStock || '0', 10);
+              
+              await this.prisma.productVariant.create({
+                data: {
+                  productId: product.id,
+                  cjVariantId: variant.vid || variant.variantId || '',
+                  name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
+                  sku: variant.variantSku || '',
+                  price: parseFloat(variant.variantSellPrice || variant.sellPrice || '0'),
+                  weight: parseFloat(variant.variantWeight || '0'),
+                  dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+                    ? JSON.stringify({
+                        length: variant.variantLength,
+                        width: variant.variantWidth,
+                        height: variant.variantHeight,
+                        volume: variant.variantVolume
+                      })
+                    : null,
+                  image: variant.variantImage || null,
+                  stock: stockValue,  // ✅ STOCK SAUVEGARDÉ
+                  properties: JSON.stringify({
+                    key: parsedKey,
+                    property: variant.variantProperty,
+                    standard: variant.variantStandard,
+                    unit: variant.variantUnit
+                  }),
+                  status: stockValue > 0 ? 'available' : 'out_of_stock',
+                  isActive: true,
+                  lastSyncAt: new Date()
+                }
+              });
+              createdCount++;
+            } catch (variantError: any) {
+              if (!variantError.message?.includes('Unique constraint')) {
+                console.warn(`⚠️ [PREPARE] Erreur création variant: ${variantError.message}`);
+              }
+            }
+          }
+          
+          console.log(`✅ [PREPARE] ${createdCount} ProductVariants créés avec stocks`);
+        } else {
+          console.log('⚠️ [PREPARE] Aucun variant à créer');
+        }
+      } catch (error) {
+        console.error('❌ [PREPARE] Erreur lors de la création des variants:', error);
+        // Ne pas bloquer la création du produit si les variants échouent
+      }
+
+      // 7. Marquer comme importé dans CJProductStore
       await this.prisma.cJProductStore.update({
         where: { id: cjStoreProductId },
         data: { status: 'imported' }
