@@ -757,24 +757,13 @@ export class CJAPIClient {
     this.logger.log('📝 PID:', pid);
     
     try {
-      // ✅ CORRECTION: Utiliser l'endpoint correct selon la doc CJ
-      const endpoint = `/product/detail/${pid}`;
+      // ✅ Utiliser l'endpoint /product/query qui fonctionne (pas /product/detail qui n'existe pas)
+      const endpoint = `/product/query?pid=${pid}`;
       this.logger.log('🌐 Endpoint final:', endpoint);
       
       const response = await this.makeRequest('GET', endpoint);
       
       this.logger.log('✅ Réponse API CJ reçue');
-      this.logger.log('📊 Structure complète de la réponse:', JSON.stringify({
-        code: response.code,
-        result: response.result,
-        hasData: !!response.data,
-        dataType: typeof response.data,
-        dataIsNull: response.data === null,
-        dataIsUndefined: response.data === undefined,
-        hasProduct: !!(response.data as any)?.productNameEn,
-        hasPid: !!(response.data as any)?.pid,
-        message: response.message
-      }, null, 2));
       
       // Vérifier si l'API retourne une erreur
       if (response.code !== 200 || !response.result) {
@@ -785,27 +774,27 @@ export class CJAPIClient {
       // Vérifier si data est null ou undefined
       if (response.data === null || response.data === undefined) {
         this.logger.error(`❌ API CJ a retourné data null/undefined pour PID ${pid}`);
-        this.logger.error(`📊 Code: ${response.code}, Result: ${response.result}, Message: ${response.message}`);
-        throw new Error(`Produit ${pid} non trouvé dans l'API CJ Dropshipping (data null/undefined)`);
+        throw new Error(`Produit ${pid} non trouvé dans l'API CJ Dropshipping`);
       }
       
       const result = response.data as any;
       
       // Vérifier si le résultat a un pid
       if (!result.pid && !result.productId) {
-        this.logger.error(`❌ Produit retourné sans pid/productId:`, JSON.stringify(result).substring(0, 300));
+        this.logger.error(`❌ Produit retourné sans pid/productId`);
         throw new Error(`Structure de produit invalide retournée par l'API CJ pour ${pid}`);
       }
       
-      this.logger.log('🎉 getProductDetails terminé avec succès');
+      this.logger.log(`✅ Produit récupéré: ${result.productNameEn || result.productName}`);
+      if (result.variants) {
+        this.logger.log(`📦 ${result.variants.length} variants trouvés dans les détails`);
+      }
       this.logger.log('🔍 === FIN getProductDetails ===');
       
       return result;
     } catch (error) {
       this.logger.error('❌ === ERREUR getProductDetails ===');
-      this.logger.error('💥 Erreur détaillée:', error);
-      this.logger.error('📊 Type d\'erreur:', typeof error);
-      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
+      this.logger.error('💥 Erreur:', error instanceof Error ? error.message : String(error));
       this.logger.error('🔍 === FIN ERREUR getProductDetails ===');
       throw error;
     }
@@ -1037,54 +1026,131 @@ export class CJAPIClient {
     this.logger.log(`📦 === RÉCUPÉRATION VARIANTS AVEC STOCK (PID: ${pid}) ===`);
     
     try {
-      // 1. Récupérer les variants (endpoint 2.1)
+      // ✅ STRATÉGIE 1 : Utiliser l'endpoint bulk inventory (le plus fiable)
+      await this.handleRateLimit();
+      const endpoint = `/product/stock/getInventoryByPid?pid=${pid}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.data) {
+        const data = response.data as CJProductInventoryResponse;
+        
+        if (!data.variantInventories || data.variantInventories.length === 0) {
+          this.logger.warn('⚠️ Aucun stock variant trouvé via inventory');
+          // Fallback sur l'ancienne méthode
+          return this.getVariantsWithStockFallback(pid);
+        }
+        
+        // Maintenant récupérer les infos complètes des variants via l'endpoint details
+        const productDetails = await this.getProductDetails(pid);
+        
+        if (!productDetails || !productDetails.variants || productDetails.variants.length === 0) {
+          this.logger.warn('⚠️ Détails produit sans variants, utilisation uniquement inventory');
+          
+          // Construire variants basiques depuis l'inventory
+          const variants: CJVariant[] = data.variantInventories.map(variantInv => {
+            const totalStock = variantInv.inventory.reduce(
+              (sum, inv) => sum + (inv.totalInventory || 0),
+              0
+            );
+            
+            return {
+              vid: variantInv.vid,
+              pid: pid,
+              variantSku: variantInv.vid, // Utiliser VID comme SKU par défaut
+              variantKey: variantInv.vid,
+              stock: totalStock,
+              warehouseStock: variantInv.inventory.map(inv => ({
+                countryCode: inv.countryCode,
+                totalInventoryNum: inv.totalInventory,
+                cjInventoryNum: inv.cjInventory,
+                factoryInventoryNum: inv.factoryInventory,
+                totalInventory: inv.totalInventory,
+                cjInventory: inv.cjInventory,
+                factoryInventory: inv.factoryInventory,
+                verifiedWarehouse: inv.verifiedWarehouse
+              }))
+            } as CJVariant;
+          });
+          
+          const totalStock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+          this.logger.log(`✅ ${variants.length} variants construits depuis inventory - Stock total: ${totalStock}`);
+          
+          return variants;
+        }
+        
+        // Enrichir les variants des détails avec les stocks de l'inventory
+        const stockMap = new Map<string, number>();
+        const warehouseMap = new Map<string, CJVariantStock[]>();
+        
+        for (const variantInv of data.variantInventories) {
+          const totalStock = variantInv.inventory.reduce(
+            (sum, inv) => sum + (inv.totalInventory || 0),
+            0
+          );
+          stockMap.set(variantInv.vid, totalStock);
+          warehouseMap.set(variantInv.vid, variantInv.inventory.map(inv => ({
+            countryCode: inv.countryCode,
+            totalInventoryNum: inv.totalInventory,
+            cjInventoryNum: inv.cjInventory,
+            factoryInventoryNum: inv.factoryInventory,
+            totalInventory: inv.totalInventory,
+            cjInventory: inv.cjInventory,
+            factoryInventory: inv.factoryInventory,
+            verifiedWarehouse: inv.verifiedWarehouse
+          })));
+        }
+        
+        const variantsWithStock: CJVariant[] = productDetails.variants.map(variant => ({
+          ...variant,
+          stock: stockMap.get(variant.vid) || 0,
+          warehouseStock: warehouseMap.get(variant.vid) || []
+        }));
+        
+        const totalStock = variantsWithStock.reduce((sum, v) => sum + (v.stock || 0), 0);
+        this.logger.log(`✅ ${variantsWithStock.length} variants enrichis - Stock total: ${totalStock}`);
+        
+        return variantsWithStock;
+      }
+      
+      // Si l'endpoint inventory échoue, utiliser le fallback
+      return this.getVariantsWithStockFallback(pid);
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération variants avec stock:`, error);
+      return this.getVariantsWithStockFallback(pid);
+    }
+  }
+  
+  /**
+   * Méthode fallback pour récupérer variants avec stock (ancienne méthode)
+   */
+  private async getVariantsWithStockFallback(pid: string): Promise<CJVariant[]> {
+    this.logger.log(`🔄 Fallback: récupération variants via endpoint /product/variant/query`);
+    
+    try {
       const variants = await this.getProductVariants(pid);
       
       if (!variants || variants.length === 0) {
-        this.logger.log('⚠️ Aucun variant trouvé');
+        this.logger.log('⚠️ Aucun variant trouvé via fallback');
         return [];
       }
       
-      this.logger.log(`📊 ${variants.length} variants trouvés`);
-      
-      // 2. Récupérer le stock de TOUS les variants en 1 requête (endpoint 3.3) ⚡
       const stockMap = await this.getProductInventoryBulk(pid);
       
-      // 3. Enrichir chaque variant avec son stock
       const variantsWithStock: CJVariant[] = variants.map(variant => {
         const stockData = stockMap.get(variant.vid);
-        
-        if (stockData) {
-          return {
-            ...variant,
-            stock: stockData.stock,
-            warehouseStock: stockData.warehouses
-          };
-        } else {
-          this.logger.warn(`⚠️ Pas de stock trouvé pour variant ${variant.vid}`);
-          return {
-            ...variant,
-            stock: 0,
-            warehouseStock: []
-          };
-        }
+        return {
+          ...variant,
+          stock: stockData?.stock || 0,
+          warehouseStock: stockData?.warehouses || []
+        };
       });
-      
-      const totalStock = variantsWithStock.reduce((sum, v) => sum + (v.stock || 0), 0);
-      this.logger.log(`✅ ${variantsWithStock.length} variants enrichis - Stock total: ${totalStock}`);
       
       return variantsWithStock;
       
     } catch (error: any) {
-      this.logger.error(`❌ Erreur récupération variants avec stock:`, error);
-      
-      // Fallback : retourner les variants sans stock plutôt que d'échouer
-      try {
-        const variants = await this.getProductVariants(pid);
-        return variants.map(v => ({ ...v, stock: 0, warehouseStock: [] }));
-      } catch {
-        return [];
-      }
+      this.logger.error(`❌ Fallback échoué:`, error);
+      return [];
     }
   }
 

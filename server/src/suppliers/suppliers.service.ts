@@ -29,7 +29,27 @@ export class SuppliersService {
         products: {
           include: {
             category: true,
-            supplier: true
+            supplier: true,
+            productVariants: {
+              // ✅ Inclure les variants avec leurs stocks
+              select: {
+                id: true,
+                productId: true,
+                cjVariantId: true,
+                sku: true,
+                name: true,
+                price: true,
+                stock: true,
+                status: true,
+                isActive: true,
+                weight: true,
+                dimensions: true,
+                image: true,
+                properties: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
           }
         },
         categoryMappings: true,
@@ -921,5 +941,94 @@ export class SuppliersService {
   private generateBadge(): string {
     const badges = ['nouveau', 'promo', 'tendance', 'top vente'];
     return badges[Math.floor(Math.random() * badges.length)];
+  }
+
+  /**
+   * Resynchroniser les compteurs des catégories non mappées
+   * Supprime les catégories sans produits et met à jour les compteurs
+   */
+  async syncUnmappedCategories() {
+    console.log('🔄 === RESYNCHRONISATION CATÉGORIES NON MAPPÉES ===');
+    
+    try {
+      // 1. Récupérer tous les fournisseurs
+      const suppliers = await this.prisma.supplier.findMany();
+      
+      let totalCleaned = 0;
+      let totalUpdated = 0;
+      
+      for (const supplier of suppliers) {
+        console.log(`\n📦 Traitement fournisseur: ${supplier.name}`);
+        
+        // 2. Récupérer les produits actuels du fournisseur groupés par catégorie
+        const products = await this.prisma.product.findMany({
+          where: { supplierId: supplier.id },
+          select: { category: true }
+        });
+        
+        // Compter les produits par catégorie externe (depuis le champ category qui contient la catégorie CJ)
+        const categoryCounts = new Map<string, number>();
+        
+        // Pour CJ, utiliser aussi les produits du store
+        if (supplier.name === 'CJ Dropshipping') {
+          const storeProducts = await this.prisma.cJProductStore.findMany({
+            select: { category: true }
+          });
+          
+          storeProducts.forEach(p => {
+            if (p.category) {
+              categoryCounts.set(p.category, (categoryCounts.get(p.category) || 0) + 1);
+            }
+          });
+        }
+        
+        // 3. Récupérer toutes les catégories non mappées de ce fournisseur
+        const unmappedCategories = await this.prisma.unmappedExternalCategory.findMany({
+          where: { supplierId: supplier.id }
+        });
+        
+        console.log(`   - ${unmappedCategories.length} catégories non mappées trouvées`);
+        console.log(`   - ${categoryCounts.size} catégories avec produits actuels`);
+        
+        // 4. Mettre à jour ou supprimer chaque catégorie
+        for (const unmappedCat of unmappedCategories) {
+          const actualCount = categoryCounts.get(unmappedCat.externalCategory) || 0;
+          
+          if (actualCount === 0) {
+            // Aucun produit avec cette catégorie, supprimer l'entrée
+            await this.prisma.unmappedExternalCategory.delete({
+              where: { id: unmappedCat.id }
+            });
+            console.log(`   ❌ Supprimé: "${unmappedCat.externalCategory}" (0 produits)`);
+            totalCleaned++;
+          } else if (actualCount !== unmappedCat.productCount) {
+            // Mettre à jour le compteur
+            await this.prisma.unmappedExternalCategory.update({
+              where: { id: unmappedCat.id },
+              data: { productCount: actualCount }
+            });
+            console.log(`   ✅ Mis à jour: "${unmappedCat.externalCategory}" (${unmappedCat.productCount} → ${actualCount})`);
+            totalUpdated++;
+          }
+        }
+      }
+      
+      console.log('\n==============================================');
+      console.log('📊 RÉSULTAT:');
+      console.log(`   - ${totalCleaned} catégories supprimées (0 produits)`);
+      console.log(`   - ${totalUpdated} catégories mises à jour`);
+      console.log('==============================================\n');
+      
+      return {
+        success: true,
+        cleaned: totalCleaned,
+        updated: totalUpdated,
+        message: `${totalCleaned} catégories nettoyées, ${totalUpdated} catégories mises à jour`
+      };
+      
+    } catch (error) {
+      console.error('❌ Erreur resynchronisation:', error);
+      throw error;
+    }
   }
 }

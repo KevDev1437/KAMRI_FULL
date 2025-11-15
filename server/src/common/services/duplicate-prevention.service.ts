@@ -271,6 +271,11 @@ export class DuplicatePreventionService {
 
         this.logger.log(`✅ Produit mis à jour avec ${changes.length} changements`);
         
+        // ✅ METTRE À JOUR LES PRODUCT VARIANTS si le JSON a changé
+        if (productData.variants && updateData.variants) {
+          await this.createProductVariantsFromJSON(updatedProduct.id, productData.variants);
+        }
+        
         return {
           status: 'updated',
           productId: updatedProduct.id,
@@ -366,6 +371,11 @@ export class DuplicatePreventionService {
 
         this.logger.log(`✅ Nouveau produit créé: ${newProduct.id}`);
         
+        // ✅ CRÉER LES PRODUCT VARIANTS depuis le JSON variants
+        if (productData.variants) {
+          await this.createProductVariantsFromJSON(newProduct.id, productData.variants);
+        }
+        
         return {
           status: 'new',
           productId: newProduct.id,
@@ -427,6 +437,108 @@ export class DuplicatePreventionService {
     } catch (error) {
       this.logger.error(`❌ Erreur upsert magasin CJ:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Créer les ProductVariant depuis le JSON variants
+   */
+  private async createProductVariantsFromJSON(productId: string, variantsJSON: string): Promise<number> {
+    try {
+      let variants = [];
+      
+      // Parser le JSON
+      try {
+        variants = JSON.parse(variantsJSON);
+        if (!Array.isArray(variants)) {
+          this.logger.warn(`⚠️ Variants non-array pour produit ${productId}, skip`);
+          return 0;
+        }
+      } catch (e) {
+        this.logger.warn(`❌ Erreur parsing JSON variants pour produit ${productId}, skip`);
+        return 0;
+      }
+
+      if (variants.length === 0) {
+        this.logger.log(`⏭️ Aucun variant JSON pour produit ${productId}, skip`);
+        return 0;
+      }
+
+      this.logger.log(`📦 Création de ${variants.length} variants pour produit ${productId}...`);
+
+      let createdCount = 0;
+      for (const variant of variants) {
+        try {
+          // Parser variantKey
+          let parsedKey = variant.variantKey || variant.variantProperty;
+          try {
+            if (parsedKey && typeof parsedKey === 'string' && parsedKey.startsWith('[')) {
+              const parsed = JSON.parse(parsedKey);
+              parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+            }
+          } catch {
+            // Garder la valeur originale
+          }
+
+          const variantData = {
+            productId: productId,
+            cjVariantId: variant.vid || variant.variantId || null,
+            name: variant.variantNameEn || variant.variantName || variant.name || `Variant ${variant.variantSku || createdCount + 1}`,
+            sku: variant.variantSku || variant.sku,
+            price: parseFloat(variant.variantSellPrice || variant.price || 0),
+            weight: parseFloat(variant.variantWeight || variant.weight || 0),
+            dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+              ? JSON.stringify({
+                  length: variant.variantLength,
+                  width: variant.variantWidth,
+                  height: variant.variantHeight,
+                  volume: variant.variantVolume
+                })
+              : null,
+            image: variant.variantImage || variant.image,
+            stock: parseInt(variant.stock || variant.variantStock || 0, 10), // ✅ Stock en premier !
+            properties: JSON.stringify({
+              key: parsedKey,
+              property: variant.variantProperty,
+              standard: variant.variantStandard,
+              unit: variant.variantUnit
+            }),
+            status: (variant.stock || variant.variantStock || 0) > 0 ? 'available' : 'out_of_stock',
+            isActive: true,
+            lastSyncAt: new Date()
+          };
+
+          // Créer ou mettre à jour le variant
+          if (variant.vid || variant.variantId) {
+            await this.prisma.productVariant.upsert({
+              where: {
+                cjVariantId: variant.vid || variant.variantId
+              },
+              update: variantData,
+              create: variantData
+            });
+          } else {
+            // Pas de vid, créer directement
+            await this.prisma.productVariant.create({
+              data: variantData
+            });
+          }
+
+          createdCount++;
+        } catch (e) {
+          this.logger.error(`❌ Erreur création variant:`, e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      if (createdCount > 0) {
+        this.logger.log(`✅ ${createdCount} variants créés pour produit ${productId}`);
+      }
+
+      return createdCount;
+
+    } catch (error) {
+      this.logger.error(`❌ Erreur création variants pour produit ${productId}:`, error);
+      return 0;
     }
   }
 

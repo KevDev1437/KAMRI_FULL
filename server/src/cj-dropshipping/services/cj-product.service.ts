@@ -1536,5 +1536,166 @@ export class CJProductService {
       throw error;
     }
   }
+
+  /**
+   * Migrer les variants JSON vers la table ProductVariant pour tous les produits
+   * Utile pour les produits importés avant la mise en place de ProductVariant
+   * @param force Si true, recrée les variants même s'ils existent déjà
+   */
+  async migrateAllVariantsToDatabase(force: boolean = false) {
+    this.logger.log('🔄 === MIGRATION VARIANTS JSON → ProductVariant ===');
+    
+    try {
+      // Récupérer tous les produits CJ qui ont des variants JSON
+      const productsWithVariants = await this.prisma.product.findMany({
+        where: {
+          AND: [
+            { source: 'cj-dropshipping' },
+            { variants: { not: null } }
+          ]
+        },
+        select: {
+          id: true,
+          name: true,
+          cjProductId: true,
+          variants: true,
+          productVariants: {
+            select: { id: true }
+          }
+        }
+      });
+
+      this.logger.log(`📦 ${productsWithVariants.length} produits CJ trouvés avec variants JSON`);
+
+      let migratedProducts = 0;
+      let migratedVariants = 0;
+      let skippedProducts = 0;
+
+      for (const product of productsWithVariants) {
+        try {
+          // Vérifier si le produit a déjà des productVariants
+          if (product.productVariants && product.productVariants.length > 0 && !force) {
+            this.logger.log(`⏭️  Produit "${product.name}" a déjà ${product.productVariants.length} variants, skip (utilisez force=true pour recréer)`);
+            skippedProducts++;
+            continue;
+          }
+
+          // Parser les variants JSON
+          let variants = [];
+          try {
+            variants = JSON.parse(product.variants);
+            if (!Array.isArray(variants)) {
+              this.logger.warn(`⚠️  Variants non-array pour "${product.name}", skip`);
+              continue;
+            }
+          } catch (e) {
+            this.logger.warn(`❌ Erreur parsing JSON variants pour "${product.name}", skip`);
+            continue;
+          }
+
+          if (variants.length === 0) {
+            this.logger.log(`⏭️  Aucun variant dans JSON pour "${product.name}", skip`);
+            continue;
+          }
+
+          this.logger.log(`\n📦 Migration de ${variants.length} variants pour "${product.name}"...`);
+
+          let createdCount = 0;
+          for (const variant of variants) {
+            try {
+              // Parser variantKey
+              let parsedKey = variant.variantKey || variant.variantProperty;
+              try {
+                if (parsedKey && typeof parsedKey === 'string' && parsedKey.startsWith('[')) {
+                  const parsed = JSON.parse(parsedKey);
+                  parsedKey = Array.isArray(parsed) ? parsed.join('-') : parsedKey;
+                }
+              } catch {
+                // Garder la valeur originale
+              }
+
+              const variantData = {
+                productId: product.id,
+                cjVariantId: variant.vid || variant.variantId || null,
+                name: variant.variantNameEn || variant.variantName || variant.name || `Variant ${variant.variantSku || createdCount + 1}`,
+                sku: variant.variantSku || variant.sku,
+                price: parseFloat(variant.variantSellPrice || variant.price || 0),
+                weight: parseFloat(variant.variantWeight || variant.weight || 0),
+                dimensions: variant.variantLength && variant.variantWidth && variant.variantHeight
+                  ? JSON.stringify({
+                      length: variant.variantLength,
+                      width: variant.variantWidth,
+                      height: variant.variantHeight,
+                      volume: variant.variantVolume
+                    })
+                  : null,
+                image: variant.variantImage || variant.image,
+                stock: parseInt(variant.stock || variant.variantStock || 0, 10), // ✅ Stock en premier !
+                properties: JSON.stringify({
+                  key: parsedKey,
+                  property: variant.variantProperty,
+                  standard: variant.variantStandard,
+                  unit: variant.variantUnit
+                }),
+                status: (variant.stock || variant.variantStock || 0) > 0 ? 'available' : 'out_of_stock', // ✅ Stock en premier !
+                isActive: true,
+                lastSyncAt: new Date()
+              };
+
+              // Créer ou mettre à jour le variant
+              if (variant.vid || variant.variantId) {
+                await this.prisma.productVariant.upsert({
+                  where: {
+                    cjVariantId: variant.vid || variant.variantId
+                  },
+                  update: variantData,
+                  create: variantData
+                });
+              } else {
+                // Pas de vid, créer directement
+                await this.prisma.productVariant.create({
+                  data: variantData
+                });
+              }
+
+              createdCount++;
+            } catch (e) {
+              this.logger.error(`❌ Erreur création variant pour "${product.name}":`, e instanceof Error ? e.message : String(e));
+            }
+          }
+
+          if (createdCount > 0) {
+            this.logger.log(`✅ ${createdCount} variants créés pour "${product.name}"`);
+            migratedProducts++;
+            migratedVariants += createdCount;
+          }
+
+        } catch (e) {
+          this.logger.error(`❌ Erreur migration produit "${product.name}":`, e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      const summary = {
+        totalProducts: productsWithVariants.length,
+        migratedProducts,
+        migratedVariants,
+        skippedProducts,
+        message: `✅ Migration terminée : ${migratedVariants} variants créés pour ${migratedProducts} produits`
+      };
+
+      this.logger.log('\n🎉 === MIGRATION TERMINÉE ===');
+      this.logger.log(`📊 Résumé:`);
+      this.logger.log(`   - Produits traités: ${productsWithVariants.length}`);
+      this.logger.log(`   - Produits migrés: ${migratedProducts}`);
+      this.logger.log(`   - Variants créés: ${migratedVariants}`);
+      this.logger.log(`   - Produits ignorés: ${skippedProducts}`);
+
+      return summary;
+
+    } catch (error) {
+      this.logger.error('❌ Erreur migration variants:', error);
+      throw error;
+    }
+  }
 }
 

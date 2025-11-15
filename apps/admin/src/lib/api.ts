@@ -576,6 +576,27 @@ export class ApiClient {
     return this.fetchWithAuth(url);
   }
 
+  // ✅ NOUVELLE MÉTHODE : Migrer les variants JSON vers ProductVariant
+  async migrateCJVariants(force: boolean = false) {
+    return this.fetchWithAuth(`/cj-dropshipping/migrate-variants${force ? '?force=true' : ''}`, {
+      method: 'POST',
+    });
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Synchroniser les stocks du magasin CJ depuis l'API
+  async syncCJStoreStocks() {
+    return this.fetchWithAuth('/cj-dropshipping/stores/sync-stocks', {
+      method: 'POST',
+    });
+  }
+
+  // ✅ Resynchroniser les compteurs des catégories non mappées
+  async syncUnmappedCategories() {
+    return this.fetchWithAuth('/suppliers/sync-unmapped-categories', {
+      method: 'POST',
+    });
+  }
+
   // ✅ NOUVELLE MÉTHODE : Statistiques anti-doublons
   async getDuplicateStats() {
     return this.fetchWithAuth('/duplicates/stats');

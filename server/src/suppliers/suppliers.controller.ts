@@ -42,6 +42,13 @@ export class SuppliersController {
     return this.suppliersService.getStats();
   }
 
+  @Post('sync-unmapped-categories')
+  @ApiOperation({ summary: 'Resynchroniser les compteurs des catégories non mappées' })
+  @ApiResponse({ status: 200, description: 'Compteurs resynchronisés avec succès' })
+  syncUnmappedCategories() {
+    return this.suppliersService.syncUnmappedCategories();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Récupérer un fournisseur par ID' })
   @ApiResponse({ status: 200, description: 'Détails du fournisseur' })

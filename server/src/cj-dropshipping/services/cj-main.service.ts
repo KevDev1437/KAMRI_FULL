@@ -119,6 +119,10 @@ export class CJMainService {
     return this.cjFavoriteService.importProduct(pid, categoryId, margin, isFavorite);
   }
 
+  async syncStoreStocks() {
+    return this.cjFavoriteService.syncAllStocks();
+  }
+
   // Commandes
   async createOrder(orderData: any) {
     return this.cjOrderService.createOrder(orderData);

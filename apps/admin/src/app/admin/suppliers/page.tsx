@@ -729,11 +729,45 @@ export default function SuppliersPage() {
                         
                         {(() => {
                           try {
-                            const variants = JSON.parse(selectedProduct.variants);
+                            // ✅ Priorité: productVariants (relation Prisma) > variants (JSON)
+                            let variants = [];
                             
-                            // Résumé des variants
-                            const colors = Array.from(new Set(variants.map((v: any) => v.variantKey?.split('-')[0]).filter(Boolean)));
-                            const sizes = Array.from(new Set(variants.map((v: any) => v.variantKey?.split('-')[1]).filter(Boolean)));
+                            if (selectedProduct.productVariants && selectedProduct.productVariants.length > 0) {
+                              // Utiliser les variants de la relation Prisma
+                              variants = selectedProduct.productVariants;
+                            } else if (selectedProduct.variants) {
+                              // Fallback: parser le JSON
+                              variants = JSON.parse(selectedProduct.variants);
+                            }
+                            
+                            // Résumé des variants - gérer les deux formats
+                            const extractVariantKey = (v: any) => {
+                              // Format productVariants: utiliser properties
+                              if (v.properties) {
+                                try {
+                                  const props = typeof v.properties === 'string' ? JSON.parse(v.properties) : v.properties;
+                                  if (typeof props === 'string') {
+                                    return props; // "Brown-S", etc.
+                                  } else if (props.key) {
+                                    return props.key;
+                                  }
+                                } catch {
+                                  return v.properties;
+                                }
+                              }
+                              // Format JSON: utiliser variantKey
+                              return v.variantKey;
+                            };
+                            
+                            const colors = Array.from(new Set(variants.map((v: any) => {
+                              const key = extractVariantKey(v);
+                              return key?.split('-')[0];
+                            }).filter(Boolean)));
+                            
+                            const sizes = Array.from(new Set(variants.map((v: any) => {
+                              const key = extractVariantKey(v);
+                              return key?.split('-')[1];
+                            }).filter(Boolean)));
                             
                             return (
                               <>
@@ -799,82 +833,103 @@ export default function SuppliersPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {variants.map((variant: any, index: number) => (
-                                          <tr key={variant.vid || index} className="border-b hover:bg-gray-50">
-                                            <td className="p-3">
-                                              <div className="flex items-center gap-2">
-                                                {variant.variantImage && (
-                                                  <img 
-                                                    src={variant.variantImage} 
-                                                    alt={variant.variantNameEn || variant.variantName}
-                                                    className="w-8 h-8 rounded object-cover"
-                                                    onError={(e) => { e.currentTarget.src = '/placeholder-product.jpg' }}
-                                                  />
-                                                )}
-                                                <div>
-                                                  <p className="font-medium text-gray-900">
-                                                    {variant.variantNameEn || variant.variantName || `Variant ${index + 1}`}
-                                                  </p>
-                                                  {variant.variantKey && (
-                                                    <p className="text-xs text-gray-500">{variant.variantKey}</p>
+                                        {variants.map((variant: any, index: number) => {
+                                          // ✅ Extraire les données selon le format (productVariants ou JSON)
+                                          const isProductVariant = variant.id && variant.productId; // Format Prisma
+                                          
+                                          const variantImage = isProductVariant ? variant.image : variant.variantImage;
+                                          const variantName = isProductVariant ? variant.name : (variant.variantNameEn || variant.variantName);
+                                          const variantKey = isProductVariant ? (
+                                            typeof variant.properties === 'string' ? variant.properties : JSON.stringify(variant.properties)
+                                          ) : variant.variantKey;
+                                          const variantId = isProductVariant ? variant.cjVariantId : variant.vid;
+                                          const variantSku = isProductVariant ? variant.sku : variant.variantSku;
+                                          const variantPrice = isProductVariant ? variant.price : variant.variantSellPrice;
+                                          const variantStock = isProductVariant ? variant.stock : (variant.variantStock ?? variant.stock);
+                                          const variantWeight = isProductVariant ? variant.weight : variant.variantWeight;
+                                          
+                                          // Dimensions
+                                          let dimensionsDisplay = 'N/A';
+                                          if (isProductVariant) {
+                                            if (variant.dimensions) {
+                                              try {
+                                                const dims = typeof variant.dimensions === 'string' ? JSON.parse(variant.dimensions) : variant.dimensions;
+                                                if (dims.length && dims.width && dims.height) {
+                                                  dimensionsDisplay = `${dims.length}×${dims.width}×${dims.height}`;
+                                                }
+                                              } catch {}
+                                            }
+                                          } else {
+                                            if (variant.variantLength && variant.variantWidth && variant.variantHeight) {
+                                              dimensionsDisplay = `${variant.variantLength}×${variant.variantWidth}×${variant.variantHeight}`;
+                                            } else if (variant.variantStandard) {
+                                              dimensionsDisplay = variant.variantStandard;
+                                            }
+                                          }
+                                          
+                                          return (
+                                            <tr key={variantId || variant.id || index} className="border-b hover:bg-gray-50">
+                                              <td className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                  {variantImage && (
+                                                    <img 
+                                                      src={variantImage} 
+                                                      alt={variantName || `Variant ${index + 1}`}
+                                                      className="w-8 h-8 rounded object-cover"
+                                                      onError={(e) => { e.currentTarget.src = '/placeholder-product.jpg' }}
+                                                    />
                                                   )}
+                                                  <div>
+                                                    <p className="font-medium text-gray-900">
+                                                      {variantName || `Variant ${index + 1}`}
+                                                    </p>
+                                                    {variantKey && (
+                                                      <p className="text-xs text-gray-500">{variantKey}</p>
+                                                    )}
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            </td>
-                                            <td className="p-3">
-                                              <span className="text-xs font-mono text-gray-600">
-                                                {variant.vid ? String(variant.vid).slice(-8) : 'N/A'}
-                                              </span>
-                                            </td>
-                                            <td className="p-3">
-                                              <span className="text-xs font-mono text-blue-600">
-                                                {variant.variantSku || 'N/A'}
-                                              </span>
-                                            </td>
-                                            <td className="p-3">
-                                              {variant.variantSellPrice ? (
-                                                <span className="font-semibold text-green-600">
-                                                  ${typeof variant.variantSellPrice === 'string' ? variant.variantSellPrice : variant.variantSellPrice.toFixed(2)}
+                                              </td>
+                                              <td className="p-3">
+                                                <span className="text-xs font-mono text-gray-600">
+                                                  {variantId ? String(variantId).slice(-8) : 'N/A'}
                                                 </span>
-                                              ) : (
-                                                <span className="text-gray-400">N/A</span>
-                                              )}
-                                            </td>
-                                            <td className="p-3">
-                                              {variant.variantStock !== undefined && variant.variantStock !== null ? (
-                                                <span className={`font-semibold ${
-                                                  variant.variantStock > 0 ? 'text-green-600' : 'text-red-600'
-                                                }`}>
-                                                  {variant.variantStock}
+                                              </td>
+                                              <td className="p-3">
+                                                <span className="text-xs font-mono text-blue-600">
+                                                  {variantSku || 'N/A'}
                                                 </span>
-                                              ) : variant.stock !== undefined && variant.stock !== null ? (
-                                                <span className={`font-semibold ${
-                                                  variant.stock > 0 ? 'text-green-600' : 'text-red-600'
-                                                }`}>
-                                                  {variant.stock}
+                                              </td>
+                                              <td className="p-3">
+                                                {variantPrice !== null && variantPrice !== undefined ? (
+                                                  <span className="font-semibold text-green-600">
+                                                    ${typeof variantPrice === 'string' ? variantPrice : variantPrice.toFixed(2)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-400">N/A</span>
+                                                )}
+                                              </td>
+                                              <td className="p-3">
+                                                {variantStock !== undefined && variantStock !== null ? (
+                                                  <span className={`font-semibold ${
+                                                    variantStock > 0 ? 'text-green-600' : 'text-red-600'
+                                                  }`}>
+                                                    {variantStock}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-400">N/A</span>
+                                                )}
+                                              </td>
+                                              <td className="p-3">
+                                                <span className="text-gray-700">
+                                                  {variantWeight ? `${Math.round(variantWeight)}g` : 'N/A'}
                                                 </span>
-                                              ) : (
-                                                <span className="text-gray-400">N/A</span>
-                                              )}
-                                            </td>
-                                            <td className="p-3">
-                                              <span className="text-gray-700">
-                                                {variant.variantWeight ? `${Math.round(variant.variantWeight)}g` : 'N/A'}
-                                              </span>
-                                            </td>
-                                            <td className="p-3">
-                                              {variant.variantLength && variant.variantWidth && variant.variantHeight ? (
-                                                <span className="text-xs text-gray-600">
-                                                  {variant.variantLength}×{variant.variantWidth}×{variant.variantHeight}
-                                                </span>
-                                              ) : variant.variantStandard ? (
-                                                <span className="text-xs text-gray-600">{variant.variantStandard}</span>
-                                              ) : (
-                                                <span className="text-gray-400">N/A</span>
-                                              )}
-                                            </td>
-                                          </tr>
-                                        ))}
+                                              </td>
+                                              <td className="p-3">
+                                                <span className="text-xs text-gray-600">{dimensionsDisplay}</span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>

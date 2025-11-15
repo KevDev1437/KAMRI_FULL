@@ -30,6 +30,7 @@ import { CJSourcingCreateRequest } from './interfaces/cj-sourcing.interface';
 // 🔧 NOUVEAUX SERVICES REFACTORISÉS
 import { CJMainService } from './services/cj-main.service';
 import { CJWebhookService } from './services/cj-webhook.service';
+import { CJProductService } from './services/cj-product.service';
 
 @ApiTags('cj-dropshipping')
 @Controller('api/cj-dropshipping')
@@ -41,6 +42,7 @@ export class CJDropshippingController {
   constructor(
     private readonly cjMainService: CJMainService, // 🔧 SERVICE REFACTORISÉ
     private readonly cjWebhookService: CJWebhookService, // ✅ SERVICE WEBHOOK
+    private readonly cjProductService: CJProductService, // ✅ SERVICE PRODUITS
     private readonly prisma: PrismaService
   ) {}
 
@@ -1353,6 +1355,45 @@ export class CJDropshippingController {
       this.logger.error('❌ Erreur marquage importé:', error);
       throw new HttpException(
         'Erreur marquage importé',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post('migrate-variants')
+  @ApiOperation({ summary: 'Migrer les variants JSON vers la table ProductVariant pour tous les produits CJ' })
+  @ApiQuery({ name: 'force', required: false, type: Boolean, description: 'Forcer la recréation même si les variants existent' })
+  @ApiResponse({ status: 200, description: 'Migration effectuée avec succès' })
+  async migrateVariants(@Query('force') force?: string) {
+    try {
+      const forceRecreate = force === 'true';
+      this.logger.log(`🔄 Démarrage migration variants JSON → ProductVariant (force: ${forceRecreate})...`);
+      const result = await this.cjProductService.migrateAllVariantsToDatabase(forceRecreate);
+      return {
+        success: true,
+        data: result
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur migration variants:', error);
+      throw new HttpException(
+        'Erreur lors de la migration des variants',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post('stores/sync-stocks')
+  @ApiOperation({ summary: 'Synchroniser les stocks de tous les produits du magasin CJ depuis l\'API' })
+  @ApiResponse({ status: 200, description: 'Stocks synchronisés avec succès' })
+  async syncStoreStocks() {
+    try {
+      this.logger.log('🔄 Synchronisation des stocks du magasin CJ...');
+      const result = await this.cjMainService.syncStoreStocks();
+      return result;
+    } catch (error) {
+      this.logger.error('❌ Erreur synchronisation stocks:', error);
+      throw new HttpException(
+        'Erreur lors de la synchronisation des stocks',
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
