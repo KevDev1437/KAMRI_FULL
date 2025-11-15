@@ -16,7 +16,8 @@ import {
     ShoppingCart,
     Store,
     Truck,
-    Users
+    Users,
+    Warehouse
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -62,6 +63,11 @@ const navigation = [
     name: 'CJ Dropshipping',
     href: '/admin/cj-dropshipping',
     icon: Globe,
+  },
+  {
+    name: 'Inventaire CJ',
+    href: '/admin/cj-dropshipping/inventory',
+    icon: Warehouse,
   },
   {
     name: 'Commandes',

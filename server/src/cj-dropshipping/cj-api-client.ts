@@ -967,7 +967,9 @@ export class CJAPIClient {
       const endpoint = `/product/stock/getInventoryByPid?pid=${pid}`;
       const response = await this.makeRequest('GET', endpoint);
       
-      if (response && response.code === 200 && response.data) {
+      // ✅ Selon la doc 3.3 : code === 200 ET (result === true OU success dans la réponse brute)
+      const hasSuccess = (response as any).success === true || response.result === true;
+      if (response && response.code === 200 && hasSuccess && response.data) {
         const data = response.data as CJProductInventoryResponse;
         
         if (!data.variantInventories || data.variantInventories.length === 0) {
@@ -1022,6 +1024,105 @@ export class CJAPIClient {
   }
 
   /**
+   * 3.1 Inventory Inquiry (GET) - Obtenir le stock d'un variant spécifique par VID
+   * Endpoint: GET /product/stock/queryByVid?vid={vid}
+   * @param vid Variant ID
+   * @returns Liste des stocks par entrepôt pour ce variant
+   */
+  async getInventoryByVid(vid: string): Promise<CJVariantStock[]> {
+    this.logger.log(`📦 === RÉCUPÉRATION INVENTAIRE PAR VID (VID: ${vid}) ===`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/stock/queryByVid?vid=${vid}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.result === true && response.data) {
+        const data = response.data as any[];
+        
+        if (!Array.isArray(data) || data.length === 0) {
+          this.logger.warn(`⚠️ Aucun stock trouvé pour le variant ${vid}`);
+          return [];
+        }
+        
+        // Mapper les données selon la structure de l'API
+        const stocks: CJVariantStock[] = data.map((item: any) => ({
+          vid: item.vid || vid,
+          areaId: item.areaId,
+          areaEn: item.areaEn,
+          countryCode: item.countryCode,
+          totalInventoryNum: item.totalInventoryNum || item.storageNum, // storageNum est déprécié
+          cjInventoryNum: item.cjInventoryNum,
+          factoryInventoryNum: item.factoryInventoryNum,
+          storageNum: item.storageNum // Garder pour compatibilité
+        }));
+        
+        const totalStock = stocks.reduce((sum, s) => sum + (s.totalInventoryNum || 0), 0);
+        this.logger.log(`✅ ${stocks.length} entrepôt(s) trouvé(s) pour variant ${vid} - Stock total: ${totalStock}`);
+        
+        return stocks;
+      }
+      
+      this.logger.warn(`⚠️ Réponse invalide pour variant ${vid}: code=${response?.code}, result=${response?.result}`);
+      return [];
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération inventaire par VID ${vid}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * 3.2 Query Inventory by SKU (GET) - Obtenir le stock par SKU
+   * Endpoint: GET /product/stock/queryBySku?sku={sku}
+   * @param sku SKU ou SPU
+   * @returns Liste des stocks par entrepôt pour ce SKU
+   */
+  async getInventoryBySku(sku: string): Promise<CJVariantStock[]> {
+    this.logger.log(`📦 === RÉCUPÉRATION INVENTAIRE PAR SKU (SKU: ${sku}) ===`);
+    
+    try {
+      await this.handleRateLimit();
+      
+      const endpoint = `/product/stock/queryBySku?sku=${encodeURIComponent(sku)}`;
+      const response = await this.makeRequest('GET', endpoint);
+      
+      if (response && response.code === 200 && response.result === true && response.data) {
+        const data = response.data as any[];
+        
+        if (!Array.isArray(data) || data.length === 0) {
+          this.logger.warn(`⚠️ Aucun stock trouvé pour le SKU ${sku}`);
+          return [];
+        }
+        
+        // Mapper les données selon la structure de l'API
+        const stocks: CJVariantStock[] = data.map((item: any) => ({
+          areaId: item.areaId,
+          areaEn: item.areaEn,
+          countryCode: item.countryCode,
+          countryNameEn: item.countryNameEn,
+          totalInventoryNum: item.totalInventoryNum,
+          cjInventoryNum: item.cjInventoryNum,
+          factoryInventoryNum: item.factoryInventoryNum
+        }));
+        
+        const totalStock = stocks.reduce((sum, s) => sum + (s.totalInventoryNum || 0), 0);
+        this.logger.log(`✅ ${stocks.length} entrepôt(s) trouvé(s) pour SKU ${sku} - Stock total: ${totalStock}`);
+        
+        return stocks;
+      }
+      
+      this.logger.warn(`⚠️ Réponse invalide pour SKU ${sku}: code=${response?.code}, result=${response?.result}`);
+      return [];
+      
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur récupération inventaire par SKU ${sku}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Obtenir les variants d'un produit AVEC leur stock (méthode optimisée utilisant bulk)
    * @param pid Product ID
    * @returns Variants enrichis avec stock
@@ -1035,7 +1136,9 @@ export class CJAPIClient {
       const endpoint = `/product/stock/getInventoryByPid?pid=${pid}`;
       const response = await this.makeRequest('GET', endpoint);
       
-      if (response && response.code === 200 && response.data) {
+      // ✅ Selon la doc 3.3 : code === 200 ET (result === true OU success dans la réponse brute)
+      const hasSuccess = (response as any).success === true || response.result === true;
+      if (response && response.code === 200 && hasSuccess && response.data) {
         const data = response.data as CJProductInventoryResponse;
         
         if (!data.variantInventories || data.variantInventories.length === 0) {
@@ -1183,11 +1286,23 @@ export class CJAPIClient {
       const endpoint = `/product/productComments?pid=${pid}&pageNum=${pageNum}&pageSize=${pageSize}`;
       const response = await this.makeRequest('GET', endpoint);
       
-      if (response && response.code === 0 && response.data) {
+      // ✅ Selon la doc API : code === 0 pour succès, data contient { pageNum, pageSize, total, list }
+      if (response && (response.code === 200 || response.code === 0) && response.data) {
         const data = response.data as any;
         
+        // ✅ Vérifier que data.list existe (selon la doc, c'est dans data.list)
+        if (!data.list || !Array.isArray(data.list)) {
+          this.logger.warn(`⚠️ Pas de liste d'avis dans la réponse:`, JSON.stringify(data).substring(0, 200));
+          return {
+            pageNum: "1",
+            pageSize: String(pageSize),
+            total: "0",
+            list: []
+          };
+        }
+        
         // Mapper les reviews pour le frontend
-        const mappedReviews = (data.list || []).map((review: CJReview) => 
+        const mappedReviews = data.list.map((review: CJReview) => 
           mapCJReview(review)
         );
         
@@ -1199,6 +1314,14 @@ export class CJAPIClient {
           total: data.total || "0",
           list: mappedReviews
         };
+      }
+      
+      // ✅ Log pour debug si pas de données
+      if (response) {
+        this.logger.warn(`⚠️ Réponse API reviews invalide: code=${response.code}, success=${(response as any).success}, hasData=${!!response.data}`);
+        if (response.data) {
+          this.logger.warn(`⚠️ Structure data:`, JSON.stringify(response.data).substring(0, 300));
+        }
       }
       
       // Retour vide si pas de reviews

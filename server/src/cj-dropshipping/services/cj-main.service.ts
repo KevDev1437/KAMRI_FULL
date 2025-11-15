@@ -176,8 +176,11 @@ export class CJMainService {
   }
 
   async getInventory(vid: string) {
-    // Délégation vers le service de produits
-    return this.cjProductService.getInventory ? this.cjProductService.getInventory(vid) : { success: false, stock: [] };
+    return this.cjProductService.getInventory(vid);
+  }
+
+  async getInventoryBySku(sku: string) {
+    return this.cjProductService.getInventoryBySku(sku);
   }
 
   async syncInventory(productIds: string[]) {

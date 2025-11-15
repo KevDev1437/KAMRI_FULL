@@ -616,6 +616,21 @@ export class ApiClient {
     });
   }
 
+  // ✅ Récupérer les avis d'un produit CJ
+  async getCJProductReviews(pid: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/products/${pid}/reviews`);
+  }
+
+  // ✅ 3.1 Inventory Inquiry - Obtenir le stock d'un variant par VID
+  async getCJInventoryByVid(vid: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/inventory/vid/${vid}`);
+  }
+
+  // ✅ 3.2 Query Inventory by SKU - Obtenir le stock par SKU
+  async getCJInventoryBySku(sku: string) {
+    return this.fetchWithAuth(`/cj-dropshipping/inventory/sku/${encodeURIComponent(sku)}`);
+  }
+
   // ✅ Nettoyer les descriptions de tous les produits (supprimer Weight/Dimensions faux)
   async cleanupProductDescriptions() {
     return this.fetchWithAuth('/products/cleanup-descriptions', {

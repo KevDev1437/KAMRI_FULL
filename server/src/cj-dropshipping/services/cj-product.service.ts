@@ -3,7 +3,7 @@ import { DuplicatePreventionService } from '../../common/services/duplicate-prev
 import { PrismaService } from '../../prisma/prisma.service';
 import { CJAPIClient } from '../cj-api-client';
 import { CJProductSearchDto } from '../dto/cj-product-search.dto';
-import { CJProduct, CJProductSearchOptions, CJProductSearchResult, calculateReviewStats } from '../interfaces/cj-product.interface';
+import { CJProduct, CJProductSearchOptions, CJProductSearchResult, calculateReviewStats, CJVariantStock } from '../interfaces/cj-product.interface';
 
 @Injectable()
 export class CJProductService {
@@ -1157,9 +1157,50 @@ export class CJProductService {
     return { synced: 0, errors: 0 };
   }
 
-  async getInventory(vid: string): Promise<{ success: boolean; stock: any[] }> {
-    // TODO: Implémenter la récupération du stock
-    return { success: false, stock: [] };
+  /**
+   * 3.1 Inventory Inquiry - Obtenir le stock d'un variant par VID
+   */
+  async getInventory(vid: string): Promise<{ success: boolean; stock: CJVariantStock[] }> {
+    this.logger.log(`📦 Récupération inventaire pour variant: ${vid}`);
+    
+    try {
+      const client = await this.initializeClient();
+      const stocks = await client.getInventoryByVid(vid);
+      
+      return {
+        success: true,
+        stock: stocks
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération inventaire ${vid}:`, error);
+      return {
+        success: false,
+        stock: []
+      };
+    }
+  }
+
+  /**
+   * 3.2 Query Inventory by SKU - Obtenir le stock par SKU
+   */
+  async getInventoryBySku(sku: string): Promise<{ success: boolean; stock: CJVariantStock[] }> {
+    this.logger.log(`📦 Récupération inventaire pour SKU: ${sku}`);
+    
+    try {
+      const client = await this.initializeClient();
+      const stocks = await client.getInventoryBySku(sku);
+      
+      return {
+        success: true,
+        stock: stocks
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erreur récupération inventaire SKU ${sku}:`, error);
+      return {
+        success: false,
+        stock: []
+      };
+    }
   }
 
   async syncInventory(productIds: string[]): Promise<{ updated: number; errors: number }> {

@@ -352,11 +352,30 @@ export class CJDropshippingController {
   }
 
   // ===== INVENTAIRE =====
+  // ⚠️ IMPORTANT: Les routes spécifiques DOIVENT être AVANT les routes génériques
 
-  @Get('inventory/:vid')
-  @ApiOperation({ summary: 'Obtenir le stock d\'une variante CJ' })
+  @Get('inventory/vid/:vid')
+  @ApiOperation({ summary: '3.1 Inventory Inquiry - Obtenir le stock d\'une variante CJ par VID' })
+  @ApiResponse({ status: 200, description: 'Liste des stocks par entrepôt pour ce variant' })
+  async getInventoryByVid(@Param('vid') vid: string) {
+    this.logger.log(`📦 Récupération inventaire par VID: ${vid}`);
+    return this.cjMainService.getInventory(vid);
+  }
+
+  @Get('inventory/sku/:sku')
+  @ApiOperation({ summary: '3.2 Query Inventory by SKU - Obtenir le stock par SKU' })
+  @ApiResponse({ status: 200, description: 'Liste des stocks par entrepôt pour ce SKU' })
+  async getInventoryBySku(@Param('sku') sku: string) {
+    this.logger.log(`📦 Récupération inventaire par SKU: ${sku}`);
+    return this.cjMainService.getInventoryBySku(sku);
+  }
+
+  // ✅ Endpoint legacy pour compatibilité - Utilise un chemin différent pour éviter les conflits
+  @Get('inventory/legacy/:vid')
+  @ApiOperation({ summary: '[LEGACY] Obtenir le stock d\'une variante CJ par VID' })
   @ApiResponse({ status: 200, description: 'Informations de stock' })
-  async getInventory(@Param('vid') vid: string) {
+  async getInventoryLegacy(@Param('vid') vid: string) {
+    this.logger.log(`📦 [LEGACY] Récupération inventaire par VID: ${vid}`);
     return this.cjMainService.getInventory(vid);
   }
 

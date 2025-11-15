@@ -108,6 +108,10 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
   const [loadingShipping, setLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState<string | null>(null)
   const [selectedShippingOption, setSelectedShippingOption] = useState<ShippingOption | null>(null)
+  
+  // États pour les avis CJ
+  const [cjReviews, setCjReviews] = useState<any[]>([])
+  const [loadingReviews, setLoadingReviews] = useState(false)
 
   useEffect(() => {
     if (isOpen && productId) {
@@ -118,8 +122,17 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
       setShippingOptions([])
       setSelectedShippingOption(null)
       setShippingError(null)
+      setCjReviews([])
     }
   }, [isOpen, productId])
+  
+  // Récupérer les avis CJ quand le produit est chargé
+  useEffect(() => {
+    if (product && (product.source === 'cj-dropshipping' || product.cjProductId)) {
+      loadCJReviews()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, product?.cjProductId])
 
   // Calculer le fret quand le pays change ou quand le produit est chargé
   useEffect(() => {
@@ -160,6 +173,41 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
       setError(err.message || 'Erreur lors du chargement des détails')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCJReviews = async () => {
+    if (!product) return
+    
+    // ✅ Récupérer le PID depuis plusieurs emplacements possibles
+    const pid = product.cjProductId || 
+                (product as any).pid || 
+                (product as any).cjMapping?.cjProductId
+    if (!pid) {
+      console.warn('⚠️ Pas de PID CJ trouvé pour récupérer les avis')
+      return
+    }
+
+    try {
+      setLoadingReviews(true)
+      const response = await apiClient.getCJProductReviews(pid)
+      
+      if (response?.error) {
+        console.warn('Erreur récupération avis CJ:', response.error)
+        setCjReviews([])
+        return
+      }
+      
+      if (response?.data?.reviews && Array.isArray(response.data.reviews)) {
+        setCjReviews(response.data.reviews)
+      } else {
+        setCjReviews([])
+      }
+    } catch (err: any) {
+      console.error('Erreur récupération avis CJ:', err)
+      setCjReviews([])
+    } finally {
+      setLoadingReviews(false)
     }
   }
 
@@ -879,47 +927,91 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
                 </Card>
               )}
 
-              {/* Avis CJ (si disponibles) */}
-              {product.cjReviews && (
+              {/* Avis CJ (récupérés dynamiquement) */}
+              {(product.source === 'cj-dropshipping' || product.cjProductId) && (
                 <Card className="p-4">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Star className="w-5 h-5" />
                     Avis CJ Dropshipping
+                    {loadingReviews && <span className="text-sm text-gray-500 ml-2">(Chargement...)</span>}
                   </h3>
                   <div className="text-sm">
-                    {(() => {
-                      const reviews = parseJsonField(product.cjReviews)
-                      if (Array.isArray(reviews) && reviews.length > 0) {
-                        return (
-                          <div className="space-y-2">
-                            {reviews.slice(0, 5).map((review: any, idx: number) => (
-                              <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2">
-                                {review.rating && (
-                                  <div className="flex items-center gap-1 mb-1">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star
-                                        key={i}
-                                        className={`w-4 h-4 ${
-                                          i < (review.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                                {review.comment && <p className="text-gray-700">{review.comment}</p>}
-                                {review.date && <p className="text-xs text-gray-500 mt-1">{review.date}</p>}
+                    {loadingReviews ? (
+                      <p className="text-gray-500">Chargement des avis...</p>
+                    ) : cjReviews.length > 0 ? (
+                      <div className="space-y-3">
+                        {(() => {
+                          // ✅ Filtrer les doublons et créer des clés uniques
+                          const uniqueReviews = cjReviews.filter((review: any, index: number, self: any[]) => {
+                            const commentId = review.commentId || review.id;
+                            if (!commentId) return true; // Garder si pas d'ID
+                            // Garder seulement le premier avis avec cet ID
+                            return index === self.findIndex((r: any) => (r.commentId || r.id) === commentId);
+                          });
+                          
+                          return uniqueReviews.slice(0, 10).map((review: any, idx: number) => {
+                            // ✅ Créer une clé unique en combinant commentId, pid et index
+                            const commentId = review.commentId || review.id;
+                            const pid = review.pid || '';
+                            const uniqueKey = commentId 
+                              ? `review-${commentId}-${pid}-${idx}` 
+                              : `review-${idx}-${Date.now()}`;
+                            
+                            return (
+                          <div key={uniqueKey} className="border-l-4 border-blue-500 pl-4 py-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-4 h-4 ${
+                                      i < (review.rating || parseInt(review.score || '0', 10) || 0) 
+                                        ? 'text-yellow-400 fill-current' 
+                                        : 'text-gray-300'
+                                    }`}
+                                  />
+                                ))}
+                                <span className="ml-2 text-sm font-semibold">
+                                  {review.rating || parseInt(review.score || '0', 10) || 0}/5
+                                </span>
                               </div>
-                            ))}
-                            {reviews.length > 5 && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                ... et {reviews.length - 5} autres avis
+                              {review.commentUser && (
+                                <span className="text-xs text-gray-500">Par {review.commentUser}</span>
+                              )}
+                            </div>
+                            {review.comment && (
+                              <p className="text-gray-700 text-sm mb-1">{review.comment}</p>
+                            )}
+                            {(review.commentDate || review.createdAt) && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatDate(review.commentDate || review.createdAt)}
                               </p>
                             )}
+                            {review.commentUrls && review.commentUrls.length > 0 && (
+                              <div className="flex gap-2 mt-2">
+                                {review.commentUrls.slice(0, 3).map((url: string, imgIdx: number) => (
+                                  <img
+                                    key={`${uniqueKey}-img-${imgIdx}-${url.substring(url.length - 20)}`}
+                                    src={url}
+                                    alt={`Avis ${idx + 1} - Image ${imgIdx + 1}`}
+                                    className="w-16 h-16 object-cover rounded"
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )
-                      }
-                      return <p className="text-gray-500">Aucun avis disponible</p>
-                    })()}
+                            );
+                          });
+                        })()}
+                        {cjReviews.length > 10 && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            ... et {cjReviews.length - 10} autres avis
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">Aucun avis disponible</p>
+                    )}
                   </div>
                 </Card>
               )}
