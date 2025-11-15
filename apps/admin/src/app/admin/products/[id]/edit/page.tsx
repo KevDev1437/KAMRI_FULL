@@ -662,7 +662,7 @@ export default function EditProductPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Prix de vente (€) *</Label>
+                    <Label htmlFor="price">Prix de vente ($) *</Label>
                     <Input
                       id="price"
                       type="number"
@@ -676,7 +676,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="originalPrice">Prix original (€)</Label>
+                    <Label htmlFor="originalPrice">Prix original ($)</Label>
                     <Input
                       id="originalPrice"
                       type="number"
@@ -930,7 +930,7 @@ export default function EditProductPage() {
                               )}
                               {variant.price !== undefined && (
                                 <span className="text-sm font-bold text-primary-600">
-                                  {variant.price}€
+                                  {variant.price}$
                                 </span>
                               )}
                             </div>

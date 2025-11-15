@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { CJLogisticsService } from './cj-logistics.service';
 
-@Controller('cj-dropshipping/logistics')
+@Controller('api/cj-dropshipping/logistics')
 export class CJLogisticsController {
   private readonly logger = new Logger(CJLogisticsController.name);
 

@@ -22,7 +22,7 @@ function ProductCard({ product }: ProductCardProps) {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const formatPrice = (price: number) => {
-    return `${price.toFixed(2)}€`;
+    return `${price.toFixed(2)}$`;
   };
 
   // Gestion des favoris

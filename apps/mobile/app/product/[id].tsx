@@ -314,9 +314,9 @@ export default function ProductDetailsScreen() {
 
           {/* Prix */}
           <View style={styles.priceContainer}>
-            <ThemedText style={styles.price}>{product.price.toFixed(2)}€</ThemedText>
+            <ThemedText style={styles.price}>{product.price.toFixed(2)}$</ThemedText>
             {product.originalPrice && (
-              <ThemedText style={styles.originalPrice}>{product.originalPrice.toFixed(2)}€</ThemedText>
+              <ThemedText style={styles.originalPrice}>{product.originalPrice.toFixed(2)}$</ThemedText>
             )}
           </View>
 
@@ -451,7 +451,7 @@ export default function ProductDetailsScreen() {
                     {similarProduct.name}
                   </ThemedText>
                   <ThemedText style={styles.similarPrice}>
-                    {similarProduct.price.toFixed(2)}€
+                    {similarProduct.price.toFixed(2)}$
                   </ThemedText>
                 </TouchableOpacity>
               ))}

@@ -752,13 +752,17 @@ export class CJAPIClient {
   /**
    * Obtenir les détails complets d'un produit (selon doc CJ - endpoint /product/detail/{pid})
    */
-  async getProductDetails(pid: string): Promise<CJProduct> {
+  async getProductDetails(pid: string, includeVideo: boolean = true): Promise<CJProduct> {
     this.logger.log('🔍 === DÉBUT getProductDetails ===');
     this.logger.log('📝 PID:', pid);
     
     try {
       // ✅ Utiliser l'endpoint /product/query qui fonctionne (pas /product/detail qui n'existe pas)
-      const endpoint = `/product/query?pid=${pid}`;
+      // ✅ Ajouter features=enable_video pour récupérer les vidéos si nécessaire
+      let endpoint = `/product/query?pid=${pid}`;
+      if (includeVideo) {
+        endpoint += '&features=enable_video';
+      }
       this.logger.log('🌐 Endpoint final:', endpoint);
       
       const response = await this.makeRequest('GET', endpoint);
@@ -1040,8 +1044,8 @@ export class CJAPIClient {
           return this.getVariantsWithStockFallback(pid);
         }
         
-        // Maintenant récupérer les infos complètes des variants via l'endpoint details
-        const productDetails = await this.getProductDetails(pid);
+        // Maintenant récupérer les infos complètes des variants via l'endpoint details (avec vidéos)
+        const productDetails = await this.getProductDetails(pid, true); // true = inclure les vidéos
         
         if (!productDetails || !productDetails.variants || productDetails.variants.length === 0) {
           this.logger.warn('⚠️ Détails produit sans variants, utilisation uniquement inventory');
@@ -1451,18 +1455,110 @@ export class CJAPIClient {
 
   /**
    * Calculer les frais de port
+   * Endpoint: /logistic/freightCalculate (selon doc CJ)
    */
   async calculateFreight(
     fromCountryCode: string,
     toCountryCode: string,
     products: Array<{ vid: string; quantity: number }>
   ): Promise<CJFreightOption[]> {
-    const response = await this.makeRequest('POST', '/logistics/calculateFreight', {
-      fromCountryCode,
-      toCountryCode,
+    this.logger.log(`🚚 Calcul du fret: ${fromCountryCode} → ${toCountryCode} (${products.length} produit(s))`);
+    
+    const response = await this.makeRequest('POST', '/logistic/freightCalculate', {
+      startCountryCode: fromCountryCode,
+      endCountryCode: toCountryCode,
       products,
     });
-    return response.data as any;
+    
+    this.logger.log(`📦 Réponse API CJ - code: ${response.code}, result: ${response.result}, hasData: ${!!response.data}`);
+    this.logger.log(`📦 Structure réponse:`, JSON.stringify(response, null, 2).substring(0, 500));
+    
+    // La réponse de l'API CJ a la structure: { code, result, message, data: [...] }
+    // data est un tableau d'options de livraison
+    if (response.code === 200 && response.result === true && response.data && Array.isArray(response.data)) {
+      this.logger.log(`✅ ${response.data.length} option(s) de livraison reçue(s)`);
+      
+      // Mapper les données de l'API vers notre interface
+      // Support de 2 formats de réponse:
+      // Format 1 (freightCalculate): logisticName, logisticPrice, logisticAging
+      // Format 2 (freightCalculateTip): option.enName, arrivalTime, postage/wrapPostage
+      const mappedOptions = response.data.map((item: any, index: number) => {
+        // Extraire le nom de la logistique
+        // Format 1: logisticName (freightCalculate)
+        // Format 2: option.enName ou channel.enName (freightCalculateTip)
+        const logisticName = item.logisticName || 
+                            item.option?.enName || 
+                            item.option?.cnName || 
+                            item.channel?.enName || 
+                            item.channel?.cnName || 
+                            'Unknown';
+        
+        // Extraire le temps de livraison
+        // Format 1: logisticAging (freightCalculate)
+        // Format 2: arrivalTime ou option.arrivalTime (freightCalculateTip)
+        const shippingTime = item.logisticAging || 
+                            item.arrivalTime || 
+                            item.option?.arrivalTime || 
+                            'N/A';
+        
+        // Extraire le prix en USD
+        // Format 1: logisticPrice (freightCalculate) - prix de base
+        // Format 2: postage ou wrapPostage (freightCalculateTip) - prix avec emballage
+        // Priorité: logisticPrice > wrapPostage > postage > totalPostageFee
+        let freight = 0;
+        
+        if (item.logisticPrice !== undefined && item.logisticPrice !== null) {
+          // Format 1: freightCalculate
+          freight = typeof item.logisticPrice === 'string' 
+            ? parseFloat(item.logisticPrice) 
+            : (item.logisticPrice || 0);
+        } else if (item.wrapPostage !== undefined && item.wrapPostage !== null) {
+          // Format 2: freightCalculateTip - prix avec emballage (recommandé)
+          freight = typeof item.wrapPostage === 'string' 
+            ? parseFloat(item.wrapPostage) 
+            : (item.wrapPostage || 0);
+        } else if (item.postage !== undefined && item.postage !== null) {
+          // Format 2: freightCalculateTip - prix de base
+          freight = typeof item.postage === 'string' 
+            ? parseFloat(item.postage) 
+            : (item.postage || 0);
+        } else if (item.totalPostageFee !== undefined && item.totalPostageFee !== null) {
+          // Format alternatif: total incluant taxes et frais
+          freight = typeof item.totalPostageFee === 'string' 
+            ? parseFloat(item.totalPostageFee) 
+            : (item.totalPostageFee || 0);
+        }
+        
+        // Vérifier que le prix est valide
+        if (isNaN(freight) || freight < 0) {
+          freight = 0;
+          this.logger.warn(`  ⚠️ Prix invalide pour ${logisticName}`);
+          this.logger.warn(`     logisticPrice: ${item.logisticPrice}, wrapPostage: ${item.wrapPostage}, postage: ${item.postage}`);
+        }
+        
+        this.logger.log(`  ✅ Option ${index + 1} mappée: ${logisticName} - ${shippingTime} - $${freight.toFixed(2)}`);
+        
+        return {
+          logisticName,
+          shippingTime: shippingTime || 'N/A',
+          freight: freight,
+          currency: 'USD',
+        };
+      });
+      
+      return mappedOptions;
+    }
+    
+    // Si pas de données ou erreur
+    if (response.code !== 200 || !response.result) {
+      this.logger.warn(`⚠️ Erreur API CJ: code=${response.code}, message=${response.message}`);
+    }
+    
+    if (!response.data || !Array.isArray(response.data)) {
+      this.logger.warn(`⚠️ Pas de données dans la réponse ou format invalide`);
+    }
+    
+    return [];
   }
 
   /**

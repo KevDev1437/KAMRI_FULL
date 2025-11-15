@@ -597,6 +597,32 @@ export class ApiClient {
     });
   }
 
+  // ✅ Calculer les frais de livraison CJ
+  async calculateCJFreight(params: {
+    startCountryCode: string;
+    endCountryCode: string;
+    zip?: string;
+    taxId?: string;
+    houseNumber?: string;
+    iossNumber?: string;
+    products: Array<{
+      quantity: number;
+      vid: string;
+    }>;
+  }) {
+    return this.fetchWithAuth('/cj-dropshipping/logistics/calculate-freight', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // ✅ Nettoyer les descriptions de tous les produits (supprimer Weight/Dimensions faux)
+  async cleanupProductDescriptions() {
+    return this.fetchWithAuth('/products/cleanup-descriptions', {
+      method: 'POST',
+    });
+  }
+
   // ✅ NOUVELLE MÉTHODE : Statistiques anti-doublons
   async getDuplicateStats() {
     return this.fetchWithAuth('/duplicates/stats');

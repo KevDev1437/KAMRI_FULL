@@ -169,7 +169,7 @@ export default function OrdersHistoryNew() {
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-[#4CAF50]">
-                      {order.total.toFixed(2)}€
+                      {order.total.toFixed(2)}$
                     </p>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
                       {getStatusText(order.status)}
@@ -255,7 +255,7 @@ export default function OrdersHistoryNew() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total</p>
-                  <p className="font-semibold text-[#4CAF50]">{selectedOrder.total.toFixed(2)}€</p>
+                  <p className="font-semibold text-[#4CAF50]">{selectedOrder.total.toFixed(2)}$</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Articles</p>
@@ -283,9 +283,9 @@ export default function OrdersHistoryNew() {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-[#4CAF50]">
-                          {(item.price * item.quantity).toFixed(2)}€
+                          {(item.price * item.quantity).toFixed(2)}$
                         </p>
-                        <p className="text-sm text-gray-600">{item.price.toFixed(2)}€ l'unité</p>
+                        <p className="text-sm text-gray-600">{item.price.toFixed(2)}$ l'unité</p>
                       </div>
                     </div>
                   ))}

@@ -232,9 +232,9 @@ export default function FavoritesScreen() {
 
         <View style={styles.priceRow}>
           <View style={styles.priceContainer}>
-            <ThemedText style={styles.currentPrice}>{item.price}€</ThemedText>
+            <ThemedText style={styles.currentPrice}>{item.price}$</ThemedText>
             {item.originalPrice > item.price && (
-              <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
+              <ThemedText style={styles.originalPrice}>{item.originalPrice}$</ThemedText>
             )}
           </View>
           {item.originalPrice > item.price && (

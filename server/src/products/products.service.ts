@@ -105,8 +105,16 @@ export class ProductsService {
       },
     });
 
-    // ✅ Transformer les données pour le frontend
-    return products.map(product => this.processProductImages(product));
+    // ✅ Transformer les données pour le frontend et calculer le stock total
+    return products.map(product => {
+      const processed = this.processProductImages(product);
+      // ✅ Calculer le stock total depuis les variants
+      if (processed.productVariants && processed.productVariants.length > 0) {
+        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...processed, stock: totalStock };
+      }
+      return processed;
+    });
   }
 
   async findAllForAdmin() {
@@ -132,8 +140,15 @@ export class ProductsService {
       },
     });
 
-    // ✅ Transformer les données pour le frontend
-    return products.map(product => this.processProductImages(product));
+    // ✅ Transformer les données pour le frontend et calculer le stock total
+    return products.map(product => {
+      const processed = this.processProductImages(product);
+      if (processed.productVariants && processed.productVariants.length > 0) {
+        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...processed, stock: totalStock };
+      }
+      return processed;
+    });
   }
 
   async findOne(id: string) {
@@ -179,8 +194,14 @@ export class ProductsService {
 
     if (!product) return null;
 
-    // ✅ Transformer les données pour le frontend
-    return this.processProductImages(product);
+    // ✅ Transformer les données pour le frontend et calculer le stock total
+    const processed = this.processProductImages(product);
+    // ✅ Calculer le stock total depuis les variants
+    if (processed.productVariants && processed.productVariants.length > 0) {
+      const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+      return { ...processed, stock: totalStock };
+    }
+    return processed;
   }
 
   async remove(id: string) {
@@ -203,7 +224,7 @@ export class ProductsService {
 
   async getPendingProducts() {
     // ✅ Unifié : retourner uniquement les produits draft
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: { 
         status: 'draft' // ✅ Unifié : uniquement draft
       },
@@ -211,10 +232,30 @@ export class ProductsService {
         category: true,
         supplier: true,
         cjMapping: true, // ✅ Inclure le mapping CJ
+        productVariants: {
+          // ✅ Inclure les variants pour calculer le stock
+          select: {
+            id: true,
+            productId: true,
+            stock: true,
+            isActive: true,
+          },
+        },
+        images: true,
       },
       orderBy: {
         createdAt: 'desc',
       },
+    });
+    
+    // ✅ Calculer le stock total depuis les variants
+    return products.map(product => {
+      const processed = this.processProductImages(product);
+      if (processed.productVariants && processed.productVariants.length > 0) {
+        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...processed, stock: totalStock };
+      }
+      return processed;
     });
   }
 
@@ -291,7 +332,15 @@ export class ProductsService {
       });
     }
 
-    return filteredProducts;
+    // ✅ Calculer le stock total depuis les variants et traiter les images
+    return filteredProducts.map(product => {
+      const processed = this.processProductImages(product);
+      if (processed.productVariants && processed.productVariants.length > 0) {
+        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...processed, stock: totalStock };
+      }
+      return processed;
+    });
   }
 
   // ✅ Nouvelle méthode pour obtenir les produits par source
@@ -1536,8 +1585,16 @@ export class ProductsService {
       })));
     }
     
-    // ✅ Traiter les images pour chaque produit
-    return products.map(product => this.processProductImages(product));
+    // ✅ Transformer les données pour le frontend et calculer le stock total
+    return products.map(product => {
+      const processed = this.processProductImages(product);
+      // ✅ Calculer le stock total depuis les variants (comme dans findAll)
+      if (processed.productVariants && processed.productVariants.length > 0) {
+        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...processed, stock: totalStock };
+      }
+      return processed;
+    });
   }
 
   /**
@@ -1579,8 +1636,14 @@ export class ProductsService {
       throw new NotFoundException('Produit draft non trouvé');
     }
 
-    // ✅ Traiter les images pour le produit
-    return this.processProductImages(product);
+    // ✅ Traiter les images et calculer le stock total
+    const processed = this.processProductImages(product);
+    // ✅ Calculer le stock total depuis les variants
+    if (processed.productVariants && processed.productVariants.length > 0) {
+      const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+      return { ...processed, stock: totalStock };
+    }
+    return processed;
   }
 
   /**
@@ -1683,6 +1746,159 @@ export class ProductsService {
     return {
       updated: result.count
     };
+  }
+
+  /**
+   * Nettoyer les descriptions de tous les produits
+   * Supprime les informations Weight/Dimensions souvent fausses
+   */
+  async cleanupAllDescriptions() {
+    console.log('🧹 === NETTOYAGE DES DESCRIPTIONS ===');
+    
+    try {
+      // Récupérer tous les produits avec descriptions
+      const products = await this.prisma.product.findMany({
+        where: {
+          description: { not: null }
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true
+        }
+      });
+      
+      console.log(`📦 ${products.length} produits à traiter`);
+      
+      let updated = 0;
+      let unchanged = 0;
+      
+      for (const product of products) {
+        const originalDesc = product.description || '';
+        
+        // Nettoyer la description
+        const cleanedDesc = this.cleanDescription(originalDesc);
+        
+        // Vérifier si la description a changé
+        if (cleanedDesc !== originalDesc) {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { description: cleanedDesc }
+          });
+          updated++;
+          console.log(`✅ ${product.name.substring(0, 50)}: ${originalDesc.length} → ${cleanedDesc.length} caractères`);
+        } else {
+          unchanged++;
+        }
+      }
+      
+      console.log('\n==============================================');
+      console.log(`✅ ${updated} descriptions mises à jour`);
+      console.log(`⏭️  ${unchanged} descriptions inchangées`);
+      console.log('==============================================\n');
+      
+      return {
+        success: true,
+        updated,
+        unchanged,
+        total: products.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Erreur nettoyage descriptions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Nettoyer une description (supprimer HTML, CSS, markdown et infos techniques fausses)
+   */
+  private cleanDescription(description: string): string {
+    if (!description) return '';
+    
+    let cleaned = description
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ NETTOYAGE AGRESSIF : Supprimer TOUT le CSS
+    let cssRemoved = cleaned;
+    let previousLength = 0;
+    while (cssRemoved.length !== previousLength) {
+      previousLength = cssRemoved.length;
+      cssRemoved = cssRemoved
+        .replace(/#[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\.[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/@media[^{]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\{[^{}]*\}/g, '')
+        .trim();
+    }
+    cleaned = cssRemoved;
+    
+    // ✅ Supprimer markdown et caractères spéciaux
+    cleaned = cleaned
+      .replace(/###\s*[^\n]+/g, '')
+      .replace(/##\s*[^\n]+/g, '')
+      .replace(/#\s*[^\n]+/g, '')
+      .replace(/\*\*[^\*]+\*\*/g, '')
+      .replace(/\*[^\*]+\*/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/⚠️\s*NOTES\s*IMPORTANTES[^\n]*/gi, '')
+      .replace(/\*\*\s*##\s*⚠️[^\n]*/gi, '')
+      .replace(/🎨\s*Couleurs\s*disponibles[^\n]*/gi, '')
+      .replace(/🎯\s*Tailles\s*disponibles[^\n]*/gi, '')
+      .replace(/[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/[a-zA-Z0-9_-]+:\s*[^;]+;/g, '')
+      .trim();
+    
+    // ✅ Supprimer la section "Technical Details" complète
+    const technicalDetailsPattern = /(?:Technical\s+Details?|Technical\s+Specifications?|Specifications?)[\s\S]*$/i;
+    cleaned = cleaned.replace(technicalDetailsPattern, '');
+    
+    // ✅ Supprimer les spécifications techniques individuelles
+    const specPatterns = [
+      /Bike\s+Type:\s*[^\n]+/gi, /Age\s+Range[^\n]+/gi, /Number\s+of\s+Speeds?:\s*[^\n]+/gi,
+      /Wheel\s+Size:\s*[^\n]+/gi, /Frame\s+Material:\s*[^\n]+/gi, /Suspension\s+Type:\s*[^\n]+/gi,
+      /Accessories?:\s*[^\n]+/gi, /Included\s+Components?:\s*[^\n]+/gi, /Brake\s+Style:\s*[^\n]+/gi,
+      /Voltage:\s*[^\n]+/gi, /Wattage:\s*[^\n]+/gi, /Material:\s*[^\n]+/gi,
+      /Item\s+Package\s+Dimensions?[^\n]+/gi, /Package\s+Weight:\s*[^\n]+/gi,
+      /Item\s+Dimensions?[^\n]+/gi, /Part\s+Number:\s*[^\n]+/gi,
+    ];
+    specPatterns.forEach(pattern => cleaned = cleaned.replace(pattern, ''));
+    
+    // ✅ Supprimer les informations techniques souvent fausses
+    cleaned = cleaned
+      .replace(/Weight:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Poids:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Dimensions?:\s*[^\n.,]+[cm|mm|m|inch]?[^\n.]*/gi, '')
+      .replace(/Size:\s*[^\n.,]*×[^\n.,]*/gi, '')
+      .replace(/Package\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/Shipping\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ Supprimer les lignes qui ne contiennent que du CSS/markdown
+    const lines = cleaned.split('\n');
+    const cleanLines = lines.filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) return false;
+      if (/^[#@{}:;,\s-]+$/.test(trimmed)) return false;
+      if (/^[a-zA-Z0-9_-]+\s*\{/.test(trimmed)) return false;
+      if (trimmed.includes('{') && trimmed.includes('}') && trimmed.length < 50) return false;
+      // Supprimer les lignes qui sont des spécifications techniques
+      if (/^[A-Z][a-zA-Z\s]+:\s*[A-Z]/.test(trimmed) && trimmed.length < 100) return false;
+      return true;
+    });
+    cleaned = cleanLines.join('\n');
+    
+    return cleaned.trim();
   }
 }
 

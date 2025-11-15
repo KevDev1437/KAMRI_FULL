@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Package, DollarSign, ShoppingCart, Tag, Calendar, User, Box, Weight, Ruler, Star, Image as ImageIcon, Info } from 'lucide-react'
+import { X, Package, DollarSign, ShoppingCart, Tag, Calendar, User, Box, Weight, Ruler, Star, Image as ImageIcon, Info, Truck, Globe } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { ShippingOptions, ShippingOption } from './ShippingOptions'
 
 interface ProductDetails {
   id: string
@@ -42,6 +43,10 @@ interface ProductDetails {
   tags?: string
   importStatus?: string
   lastImportAt?: string
+  deliveryCycle?: string
+  isFreeShipping?: boolean
+  freeShippingCountries?: string
+  defaultShippingMethod?: string
   margin?: number
   isEdited?: boolean
   editedAt?: string
@@ -96,6 +101,13 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
   const [product, setProduct] = useState<ProductDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // États pour le calcul de fret
+  const [selectedCountry, setSelectedCountry] = useState<string>('FR')
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([])
+  const [loadingShipping, setLoadingShipping] = useState(false)
+  const [shippingError, setShippingError] = useState<string | null>(null)
+  const [selectedShippingOption, setSelectedShippingOption] = useState<ShippingOption | null>(null)
 
   useEffect(() => {
     if (isOpen && productId) {
@@ -103,8 +115,27 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
     } else {
       setProduct(null)
       setError(null)
+      setShippingOptions([])
+      setSelectedShippingOption(null)
+      setShippingError(null)
     }
   }, [isOpen, productId])
+
+  // Calculer le fret quand le pays change ou quand le produit est chargé
+  useEffect(() => {
+    if (product && (product.source === 'cj-dropshipping' || product.cjProductId) && product.productVariants && product.productVariants.length > 0 && selectedCountry) {
+      calculateFreight()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCountry])
+  
+  // Calculer le fret quand le produit est chargé
+  useEffect(() => {
+    if (product && (product.source === 'cj-dropshipping' || product.cjProductId) && product.productVariants && product.productVariants.length > 0 && selectedCountry) {
+      calculateFreight()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
 
   const loadProductDetails = async () => {
     if (!productId) return
@@ -129,6 +160,51 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
       setError(err.message || 'Erreur lors du chargement des détails')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const calculateFreight = async () => {
+    if (!product || !product.productVariants || product.productVariants.length === 0) return
+
+    try {
+      setLoadingShipping(true)
+      setShippingError(null)
+      setShippingOptions([])
+
+      // Récupérer le premier variant avec un cjVariantId valide
+      const variant = product.productVariants.find(v => v.cjVariantId)
+      if (!variant || !variant.cjVariantId) {
+        setShippingError('Aucun variant CJ trouvé pour ce produit')
+        return
+      }
+
+      const response = await apiClient.calculateCJFreight({
+        startCountryCode: 'CN', // Chine (pays d'origine CJ)
+        endCountryCode: selectedCountry,
+        products: [{
+          vid: variant.cjVariantId,
+          quantity: 1
+        }]
+      })
+
+      if (response.error) {
+        setShippingError(response.error)
+        return
+      }
+
+      if (response.data?.freightOptions) {
+        setShippingOptions(response.data.freightOptions)
+        if (response.data.freightOptions.length > 0) {
+          setSelectedShippingOption(response.data.freightOptions[0])
+        }
+      } else {
+        setShippingError('Aucune option de livraison disponible')
+      }
+    } catch (err: any) {
+      console.error('Erreur calcul fret:', err)
+      setShippingError(err.message || 'Erreur lors du calcul des frais de livraison')
+    } finally {
+      setLoadingShipping(false)
     }
   }
 
@@ -270,9 +346,9 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
 
                   <div className="flex items-center gap-4">
                     <div>
-                      <span className="text-3xl font-bold text-primary-600">{product.price}€</span>
+                      <span className="text-3xl font-bold text-primary-600">{product.price}$</span>
                       {product.originalPrice && (
-                        <span className="text-lg text-gray-400 line-through ml-2">{product.originalPrice}€</span>
+                        <span className="text-lg text-gray-400 line-through ml-2">{product.originalPrice}$</span>
                       )}
                     </div>
                     {product.margin && (
@@ -410,6 +486,76 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
                 </Card>
               )}
 
+              {/* Informations de livraison */}
+              {(product.source === 'cj-dropshipping' || product.cjProductId) && (
+                <Card className="p-4 bg-blue-50">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
+                    Informations de Livraison
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {product.isFreeShipping !== undefined && (
+                      <div>
+                        <span className="text-gray-500 flex items-center gap-2">
+                          <Truck className="w-4 h-4" />
+                          Livraison gratuite:
+                        </span>
+                        <p className={`font-semibold mt-1 ${product.isFreeShipping ? 'text-green-600' : 'text-gray-600'}`}>
+                          {product.isFreeShipping ? '✅ Disponible' : '❌ Non disponible'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">(Champ: addMarkStatus de l'API CJ)</p>
+                      </div>
+                    )}
+                    {product.deliveryCycle && (
+                      <div>
+                        <span className="text-gray-500 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Délai de livraison:
+                        </span>
+                        <p className="font-semibold mt-1 text-blue-700">{product.deliveryCycle}</p>
+                        <p className="text-xs text-gray-400 mt-1">(Peut ne pas être disponible pour tous les produits)</p>
+                      </div>
+                    )}
+                    <div className="col-span-1 md:col-span-2 mt-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Globe className="w-4 h-4 text-gray-500" />
+                        <label className="text-sm font-medium text-gray-700">
+                          Pays de destination:
+                        </label>
+                        <select
+                          value={selectedCountry}
+                          onChange={(e) => setSelectedCountry(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                        >
+                          <option value="FR">🇫🇷 France</option>
+                          <option value="US">🇺🇸 États-Unis</option>
+                          <option value="GB">🇬🇧 Royaume-Uni</option>
+                          <option value="DE">🇩🇪 Allemagne</option>
+                          <option value="ES">🇪🇸 Espagne</option>
+                          <option value="IT">🇮🇹 Italie</option>
+                          <option value="CA">🇨🇦 Canada</option>
+                          <option value="BE">🇧🇪 Belgique</option>
+                          <option value="CH">🇨🇭 Suisse</option>
+                          <option value="NL">🇳🇱 Pays-Bas</option>
+                          <option value="AU">🇦🇺 Australie</option>
+                        </select>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Options de livraison:</h4>
+                        <ShippingOptions
+                          options={shippingOptions}
+                          loading={loadingShipping}
+                          error={shippingError}
+                          selectedOption={selectedShippingOption}
+                          onSelect={setSelectedShippingOption}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Variants - Section complète avec tous les détails */}
               {(() => {
                 // Priorité : productVariants (relation Prisma) > variants (JSON)
@@ -526,7 +672,7 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
                           {variant.price !== null && variant.price !== undefined && (
                             <div>
                               <span className="text-gray-500">Prix:</span>
-                              <p className="font-semibold mt-1">{variant.price}€</p>
+                              <p className="font-semibold mt-1">{variant.price}$</p>
                             </div>
                           )}
                           {variant.stock !== null && variant.stock !== undefined && (
@@ -538,7 +684,11 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
                           {variant.weight !== null && variant.weight !== undefined && (
                             <div>
                               <span className="text-gray-500">Poids:</span>
-                              <p className="font-semibold mt-1">{variant.weight} kg</p>
+                              <p className="font-semibold mt-1">
+                                {variant.weight >= 1000 
+                                  ? `${(variant.weight / 1000).toFixed(2)} kg` 
+                                  : `${variant.weight} g`}
+                              </p>
                             </div>
                           )}
                           {variant.dimensions && (
@@ -549,7 +699,11 @@ export function ProductDetailsModal({ productId, isOpen, onClose }: Props) {
                                   try {
                                     const dims = JSON.parse(variant.dimensions)
                                     if (typeof dims === 'object' && dims !== null) {
-                                      return `${dims.length || 'N/A'} x ${dims.width || 'N/A'} x ${dims.height || 'N/A'} cm`
+                                      // Convertir mm → cm (diviser par 10)
+                                      const lengthCm = dims.length ? (dims.length / 10).toFixed(1) : 'N/A'
+                                      const widthCm = dims.width ? (dims.width / 10).toFixed(1) : 'N/A'
+                                      const heightCm = dims.height ? (dims.height / 10).toFixed(1) : 'N/A'
+                                      return `${lengthCm} x ${widthCm} x ${heightCm} cm`
                                     }
                                     return variant.dimensions
                                   } catch {

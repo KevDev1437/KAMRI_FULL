@@ -255,5 +255,14 @@ export class ProductsController {
   markAllNotificationsAsRead() {
     return this.productsService.markAllNotificationsAsRead();
   }
+
+  @Post('cleanup-descriptions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Nettoyer les descriptions de tous les produits (supprimer Weight/Dimensions faux)' })
+  @ApiResponse({ status: 200, description: 'Descriptions nettoyées avec succès' })
+  cleanupDescriptions() {
+    return this.productsService.cleanupAllDescriptions();
+  }
 }
 

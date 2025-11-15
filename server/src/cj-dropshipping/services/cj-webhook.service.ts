@@ -1040,13 +1040,71 @@ export class CJWebhookService {
     
     // Supprimer les balises HTML
     let cleaned = description
-      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
-      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
-      .replace(/&amp;/g, '&') // Remplacer &amp; par &
-      .replace(/&lt;/g, '<') // Remplacer &lt; par <
-      .replace(/&gt;/g, '>') // Remplacer &gt; par >
-      .replace(/&quot;/g, '"') // Remplacer &quot; par "
-      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ NETTOYAGE AGRESSIF : Supprimer TOUT le CSS
+    let cssRemoved = cleaned;
+    let previousLength = 0;
+    while (cssRemoved.length !== previousLength) {
+      previousLength = cssRemoved.length;
+      cssRemoved = cssRemoved
+        .replace(/#[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\.[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/@media[^{]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\{[^{}]*\}/g, '')
+        .trim();
+    }
+    cleaned = cssRemoved;
+    
+    // ✅ Supprimer markdown et caractères spéciaux
+    cleaned = cleaned
+      .replace(/###\s*[^\n]+/g, '')
+      .replace(/##\s*[^\n]+/g, '')
+      .replace(/#\s*[^\n]+/g, '')
+      .replace(/\*\*[^\*]+\*\*/g, '')
+      .replace(/\*[^\*]+\*/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/⚠️\s*NOTES\s*IMPORTANTES[^\n]*/gi, '')
+      .replace(/\*\*\s*##\s*⚠️[^\n]*/gi, '')
+      .replace(/🎨\s*Couleurs\s*disponibles[^\n]*/gi, '')
+      .replace(/🎯\s*Tailles\s*disponibles[^\n]*/gi, '')
+      .replace(/[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/[a-zA-Z0-9_-]+:\s*[^;]+;/g, '')
+      .trim();
+    
+    // ✅ Supprimer la section "Technical Details" complète
+    const technicalDetailsPattern = /(?:Technical\s+Details?|Technical\s+Specifications?|Specifications?)[\s\S]*$/i;
+    cleaned = cleaned.replace(technicalDetailsPattern, '');
+    
+    // ✅ Supprimer les spécifications techniques individuelles
+    const specPatterns = [
+      /Bike\s+Type:\s*[^\n]+/gi, /Age\s+Range[^\n]+/gi, /Number\s+of\s+Speeds?:\s*[^\n]+/gi,
+      /Wheel\s+Size:\s*[^\n]+/gi, /Frame\s+Material:\s*[^\n]+/gi, /Suspension\s+Type:\s*[^\n]+/gi,
+      /Accessories?:\s*[^\n]+/gi, /Included\s+Components?:\s*[^\n]+/gi, /Brake\s+Style:\s*[^\n]+/gi,
+      /Voltage:\s*[^\n]+/gi, /Wattage:\s*[^\n]+/gi, /Material:\s*[^\n]+/gi,
+      /Item\s+Package\s+Dimensions?[^\n]+/gi, /Package\s+Weight:\s*[^\n]+/gi,
+      /Item\s+Dimensions?[^\n]+/gi, /Part\s+Number:\s*[^\n]+/gi,
+    ];
+    specPatterns.forEach(pattern => cleaned = cleaned.replace(pattern, ''));
+    
+    // ✅ Supprimer infos techniques fausses
+    cleaned = cleaned
+      .replace(/Weight:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Poids:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Dimensions?:\s*[^\n.,]+[cm|mm|m|inch]?[^\n.]*/gi, '')
+      .replace(/Size:\s*[^\n.,]*×[^\n.,]*/gi, '')
+      .replace(/Package\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/Shipping\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/\s+/g, ' ')
       .trim();
     
     return cleaned;

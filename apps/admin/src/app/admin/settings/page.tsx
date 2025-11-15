@@ -9,15 +9,15 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useToast } from '@/contexts/ToastContext'
 import { apiClient } from '@/lib/api'
 import {
-    DollarSign,
-    Edit,
-    Globe,
-    Moon,
-    Palette,
-    RefreshCw,
-    Save,
-    Settings,
-    Sun
+  DollarSign,
+  Edit,
+  Globe,
+  Moon,
+  Palette,
+  RefreshCw,
+  Save,
+  Settings,
+  Sun
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -41,7 +41,7 @@ interface Settings {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
     theme: 'light',
-    currency: 'EUR',
+    currency: 'USD',
     language: 'fr',
     accentColor: '#4CAF50',
     companyName: 'KAMRI',

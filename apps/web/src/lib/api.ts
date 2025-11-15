@@ -423,6 +423,25 @@ export class ApiClient {
   async getCompanyInfo(): Promise<ApiResponse<any>> {
     return this.fetchPublic('/settings/company-info');
   }
+
+  // ✅ Calculer les frais de livraison CJ
+  async calculateCJFreight(params: {
+    startCountryCode: string;
+    endCountryCode: string;
+    zip?: string;
+    taxId?: string;
+    houseNumber?: string;
+    iossNumber?: string;
+    products: Array<{
+      quantity: number;
+      vid: string;
+    }>;
+  }): Promise<ApiResponse<any>> {
+    return this.fetchWithAuth('/cj-dropshipping/logistics/calculate-freight', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
 }
 
 // Instance globale

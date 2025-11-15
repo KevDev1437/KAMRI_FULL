@@ -152,7 +152,7 @@ export function OrderDetailsModal({ orderId, isOpen, onClose }: Props) {
                   <div>
                     <label className="text-sm font-medium text-gray-500">Montant Total</label>
                     <div className="mt-1 text-lg font-semibold text-green-600">
-                      {order.total.toFixed(2)}€
+                      {order.total.toFixed(2)}$
                     </div>
                   </div>
                   <div>
@@ -268,7 +268,7 @@ export function OrderDetailsModal({ orderId, isOpen, onClose }: Props) {
                           </div>
                           <div className="text-right">
                             <div className="text-sm text-gray-500">x{item.quantity}</div>
-                            <div className="font-semibold text-gray-900">{(item.price * item.quantity).toFixed(2)}€</div>
+                            <div className="font-semibold text-gray-900">{(item.price * item.quantity).toFixed(2)}$</div>
                           </div>
                         </div>
                       ))}

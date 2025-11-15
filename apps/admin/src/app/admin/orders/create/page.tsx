@@ -522,7 +522,7 @@ export default function CreateOrderPage() {
                           )}
                         </div>
                         <div className="text-sm text-gray-500 mt-1">
-                          ID: {product.id} • {product.price}€
+                          ID: {product.id} • {product.price}$
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
@@ -585,7 +585,7 @@ export default function CreateOrderPage() {
                           <div className="flex-1">
                             <div className="text-sm font-medium">{item.productName}</div>
                             <div className="text-xs text-gray-500">
-                              {item.price}€ {isCJ && <span className="text-purple-600">• CJ</span>}
+                              {item.price}$ {isCJ && <span className="text-purple-600">• CJ</span>}
                               {selectedVariant && selectedVariant.cjVariantId && (
                                 <span className="text-blue-600 ml-1">• VID: {selectedVariant.cjVariantId.substring(0, 8)}...</span>
                               )}
@@ -618,7 +618,7 @@ export default function CreateOrderPage() {
                   <div className="border-t pt-4">
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-lg font-semibold">Total:</span>
-                      <span className="text-2xl font-bold text-primary-600">{total.toFixed(2)}€</span>
+                      <span className="text-2xl font-bold text-primary-600">{total.toFixed(2)}$</span>
                     </div>
 
                     {orderItems.some(item => {

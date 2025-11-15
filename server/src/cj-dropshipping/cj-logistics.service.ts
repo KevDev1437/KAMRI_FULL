@@ -18,7 +18,45 @@ export interface CJLogisticsOption {
 export class CJLogisticsService {
   private readonly logger = new Logger(CJLogisticsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cjApiClient: CJAPIClient
+  ) {}
+  
+  /**
+   * Initialiser le client CJ avec la configuration
+   */
+  private async initializeClient(): Promise<CJAPIClient> {
+    this.logger.log('🚀 Initialisation du client CJ...');
+    
+    const config = await this.prisma.cJConfig.findFirst();
+    if (!config?.enabled) {
+      throw new Error('L\'intégration CJ Dropshipping est désactivée');
+    }
+
+    // Initialiser la configuration du client injecté
+    this.cjApiClient.setConfig({
+      email: config.email,
+      apiKey: config.apiKey,
+      tier: config.tier as 'free' | 'plus' | 'prime' | 'advanced',
+      platformToken: config.platformToken,
+      debug: process.env.CJ_DEBUG === 'true',
+    });
+
+    // ✅ Essayer de charger le token depuis la base de données
+    const tokenLoaded = await this.cjApiClient.loadTokenFromDatabase();
+    
+    if (!tokenLoaded) {
+      // Si le token n'est pas en base ou est expiré, faire un login (dernier recours)
+      this.logger.log('🔑 Token non trouvé en base ou expiré - Login CJ requis');
+      await this.cjApiClient.login();
+      this.logger.log('✅ Login CJ réussi');
+    } else {
+      this.logger.log('✅ Token CJ chargé depuis la base de données - Utilisation de la connexion existante');
+    }
+    
+    return this.cjApiClient;
+  }
 
   /**
    * Liste complète des logistiques CJ
@@ -267,28 +305,28 @@ export class CJLogisticsService {
     this.logger.log(`🚚 Calcul du fret: ${params.startCountryCode} → ${params.endCountryCode}`);
     
     try {
-      const client = new CJAPIClient(null as any);
-      client.setConfig({
-        email: process.env.CJ_EMAIL || '',
-        apiKey: process.env.CJ_API_KEY || '',
-        tier: 'free',
-        debug: true
-      });
+      const client = await this.initializeClient();
       
-      await client.login();
+      // Utiliser la méthode calculateFreight du client qui utilise le bon endpoint
+      // Mapper les paramètres : startCountryCode -> fromCountryCode, endCountryCode -> toCountryCode
+      const freightOptions = await client.calculateFreight(
+        params.startCountryCode, // fromCountryCode
+        params.endCountryCode,   // toCountryCode
+        params.products.map(p => ({ vid: p.vid, quantity: p.quantity }))
+      );
       
-      const result = await client.makeRequest('POST', '/logistic/freightCalculate', params);
+      // Vérifier que freightOptions n'est pas null/undefined
+      const options = Array.isArray(freightOptions) ? freightOptions : [];
+      this.logger.log(`✅ ${options.length} options de fret calculées`);
       
-      if (result.code === 200) {
-        const data = result.data as any;
-        this.logger.log(`✅ ${data.length} options de fret calculées`);
-        return {
-          success: true,
-          freightOptions: data || []
-        };
-      } else {
-        throw new Error(result.message || 'Erreur lors du calcul du fret');
+      if (options.length === 0) {
+        this.logger.warn(`⚠️ Aucune option de fret disponible pour ${params.startCountryCode} → ${params.endCountryCode}`);
       }
+      
+      return {
+        success: true,
+        freightOptions: options
+      };
     } catch (error) {
       this.logger.error(`❌ Erreur calcul fret: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;

@@ -95,11 +95,11 @@ export default function ProductCardSimple({ product }: ProductCardProps) {
           {/* Price */}
           <div className="flex items-baseline gap-2 mb-4">
             <p className="text-2xl font-bold text-[#4CAF50]">
-              {product.price.toFixed(2)}€
+              {product.price.toFixed(2)}$
             </p>
             {product.originalPrice && (
               <p className="text-lg text-[#9CA3AF] line-through">
-                {product.originalPrice.toFixed(2)}€
+                {product.originalPrice.toFixed(2)}$
               </p>
             )}
           </div>

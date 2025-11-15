@@ -25,7 +25,7 @@ function ProductCard({ product }: ProductCardProps) {
   const badgeConfig = getBadgeConfig('promo');
   
   const formatPrice = (price: number) => {
-    return `${price.toFixed(2)}€`;
+    return `${price.toFixed(2)}$`;
   };
   
   // Calcul du pourcentage de réduction basé sur le discount

@@ -496,7 +496,7 @@ export default function StoresPage() {
                         Catégorie: {product.category || 'N/A'}
                       </p>
                       <p className="text-lg font-bold text-primary mb-2">
-                        {product.price ? `${product.price.toFixed(2)} €` : 'N/A'}
+                        {product.price ? `${product.price.toFixed(2)} $` : 'N/A'}
                       </p>
                       <Badge
                         className={`absolute top-2 right-2 ${
@@ -635,9 +635,9 @@ export default function StoresPage() {
               <div>
                 <p className="font-semibold mb-2">{selectedProductForPrepare.name}</p>
                 <p className="text-sm text-gray-600">
-                  Prix: {selectedProductForPrepare.price.toFixed(2)}€
+                  Prix: {selectedProductForPrepare.price.toFixed(2)}$
                   {selectedProductForPrepare.originalPrice && (
-                    <span className="line-through ml-2">{selectedProductForPrepare.originalPrice.toFixed(2)}€</span>
+                    <span className="line-through ml-2">{selectedProductForPrepare.originalPrice.toFixed(2)}$</span>
                   )}
                 </p>
               </div>
@@ -673,7 +673,7 @@ export default function StoresPage() {
                 />
                 {selectedProductForPrepare.originalPrice && (
                   <p className="text-sm text-gray-500 mt-1">
-                    Prix calculé: {(selectedProductForPrepare.originalPrice * (1 + (prepareFormData.margin || 30) / 100)).toFixed(2)}€
+                    Prix calculé: {(selectedProductForPrepare.originalPrice * (1 + (prepareFormData.margin || 30) / 100)).toFixed(2)}$
                   </p>
                 )}
               </div>

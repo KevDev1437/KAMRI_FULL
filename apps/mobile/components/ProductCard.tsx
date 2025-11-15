@@ -168,9 +168,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         
         {/* Price */}
         <View style={styles.priceContainer}>
-          <ThemedText style={styles.productPrice}>{product.price.toFixed(2)}€</ThemedText>
+          <ThemedText style={styles.productPrice}>{product.price.toFixed(2)}$</ThemedText>
           {product.originalPrice && (
-            <ThemedText style={styles.originalPrice}>{product.originalPrice.toFixed(2)}€</ThemedText>
+            <ThemedText style={styles.originalPrice}>{product.originalPrice.toFixed(2)}$</ThemedText>
           )}
         </View>
         

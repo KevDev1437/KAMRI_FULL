@@ -265,7 +265,7 @@ export default function OrdersPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-primary-600">{order.total}€</p>
+                    <p className="text-lg font-bold text-primary-600">{order.total}$</p>
                     <p className="text-sm text-gray-500">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </p>
@@ -307,7 +307,7 @@ export default function OrdersPage() {
                         </div>
                         <div className="flex items-center space-x-4">
                           <span className="text-gray-500">x{item.quantity}</span>
-                          <span className="font-medium">{item.price}€</span>
+                          <span className="font-medium">{item.price}$</span>
                         </div>
                       </div>
                     ))}

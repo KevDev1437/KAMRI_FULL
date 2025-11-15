@@ -1959,8 +1959,8 @@ export default function DraftProductsPage() {
                           />
                           {product.originalPrice && (
                             <p className="text-sm text-gray-500 mt-1">
-                              Prix calculé: {calculatePrice(product.originalPrice, formData.margin || 30).toFixed(2)}€
-                              (Prix original: {product.originalPrice}€)
+                              Prix calculé: {calculatePrice(product.originalPrice, formData.margin || 30).toFixed(2)}$
+                              (Prix original: {product.originalPrice}$)
                             </p>
                           )}
                         </div>
@@ -2216,7 +2216,7 @@ export default function DraftProductsPage() {
                                       {variant.price !== undefined && variant.price !== null && (
                                         <div>
                                           <span className="text-gray-500">Prix:</span>
-                                          <span className="ml-1 font-semibold">{variant.price}€</span>
+                                          <span className="ml-1 font-semibold">{variant.price}$</span>
                                         </div>
                                       )}
                                       {variant.stock !== undefined && variant.stock !== null && (
@@ -2452,11 +2452,11 @@ export default function DraftProductsPage() {
                         <div>
                           <span className="text-gray-500">Prix:</span>
                           <span className="font-semibold ml-2">
-                            {product.price.toFixed(2)}€
+                            {product.price.toFixed(2)}$
                           </span>
                           {product.originalPrice && (
                             <span className="text-gray-400 line-through ml-2">
-                              {product.originalPrice}€
+                              {product.originalPrice}$
                             </span>
                           )}
                         </div>

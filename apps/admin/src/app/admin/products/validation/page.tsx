@@ -382,7 +382,7 @@ export default function ProductValidationPage() {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Prix:</span>
                     <span className="font-semibold text-green-600">
-                      {getDisplayPrice(product).toFixed(2)}€
+                      {getDisplayPrice(product).toFixed(2)}$
                     </span>
                   </div>
                   
@@ -390,7 +390,7 @@ export default function ProductValidationPage() {
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Prix suggéré CJ:</span>
                       <span className="text-sm text-blue-600 font-medium">
-                        {product.suggestSellPrice}€
+                        {product.suggestSellPrice}$
                       </span>
                     </div>
                   )}
@@ -399,7 +399,7 @@ export default function ProductValidationPage() {
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Prix original:</span>
                       <span className="text-sm text-gray-500 line-through">
-                        {product.originalPrice.toFixed(2)}€
+                        {product.originalPrice.toFixed(2)}$
                       </span>
                     </div>
                   )}

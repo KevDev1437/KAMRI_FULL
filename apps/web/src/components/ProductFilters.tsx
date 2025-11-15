@@ -57,7 +57,7 @@ export default function ProductFilters({
               onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])}
               className="w-full p-2 border border-[#E8F5E8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] text-[#424242]"
             />
-            <span className="text-[#81C784]">€</span>
+            <span className="text-[#81C784]">$</span>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -67,7 +67,7 @@ export default function ProductFilters({
               onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
               className="w-full p-2 border border-[#E8F5E8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] text-[#424242]"
             />
-            <span className="text-[#81C784]">€</span>
+            <span className="text-[#81C784]">$</span>
           </div>
         </div>
       </div>

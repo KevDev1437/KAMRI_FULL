@@ -468,9 +468,9 @@ export default function ProductInfo({ product, onVariantChange }: ProductInfoPro
 
         {/* Prix - utilise displayPrice du variant sélectionné */}
         <div className="flex items-center gap-3 mb-6">
-          <span className="text-3xl font-bold text-[#4CAF50]">{displayPrice.toFixed(2)}€</span>
+          <span className="text-3xl font-bold text-[#4CAF50]">{displayPrice.toFixed(2)}$</span>
           {product.originalPrice && (
-            <span className="text-xl text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</span>
+            <span className="text-xl text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}$</span>
           )}
           {selectedVariant && selectedVariant.sku && (
             <span className="text-xs text-gray-500 ml-2">SKU: {selectedVariant.sku}</span>

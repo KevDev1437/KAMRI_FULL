@@ -651,9 +651,9 @@ export default function ProductsPage() {
                     {/* Price */}
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <span className="text-lg font-bold text-primary-600">{product.price}€</span>
+                        <span className="text-lg font-bold text-primary-600">{product.price}$</span>
                         {product.originalPrice && (
-                          <span className="text-sm text-gray-400 line-through ml-2">{product.originalPrice}€</span>
+                          <span className="text-sm text-gray-400 line-through ml-2">{product.originalPrice}$</span>
                         )}
                       </div>
                     </div>
@@ -746,9 +746,9 @@ export default function ProductsPage() {
                       {/* CJ Price */}
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <span className="text-lg font-bold text-primary-600">{cjProduct.sellPrice}€</span>
+                          <span className="text-lg font-bold text-primary-600">{cjProduct.sellPrice}$</span>
                           {cjProduct.originalPrice && cjProduct.originalPrice !== cjProduct.sellPrice && (
-                            <span className="text-sm text-gray-400 line-through ml-2">{cjProduct.originalPrice}€</span>
+                            <span className="text-sm text-gray-400 line-through ml-2">{cjProduct.originalPrice}$</span>
                           )}
                         </div>
                       </div>
@@ -760,7 +760,7 @@ export default function ProductsPage() {
                           <div className="max-h-20 overflow-y-auto">
                             {cjProduct.variants.slice(0, 3).map((variant) => (
                               <div key={variant.variantId} className="text-xs text-gray-600 mb-1">
-                                {variant.variantName}: {variant.sellPrice}€
+                                {variant.variantName}: {variant.sellPrice}$
                               </div>
                             ))}
                             {cjProduct.variants.length > 3 && (

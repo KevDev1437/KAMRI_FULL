@@ -522,7 +522,7 @@ export default function CJProductsPage() {
                   </div>
                   <div>
                     <span className="text-gray-500">Prix:</span>
-                    <span className="ml-2 font-semibold">{pidProduct.sellPrice} €</span>
+                    <span className="ml-2 font-semibold">{pidProduct.sellPrice} $</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Catégorie:</span>

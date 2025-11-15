@@ -50,8 +50,8 @@ export default function ModernHeader() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs sm:text-sm text-[#424242]">
           <span className="flex items-center gap-1">
             <span>🚚</span>
-            <span className="hidden xs:inline">Livraison gratuite à partir de 100€</span>
-            <span className="xs:hidden">Livraison gratuite 100€+</span>
+            <span className="hidden xs:inline">Livraison gratuite à partir de 100$</span>
+            <span className="xs:hidden">Livraison gratuite 100$+</span>
           </span>
           <span className="hidden sm:inline">|</span>
           <span className="flex items-center gap-1">

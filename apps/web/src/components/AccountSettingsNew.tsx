@@ -472,7 +472,7 @@ export default function AccountSettingsNew() {
               onChange={(e) => handlePreferenceChange('currency', e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50]"
             >
-              <option value="EUR">Euro (€)</option>
+              <option value="EUR">Euro ($)</option>
               <option value="USD">Dollar US ($)</option>
               <option value="GBP">Livre Sterling (£)</option>
               <option value="CAD">Dollar Canadien (C$)</option>

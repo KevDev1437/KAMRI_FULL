@@ -708,8 +708,8 @@ export class CJProductService {
       this.logger.log(`🌐 Produit non trouvé en local, appel API CJ...`);
       
       const client = await this.initializeClient();
-      // ✅ CORRECTION: Utiliser l'endpoint /product/detail/{pid} selon la doc CJ
-      const cjProduct: any = await client.getProductDetails(productId);
+      // ✅ Récupérer TOUS les champs avec vidéos incluses
+      const cjProduct: any = await client.getProductDetails(productId, true); // true = inclure les vidéos
       
       // Vérifier si le produit est null ou vide
       if (!cjProduct) {
@@ -863,33 +863,58 @@ export class CJProductService {
       productWeight: localProduct.productWeight,
       productUnit: localProduct.productUnit,
       productType: localProduct.productType,
-      entryCode: null, // Pas stocké localement
-      entryName: null,
-      entryNameEn: null,
-      materialName: null,
+      categoryId: localProduct.categoryId,
+      // ✅ Champs douaniers (maintenant stockés)
+      entryCode: localProduct.entryCode,
+      entryName: localProduct.entryName,
+      entryNameEn: localProduct.entryNameEn,
+      // ✅ Matériau/Emballage complets (maintenant stockés)
+      materialName: localProduct.materialName,
       materialNameEn: this.parseJsonField(localProduct.materialNameEn),
-      materialKey: null,
+      materialKey: localProduct.materialKey,
       packingWeight: localProduct.packingWeight,
-      packingName: null,
+      packingName: localProduct.packingName,
       packingNameEn: this.parseJsonField(localProduct.packingNameEn),
-      packingKey: null,
-      productKey: null,
+      packingKey: localProduct.packingKey,
+      // ✅ Attributs produit complets (maintenant stockés)
+      productKey: localProduct.productKey,
       productKeyEn: localProduct.productKeyEn,
-      productProSet: null,
-      productProEnSet: null,
-      addMarkStatus: null,
+      productProSet: localProduct.productProSet 
+        ? (typeof localProduct.productProSet === 'string' 
+            ? JSON.parse(localProduct.productProSet) 
+            : localProduct.productProSet)
+        : null,
+      productProEnSet: localProduct.productProEnSet 
+        ? (typeof localProduct.productProEnSet === 'string' 
+            ? JSON.parse(localProduct.productProEnSet) 
+            : localProduct.productProEnSet)
+        : null,
+      addMarkStatus: localProduct.isFreeShipping ? 1 : 0,
+      isFreeShipping: localProduct.isFreeShipping,
       suggestSellPrice: localProduct.suggestSellPrice,
       listedNum: localProduct.listedNum,
       status: '3', // Produit disponible
       supplierName: localProduct.supplierName || 'CJ Dropshipping',
-      supplierId: null,
-      customizationVersion: null,
-      customizationJson1: null,
-      customizationJson2: null,
-      customizationJson3: null,
-      customizationJson4: null,
+      supplierId: localProduct.supplierId,
+      // ✅ Personnalisation (maintenant stockée)
+      customizationVersion: localProduct.customizationVersion,
+      customizationJson1: localProduct.customizationJson1,
+      customizationJson2: localProduct.customizationJson2,
+      customizationJson3: localProduct.customizationJson3,
+      customizationJson4: localProduct.customizationJson4,
       createrTime: localProduct.createrTime,
-      productVideo: null
+      // ✅ Média (maintenant stocké)
+      productVideo: localProduct.productVideo 
+        ? (typeof localProduct.productVideo === 'string' 
+            ? JSON.parse(localProduct.productVideo) 
+            : localProduct.productVideo)
+        : null,
+      // ✅ Informations de livraison (selon doc API CJ)
+      // deliveryCycle peut être disponible dans les résultats de recherche
+      deliveryCycle: localProduct.deliveryCycle || null,
+      // Ces champs nécessitent un appel API séparé à /logistics/calculateFreight
+      freeShippingCountries: null,
+      defaultShippingMethod: null
     };
   }
 
@@ -949,6 +974,7 @@ export class CJProductService {
       productProSet: cjProduct.productProSet,
       productProEnSet: cjProduct.productProEnSet,
       addMarkStatus: cjProduct.addMarkStatus,
+      isFreeShipping: cjProduct.addMarkStatus === 1, // Mapper addMarkStatus → isFreeShipping
       suggestSellPrice: cjProduct.suggestSellPrice,
       listedNum: cjProduct.listedNum,
       status: cjProduct.status,
@@ -960,7 +986,13 @@ export class CJProductService {
       customizationJson3: cjProduct.customizationJson3,
       customizationJson4: cjProduct.customizationJson4,
       createrTime: cjProduct.createrTime,
-      productVideo: cjProduct.productVideo
+      productVideo: cjProduct.productVideo,
+      // ✅ Informations de livraison (selon doc API CJ)
+      // deliveryCycle peut être disponible dans les résultats de recherche mais pas toujours dans /product/query
+      deliveryCycle: cjProduct.deliveryCycle || null,
+      // Ces champs nécessitent un appel API séparé à /logistics/calculateFreight
+      freeShippingCountries: null,
+      defaultShippingMethod: null
     };
   }
 
@@ -1043,14 +1075,72 @@ export class CJProductService {
     
     // Supprimer les balises HTML
     let cleaned = htmlDescription
-      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
-      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
-      .replace(/&amp;/g, '&') // Remplacer &amp; par &
-      .replace(/&lt;/g, '<') // Remplacer &lt; par <
-      .replace(/&gt;/g, '>') // Remplacer &gt; par >
-      .replace(/&quot;/g, '"') // Remplacer &quot; par "
-      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
-      .trim(); // Supprimer les espaces en début/fin
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ NETTOYAGE AGRESSIF : Supprimer TOUT le CSS
+    let cssRemoved = cleaned;
+    let previousLength = 0;
+    while (cssRemoved.length !== previousLength) {
+      previousLength = cssRemoved.length;
+      cssRemoved = cssRemoved
+        .replace(/#[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\.[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/@media[^{]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\{[^{}]*\}/g, '')
+        .trim();
+    }
+    cleaned = cssRemoved;
+    
+    // ✅ Supprimer markdown et caractères spéciaux
+    cleaned = cleaned
+      .replace(/###\s*[^\n]+/g, '')
+      .replace(/##\s*[^\n]+/g, '')
+      .replace(/#\s*[^\n]+/g, '')
+      .replace(/\*\*[^\*]+\*\*/g, '')
+      .replace(/\*[^\*]+\*/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/⚠️\s*NOTES\s*IMPORTANTES[^\n]*/gi, '')
+      .replace(/\*\*\s*##\s*⚠️[^\n]*/gi, '')
+      .replace(/🎨\s*Couleurs\s*disponibles[^\n]*/gi, '')
+      .replace(/🎯\s*Tailles\s*disponibles[^\n]*/gi, '')
+      .replace(/[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/[a-zA-Z0-9_-]+:\s*[^;]+;/g, '')
+      .trim();
+    
+    // ✅ Supprimer la section "Technical Details" complète
+    const technicalDetailsPattern = /(?:Technical\s+Details?|Technical\s+Specifications?|Specifications?)[\s\S]*$/i;
+    cleaned = cleaned.replace(technicalDetailsPattern, '');
+    
+    // ✅ Supprimer les spécifications techniques individuelles
+    const specPatterns = [
+      /Bike\s+Type:\s*[^\n]+/gi, /Age\s+Range[^\n]+/gi, /Number\s+of\s+Speeds?:\s*[^\n]+/gi,
+      /Wheel\s+Size:\s*[^\n]+/gi, /Frame\s+Material:\s*[^\n]+/gi, /Suspension\s+Type:\s*[^\n]+/gi,
+      /Accessories?:\s*[^\n]+/gi, /Included\s+Components?:\s*[^\n]+/gi, /Brake\s+Style:\s*[^\n]+/gi,
+      /Voltage:\s*[^\n]+/gi, /Wattage:\s*[^\n]+/gi, /Material:\s*[^\n]+/gi,
+      /Item\s+Package\s+Dimensions?[^\n]+/gi, /Package\s+Weight:\s*[^\n]+/gi,
+      /Item\s+Dimensions?[^\n]+/gi, /Part\s+Number:\s*[^\n]+/gi,
+    ];
+    specPatterns.forEach(pattern => cleaned = cleaned.replace(pattern, ''));
+    
+    // ✅ Supprimer infos techniques fausses
+    cleaned = cleaned
+      .replace(/Weight:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Poids:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Dimensions?:\s*[^\n.,]+[cm|mm|m|inch]?[^\n.]*/gi, '')
+      .replace(/Size:\s*[^\n.,]*×[^\n.,]*/gi, '')
+      .replace(/Package\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/Shipping\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     
     // Limiter à 200 caractères pour l'affichage
     if (cleaned.length > 200) {

@@ -123,7 +123,7 @@ export default function TopSales() {
           <a href={`/product/${product.id}`} className="block">
             <h3 className="text-lg font-semibold text-[#424242] mb-3 line-clamp-1 hover:text-[#4CAF50] transition-colors">{product.name}</h3>
           </a>
-          <p className="text-2xl font-bold text-[#4CAF50] mb-6">{product.price.toFixed(2)}€</p>
+          <p className="text-2xl font-bold text-[#4CAF50] mb-6">{product.price.toFixed(2)}$</p>
           
           <button 
             onClick={() => handleAddToCart(product.id)}

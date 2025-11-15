@@ -290,10 +290,10 @@ export default function FavoritesPage() {
                           </p>
                           
                           <div className="flex items-center gap-2 mb-3">
-                            <span className="text-xl font-bold text-[#4CAF50]">{item.product.price}€</span>
+                            <span className="text-xl font-bold text-[#4CAF50]">{item.product.price}$</span>
                             {item.product.originalPrice && item.product.originalPrice > item.product.price && (
                               <>
-                                <span className="text-sm text-gray-500 line-through">{item.product.originalPrice}€</span>
+                                <span className="text-sm text-gray-500 line-through">{item.product.originalPrice}$</span>
                                 <span className="bg-[#E8F5E8] text-[#4CAF50] px-2 py-1 rounded-full text-xs font-medium">
                                   {formatDiscountPercentage(calculateDiscountPercentage(item.product.originalPrice, item.product.price))}
                                 </span>

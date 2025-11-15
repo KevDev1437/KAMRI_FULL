@@ -646,7 +646,7 @@ export default function CJWebhooksPage() {
                         </div>
                         <div>
                           <span className="text-gray-500">Prix:</span>
-                          <span className="ml-2 font-semibold">{payloadInfo.variantSellPrice} €</span>
+                          <span className="ml-2 font-semibold">{payloadInfo.variantSellPrice} $</span>
                         </div>
                         <div>
                           <span className="text-gray-500">Poids:</span>
@@ -694,7 +694,7 @@ export default function CJWebhooksPage() {
                         </div>
                         <div>
                           <span className="text-gray-500">Prix:</span>
-                          <span className="ml-2 font-semibold">{payloadInfo.productSellPrice} €</span>
+                          <span className="ml-2 font-semibold">{payloadInfo.productSellPrice} $</span>
                         </div>
                         <div className="col-span-2 md:col-span-3">
                           <span className="text-gray-500">Nom:</span>

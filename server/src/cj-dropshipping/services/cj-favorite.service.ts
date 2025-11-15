@@ -507,27 +507,14 @@ export class CJFavoriteService {
       
       this.logger.log('📦 Récupération des détails du produit CJ...');
       
-      // 🔧 UTILISER LA MÊME LOGIQUE QUE getProductDetails
-      const result = await client.makeRequest('GET', `/product/query?pid=${pid}`);
+      // 🔧 UTILISER getProductDetails avec vidéos incluses
+      const cjProduct = await client.getProductDetails(pid, true); // true = inclure les vidéos
       
-      if (result.code !== 200) {
-        this.logger.error(`❌ Erreur détails produit ${pid}:`, result.message);
-        
-        // ✅ Gérer spécifiquement le cas où le produit a été retiré des étagères
-        if (result.message && result.message.includes('removed from shelves')) {
-          return {
-            success: false,
-            message: `Ce produit a été retiré des étagères de CJ Dropshipping (PID: ${pid}). Il n'est plus disponible à l'import.`,
-            product: null,
-            errorCode: 'PRODUCT_REMOVED'
-          };
-        }
-        
-        // ✅ Gérer les autres erreurs
-        throw new Error(result.message || 'Erreur lors de la récupération des détails du produit');
+      // Vérifier que le produit est valide
+      if (!cjProduct || !cjProduct.pid) {
+        this.logger.error(`❌ Produit ${pid} non trouvé dans l'API CJ (retour null ou sans pid)`);
+        throw new Error(`Produit ${pid} non trouvé dans l'API CJ Dropshipping`);
       }
-      
-      const cjProduct = result.data;
       
       this.logger.log('📦 Produit CJ récupéré:', {
         name: (cjProduct as any).productNameEn || (cjProduct as any).productName,
@@ -576,6 +563,7 @@ export class CJFavoriteService {
       const cleanedName = this.cleanProductName((cjProduct as any).productNameEn || (cjProduct as any).productName);
       const cleanedDescription = this.cleanProductDescription((cjProduct as any).description);
       
+      // ✅ Récupérer TOUS les champs disponibles depuis l'API CJ selon la doc
       const storeProductData = {
         cjProductId: pid,
         name: cleanedName,
@@ -586,10 +574,10 @@ export class CJFavoriteService {
         category: (cjProduct as any).categoryName,
         status: 'available',
         isFavorite: isFavorite,
-        // 🔧 AJOUTER TOUTES LES DONNÉES DÉTAILLÉES
+        // ✅ Champs de base
         productSku: (cjProduct as any).productSku,
         productWeight: (cjProduct as any).productWeight,
-        packingWeight: (cjProduct as any).packingWeight,
+        packingWeight: (cjProduct as any).packingWeight || (cjProduct as any).packWeight,
         productType: (cjProduct as any).productType,
         productUnit: (cjProduct as any).productUnit,
         productKeyEn: (cjProduct as any).productKeyEn,
@@ -598,13 +586,88 @@ export class CJFavoriteService {
         suggestSellPrice: (cjProduct as any).suggestSellPrice,
         listedNum: (cjProduct as any).listedNum,
         supplierName: (cjProduct as any).supplierName,
+        supplierId: (cjProduct as any).supplierId,
         createrTime: (cjProduct as any).createrTime,
+        // ✅ Champs douaniers (essentiels pour l'export)
+        categoryId: (cjProduct as any).categoryId,
+        entryCode: (cjProduct as any).entryCode,
+        entryName: (cjProduct as any).entryName,
+        entryNameEn: (cjProduct as any).entryNameEn,
+        // ✅ Matériau/Emballage complets
+        materialName: (cjProduct as any).materialName,
+        materialKey: (cjProduct as any).materialKey,
+        packingName: (cjProduct as any).packingName,
+        packingKey: (cjProduct as any).packingKey,
+        // ✅ Attributs produit complets
+        productKey: (cjProduct as any).productKey,
+        productProSet: (cjProduct as any).productProSet 
+          ? JSON.stringify((cjProduct as any).productProSet) 
+          : null,
+        productProEnSet: (cjProduct as any).productProEnSet 
+          ? JSON.stringify((cjProduct as any).productProEnSet) 
+          : null,
+        // ✅ Personnalisation (POD)
+        customizationVersion: (cjProduct as any).customizationVersion,
+        customizationJson1: (cjProduct as any).customizationJson1,
+        customizationJson2: (cjProduct as any).customizationJson2,
+        customizationJson3: (cjProduct as any).customizationJson3,
+        customizationJson4: (cjProduct as any).customizationJson4,
+        // ✅ Média (si features=enable_video)
+        productVideo: (cjProduct as any).productVideo 
+          ? JSON.stringify((cjProduct as any).productVideo) 
+          : null,
+        // ✅ Variants et reviews (JSON complets avec TOUS les champs)
         variants: JSON.stringify((cjProduct as any).variants || []),
         reviews: JSON.stringify((cjProduct as any).reviews || []),
         dimensions: (cjProduct as any).dimensions,
         brand: (cjProduct as any).brand,
         tags: JSON.stringify((cjProduct as any).tags || []),
+        // ✅ Informations de livraison (selon doc API CJ)
+        // addMarkStatus: 0=not Free, 1=Free (dans la doc API)
+        isFreeShipping: (cjProduct as any).addMarkStatus === 1 || (cjProduct as any).addMarkStatus === true || (cjProduct as any).isFreeShipping === 1,
+        // deliveryCycle peut être disponible dans les résultats de recherche mais pas toujours dans /product/query
+        deliveryCycle: (cjProduct as any).deliveryCycle || null,
+        // Ces champs ne sont PAS dans l'API - nécessitent un appel séparé à /logistics/calculateFreight
+        freeShippingCountries: null, // Nécessite un appel API séparé avec pays de destination
+        defaultShippingMethod: null, // Nécessite un appel API séparé
       };
+      
+      // ✅ Log pour vérifier que tous les champs sont bien récupérés
+      this.logger.log('📋 Champs API récupérés:', {
+        hasProductSku: !!storeProductData.productSku,
+        hasProductWeight: !!storeProductData.productWeight,
+        hasPackingWeight: !!storeProductData.packingWeight,
+        hasProductType: !!storeProductData.productType,
+        hasProductUnit: !!storeProductData.productUnit,
+        hasProductKeyEn: !!storeProductData.productKeyEn,
+        hasMaterialNameEn: !!storeProductData.materialNameEn,
+        hasPackingNameEn: !!storeProductData.packingNameEn,
+        hasSuggestSellPrice: !!storeProductData.suggestSellPrice,
+        hasListedNum: !!storeProductData.listedNum,
+        hasSupplierName: !!storeProductData.supplierName,
+        hasSupplierId: !!storeProductData.supplierId,
+        hasCreaterTime: !!storeProductData.createrTime,
+        variantsCount: (cjProduct as any).variants?.length || 0,
+        hasVariants: !!(cjProduct as any).variants && (cjProduct as any).variants.length > 0,
+        // ✅ Champs douaniers
+        hasCategoryId: !!storeProductData.categoryId,
+        hasEntryCode: !!storeProductData.entryCode,
+        // ✅ Matériau/Emballage
+        hasMaterialKey: !!storeProductData.materialKey,
+        hasPackingKey: !!storeProductData.packingKey,
+        // ✅ Attributs produit
+        hasProductKey: !!storeProductData.productKey,
+        hasProductProSet: !!storeProductData.productProSet,
+        hasProductProEnSet: !!storeProductData.productProEnSet,
+        // ✅ Personnalisation
+        hasCustomizationVersion: storeProductData.customizationVersion !== undefined,
+        // ✅ Média
+        hasProductVideo: !!storeProductData.productVideo,
+        // ✅ Informations de livraison
+        hasDeliveryCycle: !!storeProductData.deliveryCycle,
+        hasIsFreeShipping: storeProductData.isFreeShipping !== undefined,
+        addMarkStatus: (cjProduct as any).addMarkStatus // Champ original de l'API
+      });
       
       const storeResult = await this.duplicateService.upsertCJStoreProduct(storeProductData);
       
@@ -703,6 +766,7 @@ export class CJFavoriteService {
               // Garder la valeur originale si parsing échoue
             }
             
+            // ✅ Récupérer TOUS les champs du variant selon la doc API
             const variantData = {
               name: variant.variantNameEn || variant.variantName || `Variant ${variant.variantSku}`,
               sku: variant.variantSku,
@@ -718,11 +782,26 @@ export class CJFavoriteService {
                 : null,
               image: variant.variantImage,
               stock: variant.stock || 0,
+              // ✅ Inclure TOUS les champs disponibles dans properties (selon doc API)
               properties: JSON.stringify({
                 key: parsedKey,
                 property: variant.variantProperty,
                 standard: variant.variantStandard,
-                unit: variant.variantUnit
+                unit: variant.variantUnit,
+                // Champs supplémentaires de la doc API
+                variantSugSellPrice: variant.variantSugSellPrice,
+                createTime: variant.createTime,
+                combineVariants: variant.combineVariants,
+                // Garder tous les autres champs non mappés
+                ...Object.fromEntries(
+                  Object.entries(variant).filter(([key]) => 
+                    !['vid', 'pid', 'variantName', 'variantNameEn', 'variantSku', 
+                      'variantSellPrice', 'variantWeight', 'variantLength', 'variantWidth', 
+                      'variantHeight', 'variantVolume', 'variantImage', 'variantKey', 
+                      'variantProperty', 'variantStandard', 'variantUnit', 'stock', 
+                      'warehouseStock'].includes(key)
+                  )
+                )
               }),
               status: (variant.stock || 0) > 0 ? 'available' : 'out_of_stock',
               lastSyncAt: new Date()
@@ -749,6 +828,14 @@ export class CJFavoriteService {
         }
         
         this.logger.log(`✅ ProductVariant: ${variantsSaved} créés/mis à jour, ${variantsFailed} échecs`);
+        
+        // ✅ METTRE À JOUR le stock total du produit
+        const totalStock = variantsWithStock.reduce((sum, v) => sum + (v.stock || 0), 0);
+        await this.prisma.product.update({
+          where: { id: kamriProduct.id },
+          data: { stock: totalStock }
+        });
+        this.logger.log(`✅ Product.stock mis à jour: ${totalStock} unités`);
       }
       
       this.logger.log('🎉 === FIN ENRICHISSEMENT VARIANTS ===');
@@ -926,14 +1013,72 @@ export class CJFavoriteService {
     
     // Supprimer les balises HTML
     let cleaned = htmlDescription
-      .replace(/<[^>]*>/g, '') // Supprimer toutes les balises HTML
-      .replace(/&nbsp;/g, ' ') // Remplacer &nbsp; par des espaces
-      .replace(/&amp;/g, '&') // Remplacer &amp; par &
-      .replace(/&lt;/g, '<') // Remplacer &lt; par <
-      .replace(/&gt;/g, '>') // Remplacer &gt; par >
-      .replace(/&quot;/g, '"') // Remplacer &quot; par "
-      .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
-      .trim(); // Supprimer les espaces en début/fin
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ NETTOYAGE AGRESSIF : Supprimer TOUT le CSS
+    let cssRemoved = cleaned;
+    let previousLength = 0;
+    while (cssRemoved.length !== previousLength) {
+      previousLength = cssRemoved.length;
+      cssRemoved = cssRemoved
+        .replace(/#[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\.[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/@media[^{]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/\{[^{}]*\}/g, '')
+        .trim();
+    }
+    cleaned = cssRemoved;
+    
+    // ✅ Supprimer markdown et caractères spéciaux
+    cleaned = cleaned
+      .replace(/###\s*[^\n]+/g, '')
+      .replace(/##\s*[^\n]+/g, '')
+      .replace(/#\s*[^\n]+/g, '')
+      .replace(/\*\*[^\*]+\*\*/g, '')
+      .replace(/\*[^\*]+\*/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/⚠️\s*NOTES\s*IMPORTANTES[^\n]*/gi, '')
+      .replace(/\*\*\s*##\s*⚠️[^\n]*/gi, '')
+      .replace(/🎨\s*Couleurs\s*disponibles[^\n]*/gi, '')
+      .replace(/🎯\s*Tailles\s*disponibles[^\n]*/gi, '')
+      .replace(/[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/[a-zA-Z0-9_-]+:\s*[^;]+;/g, '')
+      .trim();
+    
+    // ✅ Supprimer la section "Technical Details" complète
+    const technicalDetailsPattern = /(?:Technical\s+Details?|Technical\s+Specifications?|Specifications?)[\s\S]*$/i;
+    cleaned = cleaned.replace(technicalDetailsPattern, '');
+    
+    // ✅ Supprimer les spécifications techniques individuelles
+    const specPatterns = [
+      /Bike\s+Type:\s*[^\n]+/gi, /Age\s+Range[^\n]+/gi, /Number\s+of\s+Speeds?:\s*[^\n]+/gi,
+      /Wheel\s+Size:\s*[^\n]+/gi, /Frame\s+Material:\s*[^\n]+/gi, /Suspension\s+Type:\s*[^\n]+/gi,
+      /Accessories?:\s*[^\n]+/gi, /Included\s+Components?:\s*[^\n]+/gi, /Brake\s+Style:\s*[^\n]+/gi,
+      /Voltage:\s*[^\n]+/gi, /Wattage:\s*[^\n]+/gi, /Material:\s*[^\n]+/gi,
+      /Item\s+Package\s+Dimensions?[^\n]+/gi, /Package\s+Weight:\s*[^\n]+/gi,
+      /Item\s+Dimensions?[^\n]+/gi, /Part\s+Number:\s*[^\n]+/gi,
+    ];
+    specPatterns.forEach(pattern => cleaned = cleaned.replace(pattern, ''));
+    
+    // ✅ Supprimer infos techniques fausses
+    cleaned = cleaned
+      .replace(/Weight:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Poids:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Dimensions?:\s*[^\n.,]+[cm|mm|m|inch]?[^\n.]*/gi, '')
+      .replace(/Size:\s*[^\n.,]*×[^\n.,]*/gi, '')
+      .replace(/Package\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/Shipping\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     
     // Limiter à 200 caractères pour l'affichage
     if (cleaned.length > 200) {
@@ -972,7 +1117,133 @@ export class CJFavoriteService {
       .replace(/\s+/g, ' ') // Remplacer les espaces multiples par un seul
       .trim();
     
-    return cleaned;
+    // ✅ NETTOYAGE AGRESSIF : Supprimer TOUT le CSS (même mal formaté)
+    // Supprimer les blocs CSS complets (y compris ceux avec des accolades imbriquées)
+    let cssRemoved = cleaned;
+    let previousLength = 0;
+    // Répéter jusqu'à ce qu'il n'y ait plus de CSS
+    while (cssRemoved.length !== previousLength) {
+      previousLength = cssRemoved.length;
+      cssRemoved = cssRemoved
+        .replace(/#[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '') // CSS avec accolades imbriquées
+        .replace(/\.[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/@media[^{]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '')
+        .replace(/[a-zA-Z0-9_-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '') // Tout sélecteur CSS
+        .replace(/\{[^{}]*\}/g, '') // Accolades isolées
+        .trim();
+    }
+    cleaned = cssRemoved;
+    
+    // ✅ Supprimer le markdown et caractères spéciaux mal formatés
+    cleaned = cleaned
+      .replace(/###\s*[^\n]+/g, '') // ### titres
+      .replace(/##\s*[^\n]+/g, '') // ## titres
+      .replace(/#\s*[^\n]+/g, '') // # titres
+      .replace(/\*\*[^\*]+\*\*/g, '') // **bold**
+      .replace(/\*[^\*]+\*/g, '') // *italic*
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // [text](url)
+      .replace(/⚠️\s*NOTES\s*IMPORTANTES[^\n]*/gi, '') // Notes importantes
+      .replace(/\*\*\s*##\s*⚠️[^\n]*/gi, '') // Combinaisons markdown
+      .replace(/🎨\s*Couleurs\s*disponibles[^\n]*/gi, '') // Emojis + texte
+      .replace(/🎯\s*Tailles\s*disponibles[^\n]*/gi, '')
+      .trim();
+    
+    // ✅ Supprimer les séquences de caractères CSS/markdown mal formatées
+    cleaned = cleaned
+      .replace(/[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, '') // Sélecteurs CSS restants
+      .replace(/\{[^}]*\}/g, '') // Accolades restantes
+      .replace(/[a-zA-Z0-9_-]+:\s*[^;]+;/g, '') // Propriétés CSS : value;
+      .replace(/[a-zA-Z0-9_-]+\s*-\s*[a-zA-Z0-9_-]+\s*-\s*[a-zA-Z0-9_-]+/g, '') // Patterns CSS-like
+      .trim();
+    
+    // ✅ Supprimer la section "Technical Details" complète (déjà dans les champs structurés)
+    // Cette section commence souvent par "Technical Details" ou "Technical Specifications"
+    // Chercher "Technical Details" même sans saut de ligne avant
+    const technicalDetailsPattern = /(?:Technical\s+Details?|Technical\s+Specifications?|Specifications?)[\s\S]*$/i;
+    cleaned = cleaned.replace(technicalDetailsPattern, '');
+    
+    // ✅ Aussi supprimer si "Technical Details" apparaît au milieu (sans saut de ligne)
+    cleaned = cleaned.replace(/(?:Technical\s+Details?|Technical\s+Specifications?)[\s\S]*$/i, '');
+    
+    // ✅ Supprimer les lignes de spécifications techniques individuelles
+    // Format: "Label: Value" (ex: "Bike Type: Electric Bike")
+    const specPatterns = [
+      /Bike\s+Type:\s*[^\n]+/gi,
+      /Age\s+Range[^\n]+/gi,
+      /Number\s+of\s+Speeds?:\s*[^\n]+/gi,
+      /Wheel\s+Size:\s*[^\n]+/gi,
+      /Frame\s+Material:\s*[^\n]+/gi,
+      /Suspension\s+Type:\s*[^\n]+/gi,
+      /Accessories?:\s*[^\n]+/gi,
+      /Included\s+Components?:\s*[^\n]+/gi,
+      /Brake\s+Style:\s*[^\n]+/gi,
+      /Cartoon\s+Character:\s*[^\n]+/gi,
+      /Wheel\s+Width:\s*[^\n]+/gi,
+      /Specific\s+Uses?\s+For\s+Product:\s*[^\n]+/gi,
+      /Voltage:\s*[^\n]+/gi,
+      /Theme:\s*[^\n]+/gi,
+      /Style:\s*[^\n]+/gi,
+      /Power\s+Source:\s*[^\n]+/gi,
+      /Wattage:\s*[^\n]+/gi,
+      /Wheel\s+Material:\s*[^\n]+/gi,
+      /Lithium\s+Battery\s+Energy\s+Content:\s*[^\n]+/gi,
+      /Seat\s+Material\s+Type:\s*[^\n]+/gi,
+      /Warranty\s+Type:\s*[^\n]+/gi,
+      /Maximum\s+Weight:\s*[^\n]+/gi,
+      /Assembly\s+Required:\s*[^\n]+/gi,
+      /Bicycle\s+Gear\s+Shifter\s+Type:\s*[^\n]+/gi,
+      /Number\s+of\s+Handles?:\s*[^\n]+/gi,
+      /Item\s+Package\s+Dimensions?[^\n]+/gi,
+      /Package\s+Weight:\s*[^\n]+/gi,
+      /Item\s+Dimensions?[^\n]+/gi,
+      /Material:\s*[^\n]+/gi,
+      /Suggested\s+Users?:\s*[^\n]+/gi,
+      /Part\s+Number:\s*[^\n]+/gi,
+    ];
+    
+    specPatterns.forEach(pattern => {
+      cleaned = cleaned.replace(pattern, '');
+    });
+    
+    // ✅ Supprimer les informations techniques souvent fausses
+    cleaned = cleaned
+      .replace(/Weight:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Poids:\s*[^\n.,]+[kg|g|lb]?[^\n.]*/gi, '')
+      .replace(/Dimensions?:\s*[^\n.,]+[cm|mm|m|inch]?[^\n.]*/gi, '')
+      .replace(/Size:\s*[^\n.,]*×[^\n.,]*/gi, '')
+      .replace(/Package\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/Shipping\s+Weight:\s*[^\n.,]+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // ✅ Nettoyer les espaces et sauts de ligne
+    cleaned = cleaned
+      .replace(/\n\s*\n\s*\n+/g, '\n\n') // Triples sauts de ligne
+      .replace(/\s{3,}/g, ' ') // Espaces multiples
+      .replace(/\s+-\s+/g, ' - ') // Espaces autour des tirets
+      .trim();
+    
+    // ✅ Supprimer les lignes qui ne contiennent que des caractères spéciaux ou CSS
+    const lines = cleaned.split('\n');
+    const cleanLines = lines.filter(line => {
+      const trimmed = line.trim();
+      // Supprimer les lignes qui sont principalement du CSS/markdown
+      if (trimmed.length === 0) return false;
+      if (/^[#@{}:;,\s-]+$/.test(trimmed)) return false; // Lignes avec seulement CSS chars
+      if (/^[a-zA-Z0-9_-]+\s*\{/.test(trimmed)) return false; // Début de sélecteur CSS
+      if (trimmed.includes('{') && trimmed.includes('}') && trimmed.length < 50) return false; // CSS court
+      // Supprimer les lignes qui sont des spécifications techniques (format "Label: Value")
+      if (/^[A-Z][a-zA-Z\s]+:\s*[A-Z]/.test(trimmed) && trimmed.length < 100) return false;
+      return true;
+    });
+    cleaned = cleanLines.join('\n');
+    
+    // ✅ Limiter la longueur finale (garder seulement le texte marketing)
+    if (cleaned.length > 2000) {
+      cleaned = cleaned.substring(0, 2000) + '...';
+    }
+    
+    return cleaned.trim();
   }
 }
 

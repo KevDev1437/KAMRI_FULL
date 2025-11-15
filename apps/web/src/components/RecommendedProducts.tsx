@@ -138,10 +138,10 @@ export default function RecommendedProducts() {
                 {product.name}
               </h4>
               <p className="text-sm text-[#4CAF50] font-semibold mb-3">
-                {product.price}€
+                {product.price}$
                 {product.originalPrice && product.originalPrice > product.price && (
                   <span className="text-xs text-gray-500 line-through ml-1">
-                    {product.originalPrice}€
+                    {product.originalPrice}$
                   </span>
                 )}
               </p>

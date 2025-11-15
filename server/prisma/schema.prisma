@@ -402,12 +402,46 @@ model CJProductStore {
   suggestSellPrice String?
   listedNum        Int?
   supplierName     String?
+  supplierId       String? // ✅ ID fournisseur CJ
   createrTime      String?
   variants         String? // JSON string
   reviews          String? // JSON string
   dimensions       String?
   brand            String?
   tags             String? // JSON string
+  
+  // ✅ Champs douaniers (essentiels pour l'export)
+  categoryId       String? // ID catégorie CJ
+  entryCode        String? // HS code (code douanier)
+  entryName        String? // Nom douanier (chinois)
+  entryNameEn      String? // Nom douanier (anglais)
+  
+  // ✅ Matériau/Emballage complets
+  materialName     String? // Nom matériau (chinois)
+  materialKey      String? // Attributs matériau
+  packingName      String? // Nom emballage (chinois)
+  packingKey       String? // Attributs emballage
+  
+  // ✅ Attributs produit complets
+  productKey       String? // Attributs produit (chinois)
+  productProSet    String? // Attributs logistiques (chinois) - JSON array
+  productProEnSet  String? // Attributs logistiques (anglais) - JSON array
+  
+  // ✅ Personnalisation (POD)
+  customizationVersion Int? // Version personnalisation (0=non-POD, 1-5=POD)
+  customizationJson1  String? // JSON personnalisation 1
+  customizationJson2  String? // JSON personnalisation 2
+  customizationJson3  String? // JSON personnalisation 3
+  customizationJson4  String? // JSON personnalisation 4
+  
+  // ✅ Média
+  productVideo     String? // JSON array des IDs vidéo (si features=enable_video)
+  
+  // ✅ Informations de livraison
+  deliveryCycle    String? // Délai de livraison (ex: "7-15 days")
+  isFreeShipping   Boolean? // Livraison gratuite disponible
+  freeShippingCountries String? // JSON array des pays avec livraison gratuite
+  defaultShippingMethod String? // Méthode de livraison par défaut
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -211,7 +211,7 @@ export default function CartScreen() {
       Alert.alert('Panier vide', 'Veuillez sélectionner au moins un article');
       return;
     }
-    Alert.alert('Commande', `Procéder au paiement de ${selectedCount} article(s) pour ${total.toFixed(2)}€`);
+    Alert.alert('Commande', `Procéder au paiement de ${selectedCount} article(s) pour ${total.toFixed(2)}$`);
   };
 
   const renderCartItem = ({ item }: { item: any }) => (
@@ -235,9 +235,9 @@ export default function CartScreen() {
         
         <View style={styles.priceRow}>
           <View style={styles.priceContainer}>
-            <ThemedText style={styles.currentPrice}>{item.price}€</ThemedText>
+            <ThemedText style={styles.currentPrice}>{item.price}$</ThemedText>
             {item.originalPrice > item.price && (
-              <ThemedText style={styles.originalPrice}>{item.originalPrice}€</ThemedText>
+              <ThemedText style={styles.originalPrice}>{item.originalPrice}$</ThemedText>
             )}
           </View>
           {item.originalPrice > item.price && (
@@ -397,7 +397,7 @@ export default function CartScreen() {
           
           <View style={styles.summaryRow}>
             <ThemedText style={styles.summaryLabel}>Sous-total</ThemedText>
-            <ThemedText style={styles.summaryValue}>{subtotal.toFixed(2)}€</ThemedText>
+            <ThemedText style={styles.summaryValue}>{subtotal.toFixed(2)}$</ThemedText>
           </View>
           
           {averageDiscountPercentage > 0 && (
@@ -412,20 +412,20 @@ export default function CartScreen() {
           <View style={styles.summaryRow}>
             <ThemedText style={styles.summaryLabel}>Livraison</ThemedText>
             <ThemedText style={styles.summaryValue}>
-              {shipping === 0 ? 'Gratuite' : `${shipping.toFixed(2)}€`}
+              {shipping === 0 ? 'Gratuite' : `${shipping.toFixed(2)}$`}
             </ThemedText>
           </View>
           
           {promoDiscount > 0 && (
             <View style={styles.summaryRow}>
               <ThemedText style={styles.summaryLabel}>Réduction promo</ThemedText>
-              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>-{promoDiscount.toFixed(2)}€</ThemedText>
+              <ThemedText style={[styles.summaryValue, styles.savingsValue]}>-{promoDiscount.toFixed(2)}$</ThemedText>
             </View>
           )}
           
           <View style={[styles.summaryRow, styles.totalRow]}>
             <ThemedText style={styles.totalLabel}>Total</ThemedText>
-            <ThemedText style={styles.totalValue}>{total.toFixed(2)}€</ThemedText>
+            <ThemedText style={styles.totalValue}>{total.toFixed(2)}$</ThemedText>
           </View>
         </View>
 
@@ -435,7 +435,7 @@ export default function CartScreen() {
             <ThemedText style={styles.checkoutCount}>
               {selectedItems.size} article(s) sélectionné(s)
             </ThemedText>
-            <ThemedText style={styles.checkoutTotal}>{total.toFixed(2)}€</ThemedText>
+            <ThemedText style={styles.checkoutTotal}>{total.toFixed(2)}$</ThemedText>
           </View>
           <TouchableOpacity style={styles.checkoutButton} onPress={proceedToCheckout}>
             <ThemedText style={styles.checkoutButtonText}>Commander</ThemedText>
@@ -455,7 +455,7 @@ export default function CartScreen() {
               <TouchableOpacity key={index} style={styles.recommendationCard}>
                 <Image source={{ uri: product.image }} style={styles.recommendationImage} />
                 <ThemedText style={styles.recommendationName}>{product.name}</ThemedText>
-                <ThemedText style={styles.recommendationPrice}>{product.price}€</ThemedText>
+                <ThemedText style={styles.recommendationPrice}>{product.price}$</ThemedText>
               </TouchableOpacity>
             ))}
           </ScrollView>

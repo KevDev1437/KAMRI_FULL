@@ -274,9 +274,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Price */}
         <div className="mb-3">
           <div className="flex items-baseline gap-2">
-            <p className="text-2xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}€</p>
+            <p className="text-2xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}$</p>
             {product.originalPrice && product.originalPrice > product.price && (
-              <p className="text-base text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</p>
+              <p className="text-base text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}$</p>
             )}
           </div>
           
@@ -287,7 +287,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
               </span>
               <span className="text-xs text-[#9CA3AF]">
-                Économisez {(product.originalPrice - product.price).toFixed(2)}€
+                Économisez {(product.originalPrice - product.price).toFixed(2)}$
               </span>
             </div>
           )}

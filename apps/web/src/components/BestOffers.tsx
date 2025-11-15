@@ -123,9 +123,9 @@ export default function BestOffers() {
             <h3 className="text-lg font-semibold text-[#424242] mb-3 line-clamp-1 hover:text-[#4CAF50] transition-colors">{product.name}</h3>
           </a>
           <div className="flex items-center gap-2 mb-6">
-            <p className="text-2xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}€</p>
+            <p className="text-2xl font-bold text-[#4CAF50]">{product.price.toFixed(2)}$</p>
             {product.originalPrice && (
-              <p className="text-lg text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}€</p>
+              <p className="text-lg text-[#9CA3AF] line-through">{product.originalPrice.toFixed(2)}$</p>
             )}
           </div>
           

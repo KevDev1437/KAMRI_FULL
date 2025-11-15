@@ -334,7 +334,7 @@ export default function ProfileScreen() {
                     </View>
                   </View>
                   <ThemedText style={styles.orderDate}>{formatDate(order.createdAt)}</ThemedText>
-                  <ThemedText style={styles.orderTotal}>{order.total?.toFixed(2)}€</ThemedText>
+                  <ThemedText style={styles.orderTotal}>{order.total?.toFixed(2)}$</ThemedText>
                 </View>
               ))}
             </View>
@@ -715,7 +715,7 @@ export default function ProfileScreen() {
             <ThemedText style={styles.settingLabel}>Devise</ThemedText>
             <View style={styles.preferenceButtons}>
               {[
-                { value: 'EUR', label: 'Euro (€)' },
+                { value: 'EUR', label: 'Euro ($)' },
                 { value: 'USD', label: 'Dollar ($)' },
                 { value: 'GBP', label: 'Livre (£)' }
               ].map((currency) => (
